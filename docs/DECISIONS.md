@@ -1,0 +1,45 @@
+# Decision Log
+
+Append-only. Newest at the bottom. Each entry: **date · decision · why · alternatives
+considered**. Record any decision (product or technical) that future sessions shouldn't
+have to re-litigate.
+
+---
+
+### 2026-06-04 — Storage: SQLite, single local file
+- **Decision:** Use SQLite, stored as a single `.db` file, auto-created on first launch
+  in the per-user app folder resolved via Go's `os.UserConfigDir()`
+  (`%APPDATA%\gopal-v2\inventory.db` on Windows).
+- **Why:** Relational data (inventory) needs real queries; SQLite is zero-setup for the
+  end user, reliable, and the whole DB is one portable file (backup = copy the file).
+- **Alternatives:** JSON/flat files (too fragile/slow as data grows); server/cloud DB
+  (unneeded — single user, local only).
+
+### 2026-06-04 — Users: single-user, local only
+- **Decision:** Design for one user on one machine. No auth, no sync, no server.
+- **Why:** That's the client's actual use case. Keeps everything simple.
+- **Alternatives:** Multi-user shared / multi-device sync — deferred; data layer kept
+  swappable should this ever change.
+
+### 2026-06-04 — SQLite driver: modernc.org/sqlite (pure Go)
+- **Decision:** Use the pure-Go `modernc.org/sqlite` driver.
+- **Why:** No CGO/gcc toolchain required — keeps `wails dev` simple on Mac and makes the
+  eventual Windows build far less painful.
+- **Alternatives:** `mattn/go-sqlite3` (CGO; faster but cross-compilation headaches).
+
+### 2026-06-04 — Version control: local git only
+- **Decision:** Initialize git locally; no remote/GitHub for now.
+- **Why:** Gives durable history and makes the repo (incl. `docs/` context) portable
+  between Mac and Windows. Remote can be added later.
+
+### 2026-06-04 — Windows build: deferred
+- **Decision:** Develop on Mac with `wails dev`; figure out Windows packaging closer to
+  delivery (likely on a Windows machine or via CI).
+- **Why:** Wails Mac→Windows cross-compilation is unreliable; packaging doesn't block
+  development.
+
+### 2026-06-04 — Cross-session context lives in repo `docs/`
+- **Decision:** Keep all durable project context in committed `docs/` files; Claude
+  memory is secondary (machine-local, doesn't travel to Windows).
+- **Why:** The repo is the portable source of truth that survives across sessions and
+  machines.
