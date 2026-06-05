@@ -60,6 +60,18 @@ The Go/frontend boundary is the core concept here:
 - **Frontend** (`frontend/src/`): Standard React + TypeScript. Calls Go methods by importing from `../wailsjs/go/main/App` (e.g., `import {Greet} from "../wailsjs/go/main/App"`).
 - **Embedding**: `main.go` embeds `frontend/dist` into the binary with `//go:embed all:frontend/dist`. The frontend must be built before `go build` works standalone.
 
+### Frontend stack
+- **React 18 + TypeScript + Vite 6.** Styling via **Tailwind CSS v4** + **shadcn/ui**
+  (new-york style, neutral base, **light theme only**).
+- shadcn components are **copied into `frontend/src/components/ui/`** and owned/editable
+  (not a dependency). Add more with `npx shadcn@latest add <name>` from `frontend/`
+  (config: `frontend/components.json`).
+- **Path alias `@/` → `frontend/src/`** (`vite.config.ts` + `tsconfig.json`). Import shared
+  code as `@/components/...`, `@/lib/utils`, etc.
+- Theme tokens + base styles live in `frontend/src/index.css`. The `cn()` helper is in
+  `frontend/src/lib/utils.ts`.
+- The **frontend-design** skill is available for polished, distinctive UI work.
+
 ### Data layer
 - **SQLite, single file**, opened via the `internal/db` package. The DB path is resolved
   with `os.UserConfigDir()` → `<config>/gopal-v2/inventory.db`, auto-created on first run.

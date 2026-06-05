@@ -43,3 +43,20 @@ have to re-litigate.
   memory is secondary (machine-local, doesn't travel to Windows).
 - **Why:** The repo is the portable source of truth that survives across sessions and
   machines.
+
+### 2026-06-04 — UI: shadcn/ui + Tailwind v4, light theme only
+- **Decision:** Build the frontend with **shadcn/ui** (new-york style, **neutral** base)
+  on **Tailwind CSS v4**, with a **light-only** theme. Nunito as the UI font; `@/` path
+  alias → `src/`. Components live in `src/components/ui/` (owned, editable, copied in by
+  the shadcn CLI — not a runtime dependency).
+- **Why:** shadcn gives accessible, sleek table/form/dialog primitives ideal for a
+  data-entry app, with nothing phoning home (fits a single-user offline Windows app).
+  Light-only matches a business/office use case and keeps setup simple.
+- **Alternatives:** plain React + CSS (slower to a polished look); Tailwind v3 (mature
+  but being superseded); dark/both themes (deferred — easy to add later via a `.dark` block).
+
+### 2026-06-04 — Frontend toolchain bumped to current
+- **Decision:** Upgrade the template's 2022-era toolchain: Vite 3→6, TypeScript 4.6→5.9,
+  `@vitejs/plugin-react` 2→4. React stays on 18.
+- **Why:** shadcn's CLI and Tailwind v4 tooling expect modern Vite/TS; the old versions
+  fight the tooling. Verified `npm run build` and `go build ./...` (embed) still pass.

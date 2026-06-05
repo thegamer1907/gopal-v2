@@ -6,6 +6,25 @@ reads the top entry first.
 
 ---
 
+## 2026-06-04 — Frontend stack: shadcn/ui + Tailwind v4
+**Did:**
+- Chose the UI stack with the user: **shadcn/ui** (new-york, neutral) on **Tailwind v4**,
+  **light theme only**. Recorded in `DECISIONS.md` / `UI.md`.
+- Bumped the frontend toolchain (Vite 3→6, TS 4.6→5.9, plugin-react 2→4); React stays 18.
+- Set up Tailwind v4 (`@tailwindcss/vite`), `@/`→`src/` alias, `src/index.css` theme tokens
+  (light, Nunito font), `cn()` util, `components.json`.
+- Added shadcn components (button, input, label, card, table) and rebuilt the items screen
+  with them (header + add-item card + items table + empty state).
+- Verified: `npm run build` ✅ and `go build ./...` (embed) ✅. Removed unused template CSS.
+
+**Decisions:** see `DECISIONS.md` (2026-06-04: shadcn/Tailwind v4/light; toolchain bump).
+
+**Next steps:**
+- Brainstorm the real inventory feature set + domain model (replace the `items` skeleton).
+- Design the real screens using the frontend-design skill once the model is defined.
+
+---
+
 ## 2026-06-04 — Foundation & context system
 **Did:**
 - Defined the cross-session context system: `docs/` (committed, source of truth) +
