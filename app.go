@@ -39,12 +39,18 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 }
 
-// AddItem creates an inventory item and returns the stored record.
-func (a *App) AddItem(name string, quantity int) (db.Item, error) {
-	return db.AddItem(a.db, name, quantity)
+// AddItem creates an item master record and returns the stored record.
+func (a *App) AddItem(name string, packSize, gstPercent float64, hsn int64) (db.Item, error) {
+	return db.AddItem(a.db, name, packSize, gstPercent, hsn)
 }
 
 // ListItems returns all inventory items, newest first.
 func (a *App) ListItems() ([]db.Item, error) {
 	return db.ListItems(a.db)
+}
+
+// AddPurchaseBill saves a purchase bill (header + line items) and returns it with
+// its assigned id.
+func (a *App) AddPurchaseBill(bill db.PurchaseBill) (db.PurchaseBill, error) {
+	return db.AddPurchaseBill(a.db, bill)
 }

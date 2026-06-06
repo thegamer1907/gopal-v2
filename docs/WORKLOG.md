@@ -6,6 +6,121 @@ reads the top entry first.
 
 ---
 
+## 2026-06-05 — Layout: full-bleed shell + scroll fixes
+**Did:**
+- Made the app shell **full-width / full-height**: `html/body/#root` are 100% tall
+  (`index.css`); `App.tsx` is a flex column with a fixed header and a `flex-1 overflow-auto`
+  main, no max-width cap — pages now fill the window and resize with it. Dashboard centers
+  in the full area.
+- Fixed a stray **vertical scrollbar** on the line-items grid: an `overflow-x-auto`
+  container is forced to `overflow-y: auto`, and the item-search dropdown made it scroll.
+  `ItemCombobox` now renders its list in a **portal** (fixed under the input, tracks
+  scroll/resize), so the grid scrolls horizontally only and the dropdown isn't clipped.
+- Verified `npm run build` ✅.
+
+**Next steps:** unchanged from below (saved-bills view; items edit/delete; date handling).
+
+---
+
+## 2026-06-05 — Add Purchase Bill: full UI + persistence
+**Did:**
+- **Go:** `db.PurchaseBill`/`db.PurchaseBillItem` + transactional `AddPurchaseBill`
+  (`internal/db/purchase_bills.go`); exposed via `app.go`. Wails bindings auto-regenerated
+  (a `wails dev` watcher is regenerating `frontend/wailsjs/...` on Go save).
+- **Frontend (Add Purchase Bill page):**
+  - Caches all items on load (`ListItems`).
+  - `ItemCombobox` (light custom search): type → suggestions “name · pack size” → select
+    fills the line (Pack Size / GST % shown read-only).
+  - Inputs Tax Qty / Tax Value / D-Qty / D-Value / Discount / Remarks; **calculated**
+    columns (GST Amt, Total Tax Bill Amt, Total Bill Value, Final Rate, Final Billing Rate)
+    computed live per the agreed formulas. Bill total = Σ Total Bill Value.
+  - `NewItemDialog` (added a shadcn-style `dialog` ui component): "add as new item" when no
+    match → `AddItem` → pushed into cache + selected.
+  - Save → `AddPurchaseBill`, confirmation + form reset.
+  - Date is a dd/mm/yyyy text field (defaults to today), stored as entered.
+- Brought **Items** screen in sync with the numeric items schema (pack size/HSN numbers,
+  composite key) so the build is green.
+- Verified: `go test ./...` ✅, `go build ./...` ✅, `npm run build` ✅.
+
+**Notes / decisions:**
+- **Discount** is captured + stored but unused by any formula (flagged to user).
+- Calculated columns are derived in the UI, **not stored**.
+- Line table is a wide horizontally-scrollable `<table>` (16 cols).
+
+**Next steps:**
+- A **view/list of saved bills** (currently write-only).
+- Consider validating/normalising the dd/mm/yyyy date; revisit if sorting needed.
+- Items edit/delete.
+
+---
+
+## 2026-06-05 — Purchase bill schema (two tables)
+**Did:**
+- Added the purchase bill schema as **two tables** (user's choice):
+  - `purchase_bills` (header): `id` (surrogate PK), `company`, `bill_number`, `date`.
+  - `purchase_bill_items` (lines): `id`, `bill_id` (FK → bill, ON DELETE CASCADE),
+    `item_name` + `item_pack_size` (**composite FK → items(name, pack_size)**), plus
+    `tax_qty`, `tax_value`, `d_qty`, `d_value`, `discount`, `remarks`. All numeric cols
+    are REAL; `remarks` is TEXT.
+- Defined in `internal/db/migrate.go`; documented in `DATA_MODEL.md`.
+- **Schema only** — no Go structs/CRUD/bindings/UI for bills yet (deferred while
+  iterating). Verified `go build ./...` ✅ and `go test ./internal/db` ✅ (migrations,
+  incl. the composite FK, apply on a fresh DB).
+
+**Next steps:**
+- Continue schema iteration as needed, then add Go CRUD + bindings + UI for bills.
+- Still pending from before: update the **Items UI** to the new items schema.
+
+---
+
+## 2026-06-05 — Item master schema (items table)
+**Did:**
+- Defined the **item master** schema. `items` columns: **Item** (`name` TEXT), **Pack
+  Size** (`pack_size` REAL), **GST %** (`gst_percent` REAL), **HSN** (`hsn` INTEGER).
+  **Primary key = composite `(name, pack_size)`** (no surrogate id). All of pack size /
+  GST / HSN are numeric. Recorded in `DATA_MODEL.md`.
+- **No migration ceremony** during this fast-iteration phase: single schema definition in
+  `migrate.go`, edited in place; reset the dev DB to apply changes (deleted the local
+  `inventory.db`). Real migrations deferred until there's data to protect.
+- Go: rewrote `db.Item` + `AddItem`/`ListItems` (`internal/db/items.go`); updated `app.go`
+  binding (`AddItem(name string, packSize, gstPercent float64, hsn int64)`) and the db
+  test. Wails JS bindings updated to match.
+- **UI deliberately untouched** (per request: schema first). The Items screen still
+  references the old shape and won't typecheck — to be fixed in a later UI pass.
+- Verified backend only: `go test ./internal/db` ✅, `go build ./...` ✅.
+  (Frontend `npm run build` intentionally skipped — UI not updated yet.)
+
+**Next steps:**
+- Update the **Items UI** to the new schema (Item / numeric Pack Size / GST % / numeric
+  HSN; composite key, no id) once we're done iterating the schema.
+- Items: add **edit/delete** later.
+- Wire **Add Purchase Bill** line items to pick from the item master.
+
+---
+
+## 2026-06-05 — Navigation shell + Add Purchase Bill screen (UI)
+**Did:**
+- Added app navigation: top-bar **nav chips** (Dashboard · Add Purchase Bill · Items)
+  via **`react-router-dom` + `HashRouter`**. New structure: `src/pages/` for screens,
+  `src/components/Nav.tsx` for the chips; `App.tsx` is now the layout + routes.
+- **Dashboard** (`/`) — placeholder landing page showing a centered "Hare Krishna".
+- **Add Purchase Bill** (`/purchase-bills/new`) — UI shell: header card (Company name,
+  Bill number, Date) + line-items table (product/qty/unit price/per-line total, add &
+  delete rows, running grand total). **Not persisted** — Save logs to console for now.
+  (Renamed from "New Purchase Order" → "Add Purchase Bill" mid-session.)
+- Moved the items skeleton into `src/pages/Items.tsx` (`/items`), still reachable.
+- Verified: `npm run build` ✅ and `go build ./...` (embed) ✅.
+
+**Decisions:** see `DECISIONS.md` (2026-06-05: routing = react-router-dom / HashRouter).
+
+**Next steps:**
+- Design the **Purchase Bill data model** in `DATA_MODEL.md` (bill header + line items),
+  add the migration + Go methods (`internal/db`, `app.go`), then wire the Add Purchase
+  Bill form to persist.
+- Decide real **Dashboard** content (what KPIs / lists to show).
+
+---
+
 ## 2026-06-04 — Frontend stack: shadcn/ui + Tailwind v4
 **Did:**
 - Chose the UI stack with the user: **shadcn/ui** (new-york, neutral) on **Tailwind v4**,

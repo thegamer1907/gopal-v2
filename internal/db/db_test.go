@@ -15,11 +15,12 @@ func TestItemsRoundTripAndPersistence(t *testing.T) {
 		t.Fatalf("OpenAt: %v", err)
 	}
 
-	added, err := AddItem(conn, "widget", 5)
+	added, err := AddItem(conn, "widget", 100, 18, 3402)
 	if err != nil {
 		t.Fatalf("AddItem: %v", err)
 	}
-	if added.ID == 0 || added.Name != "widget" || added.Quantity != 5 {
+	if added.Name != "widget" || added.PackSize != 100 ||
+		added.GSTPercent != 18 || added.HSN != 3402 {
 		t.Fatalf("unexpected added item: %+v", added)
 	}
 

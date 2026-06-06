@@ -12,17 +12,49 @@ type migration struct {
 	sql string
 }
 
-// migrations is the ordered list of schema changes. Append new migrations to the
-// end with the next id — never edit or reorder existing ones. Keep this in sync
-// with docs/DATA_MODEL.md.
+// migrations is the ordered list of schema changes. NOTE: we're in early, fast schema
+// iteration — we are NOT maintaining incremental migrations yet. Edit the schema below
+// directly; the local dev DB is reset when it changes (see docs/DATA_MODEL.md). Real
+// migrations come later, before there's data worth preserving.
 var migrations = []migration{
 	{
 		id: 1,
 		sql: `CREATE TABLE IF NOT EXISTS items (
-			id         INTEGER PRIMARY KEY AUTOINCREMENT,
-			name       TEXT    NOT NULL,
-			quantity   INTEGER NOT NULL DEFAULT 0,
-			created_at TEXT    NOT NULL
+			name        TEXT NOT NULL,
+			pack_size   REAL NOT NULL DEFAULT 0,
+			gst_percent REAL NOT NULL DEFAULT 0,
+			hsn         INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (name, pack_size)
+		);`,
+	},
+	// Purchase bill header (Company, Bill number, Date). Surrogate id so line items
+	// have a clean FK target.
+	{
+		id: 2,
+		sql: `CREATE TABLE IF NOT EXISTS purchase_bills (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			company     TEXT NOT NULL,
+			bill_number TEXT NOT NULL,
+			date        TEXT NOT NULL
+		);`,
+	},
+	// Purchase bill line items. References the parent bill and an item in the master
+	// (composite FK, since items' PK is (name, pack_size)).
+	{
+		id: 3,
+		sql: `CREATE TABLE IF NOT EXISTS purchase_bill_items (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			bill_id        INTEGER NOT NULL,
+			item_name      TEXT NOT NULL,
+			item_pack_size REAL NOT NULL,
+			tax_qty        REAL NOT NULL DEFAULT 0,
+			tax_value      REAL NOT NULL DEFAULT 0,
+			d_qty          REAL NOT NULL DEFAULT 0,
+			d_value        REAL NOT NULL DEFAULT 0,
+			discount       REAL NOT NULL DEFAULT 0,
+			remarks        TEXT NOT NULL DEFAULT '',
+			FOREIGN KEY (bill_id) REFERENCES purchase_bills(id) ON DELETE CASCADE,
+			FOREIGN KEY (item_name, item_pack_size) REFERENCES items(name, pack_size)
 		);`,
 	},
 }

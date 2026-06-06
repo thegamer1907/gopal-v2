@@ -3,39 +3,33 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"time"
 )
 
-// Item is a single inventory record. (Skeleton model — proves the stack; the real
-// inventory schema will replace it. See docs/DATA_MODEL.md.)
+// Item is a product in the item master. The natural key is (Name, PackSize); see
+// docs/DATA_MODEL.md. Columns: Item (name), Pack Size, GST %, HSN.
 type Item struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Quantity  int    `json:"quantity"`
-	CreatedAt string `json:"createdAt"`
+	Name       string  `json:"name"`       // displayed as "Item"
+	PackSize   float64 `json:"packSize"`   // numeric pack size, e.g. 100
+	GSTPercent float64 `json:"gstPercent"` // GST rate %, e.g. 18
+	HSN        int64   `json:"hsn"`        // HSN code (numeric)
 }
 
-// AddItem inserts a new item and returns it with its assigned id and timestamp.
-func AddItem(conn *sql.DB, name string, quantity int) (Item, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := conn.Exec(
-		`INSERT INTO items (name, quantity, created_at) VALUES (?, ?, ?)`,
-		name, quantity, now,
+// AddItem inserts a new item and returns it. (name, packSize) must be unique.
+func AddItem(conn *sql.DB, name string, packSize, gstPercent float64, hsn int64) (Item, error) {
+	_, err := conn.Exec(
+		`INSERT INTO items (name, pack_size, gst_percent, hsn) VALUES (?, ?, ?, ?)`,
+		name, packSize, gstPercent, hsn,
 	)
 	if err != nil {
 		return Item{}, fmt.Errorf("insert item: %w", err)
 	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return Item{}, fmt.Errorf("last insert id: %w", err)
-	}
-	return Item{ID: id, Name: name, Quantity: quantity, CreatedAt: now}, nil
+	return Item{Name: name, PackSize: packSize, GSTPercent: gstPercent, HSN: hsn}, nil
 }
 
-// ListItems returns all items, newest first.
+// ListItems returns all items, ordered by name then pack size.
 func ListItems(conn *sql.DB) ([]Item, error) {
 	rows, err := conn.Query(
-		`SELECT id, name, quantity, created_at FROM items ORDER BY id DESC`,
+		`SELECT name, pack_size, gst_percent, hsn FROM items ORDER BY name, pack_size`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query items: %w", err)
@@ -45,7 +39,7 @@ func ListItems(conn *sql.DB) ([]Item, error) {
 	items := []Item{}
 	for rows.Next() {
 		var it Item
-		if err := rows.Scan(&it.ID, &it.Name, &it.Quantity, &it.CreatedAt); err != nil {
+		if err := rows.Scan(&it.Name, &it.PackSize, &it.GSTPercent, &it.HSN); err != nil {
 			return nil, fmt.Errorf("scan item: %w", err)
 		}
 		items = append(items, it)

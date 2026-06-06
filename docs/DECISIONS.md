@@ -60,3 +60,16 @@ have to re-litigate.
   `@vitejs/plugin-react` 2→4. React stays on 18.
 - **Why:** shadcn's CLI and Tailwind v4 tooling expect modern Vite/TS; the old versions
   fight the tooling. Verified `npm run build` and `go build ./...` (embed) still pass.
+
+### 2026-06-05 — Routing: react-router-dom with HashRouter
+- **Decision:** Use `react-router-dom` for multi-page navigation, wrapped in
+  **`HashRouter`** (not `BrowserRouter`). Top-of-app **nav chips** (`NavLink`) are the
+  primary navigation; add a page by creating it under `src/pages/`, then adding a
+  `<Route>` in `App.tsx` and a chip entry in `src/components/Nav.tsx`.
+- **Why:** The app is served from inside the Wails webview (no real HTTP server / history
+  API for deep links); `HashRouter` routes purely via the URL fragment, which is robust in
+  that embedded/`file://`-style context. `react-router` is the standard and scales as the
+  page count grows.
+- **Alternatives:** Hand-rolled `useState` view switch (fine for 2 pages, gets messy as
+  pages/links grow); `BrowserRouter` (needs server-side fallback routing — fragile in a
+  webview).
