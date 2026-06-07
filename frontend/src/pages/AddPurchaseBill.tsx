@@ -1,8 +1,8 @@
 import {useEffect, useState} from 'react';
-import {Plus, Trash2, Save} from 'lucide-react';
+import {Plus, Trash2, Save, Calendar as CalendarIcon} from 'lucide-react';
 import {ListItems, AddPurchaseBill as SavePurchaseBill} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
-import {Button} from '@/components/ui/button';
+import {Button, buttonVariants} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {
@@ -14,6 +14,10 @@ import {
 } from '@/components/ui/card';
 import {ItemCombobox} from '@/components/ItemCombobox';
 import {NewItemDialog} from '@/components/NewItemDialog';
+import {NumberInput} from '@/components/NumberInput';
+import {Calendar} from '@/components/ui/calendar';
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
+import {cn} from '@/lib/utils';
 
 // Add Purchase Bill — header (Company, Bill number, Date) plus searchable line items.
 // Items are cached on load; each line is calculated live. New items can be added on the
@@ -38,11 +42,29 @@ function num(v: string): number {
     return parseFloat(v) || 0;
 }
 
-function todayDDMMYYYY(): string {
-    const d = new Date();
+function fmtDDMMYYYY(d: Date): string {
     const dd = String(d.getDate()).padStart(2, '0');
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+function todayDDMMYYYY(): string {
+    return fmtDDMMYYYY(new Date());
+}
+
+// Parse a dd/mm/yyyy string into a Date, or undefined if it isn't a real calendar date.
+function parseDDMMYYYY(s: string): Date | undefined {
+    const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return undefined;
+    const dd = Number(m[1]);
+    const mm = Number(m[2]);
+    const yyyy = Number(m[3]);
+    const d = new Date(yyyy, mm - 1, dd);
+    // Round-trip check rejects overflow like 32/13/2026.
+    if (d.getFullYear() !== yyyy || d.getMonth() !== mm - 1 || d.getDate() !== dd) {
+        return undefined;
+    }
+    return d;
 }
 
 // Derived (display-only) values for a line, per the agreed formulas.
@@ -72,6 +94,7 @@ export function AddPurchaseBill() {
     const [company, setCompany] = useState('');
     const [billNumber, setBillNumber] = useState('');
     const [date, setDate] = useState(todayDDMMYYYY());
+    const [dateOpen, setDateOpen] = useState(false);
     const [lines, setLines] = useState<Line[]>([blankLine(1)]);
     const [nextId, setNextId] = useState(2);
 
@@ -113,7 +136,15 @@ export function AddPurchaseBill() {
         if (dialog.lineId !== null) updateLine(dialog.lineId, {item});
     }
 
-    const grandTotal = lines.reduce((sum, l) => sum + calc(l).totalBillValue, 0);
+    const totals = lines.reduce(
+        (acc, l) => {
+            const c = calc(l);
+            acc.taxBillAmount += c.totalTaxBillAmount;
+            acc.billValue += c.totalBillValue;
+            return acc;
+        },
+        {taxBillAmount: 0, billValue: 0},
+    );
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -187,13 +218,41 @@ export function AddPurchaseBill() {
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="date">Date</Label>
-                            <Input
-                                id="date"
-                                placeholder="dd/mm/yyyy"
-                                autoComplete="off"
-                                value={date}
-                                onChange={(e) => setDate(e.target.value)}
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="date"
+                                    placeholder="dd/mm/yyyy"
+                                    autoComplete="off"
+                                    className="pr-9"
+                                    value={date}
+                                    onChange={(e) => setDate(e.target.value)}
+                                />
+                                <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                                    <PopoverTrigger
+                                        type="button"
+                                        aria-label="Pick a date"
+                                        className={cn(
+                                            buttonVariants({variant: 'ghost', size: 'icon'}),
+                                            'absolute right-1 top-1 size-7 text-muted-foreground',
+                                        )}
+                                    >
+                                        <CalendarIcon className="size-4"/>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="end">
+                                        <Calendar
+                                            mode="single"
+                                            selected={parseDDMMYYYY(date)}
+                                            defaultMonth={parseDDMMYYYY(date)}
+                                            onSelect={(d) => {
+                                                if (d) {
+                                                    setDate(fmtDDMMYYYY(d));
+                                                    setDateOpen(false);
+                                                }
+                                            }}
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
@@ -210,22 +269,22 @@ export function AddPurchaseBill() {
                     <div className="overflow-x-auto">
                         <table className="w-full border-separate border-spacing-0 text-sm">
                             <thead>
-                                <tr className="text-left text-muted-foreground [&>th]:px-2 [&>th]:pb-2 [&>th]:font-medium [&>th]:whitespace-nowrap">
-                                    <th>Item</th>
-                                    <th className="text-right">Pack Size</th>
-                                    <th className="text-right">GST %</th>
-                                    <th className="text-right">Tax Qty</th>
-                                    <th className="text-right">Tax Value</th>
-                                    <th className="text-right">D-Qty</th>
-                                    <th className="text-right">D-Value</th>
-                                    <th className="text-right">Discount</th>
+                                <tr className="text-center align-bottom text-muted-foreground [&>th]:px-1.5 [&>th]:pb-2 [&>th]:font-medium [&>th]:leading-tight">
+                                    <th className="text-left">Item</th>
+                                    <th className="w-12">Pack Size</th>
+                                    <th className="w-10">GST %</th>
+                                    <th className="w-14">Tax Qty</th>
+                                    <th className="w-20">Tax Value</th>
+                                    <th className="w-14">D Qty</th>
+                                    <th className="w-20">D Value</th>
+                                    <th className="w-16 bg-muted/50">GST Amount</th>
+                                    <th className="w-16 bg-muted/50">Tax Bill Amount</th>
+                                    <th className="w-16 bg-muted/50">Bill Value</th>
+                                    <th className="w-16 bg-muted/50">Billing Rate</th>
+                                    <th className="w-16 bg-muted/50">Final Rate</th>
+                                    <th className="w-16">Discount</th>
                                     <th>Remarks</th>
-                                    <th className="text-right bg-muted/50">GST Amt</th>
-                                    <th className="text-right bg-muted/50">Total Tax Bill Amt</th>
-                                    <th className="text-right bg-muted/50">Total Bill Value</th>
-                                    <th className="text-right bg-muted/50">Final Rate</th>
-                                    <th className="text-right bg-muted/50">Final Billing Rate</th>
-                                    <th/>
+                                    <th className="w-8"/>
                                 </tr>
                             </thead>
                             <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1.5 [&>tr>td]:align-middle">
@@ -248,43 +307,43 @@ export function AddPurchaseBill() {
                                                 {line.item ? line.item.gstPercent : '—'}
                                             </td>
                                             <td>
-                                                <Input
-                                                    type="number" step="0.01" min="0"
-                                                    className="w-24 text-right"
+                                                <NumberInput
+                                                    className="w-14 text-right"
                                                     value={line.taxQty}
-                                                    onChange={(e) => updateLine(line.id, {taxQty: e.target.value})}
+                                                    onChange={(v) => updateLine(line.id, {taxQty: v})}
                                                 />
                                             </td>
                                             <td>
-                                                <Input
-                                                    type="number" step="0.01" min="0"
-                                                    className="w-24 text-right"
+                                                <NumberInput
+                                                    className="w-20 text-right"
                                                     value={line.taxValue}
-                                                    onChange={(e) => updateLine(line.id, {taxValue: e.target.value})}
+                                                    onChange={(v) => updateLine(line.id, {taxValue: v})}
                                                 />
                                             </td>
                                             <td>
-                                                <Input
-                                                    type="number" step="0.01" min="0"
-                                                    className="w-24 text-right"
+                                                <NumberInput
+                                                    className="w-14 text-right"
                                                     value={line.dQty}
-                                                    onChange={(e) => updateLine(line.id, {dQty: e.target.value})}
+                                                    onChange={(v) => updateLine(line.id, {dQty: v})}
                                                 />
                                             </td>
                                             <td>
-                                                <Input
-                                                    type="number" step="0.01" min="0"
-                                                    className="w-24 text-right"
+                                                <NumberInput
+                                                    className="w-20 text-right"
                                                     value={line.dValue}
-                                                    onChange={(e) => updateLine(line.id, {dValue: e.target.value})}
+                                                    onChange={(v) => updateLine(line.id, {dValue: v})}
                                                 />
                                             </td>
+                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.gstAmount)}</td>
+                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.totalTaxBillAmount)}</td>
+                                            <td className="text-right tabular-nums bg-muted/50 font-medium">{fmt(c.totalBillValue)}</td>
+                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.finalBillingRate)}</td>
+                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.finalRate)}</td>
                                             <td>
-                                                <Input
-                                                    type="number" step="0.01" min="0"
-                                                    className="w-24 text-right"
+                                                <NumberInput
+                                                    className="w-16 text-right"
                                                     value={line.discount}
-                                                    onChange={(e) => updateLine(line.id, {discount: e.target.value})}
+                                                    onChange={(v) => updateLine(line.id, {discount: v})}
                                                 />
                                             </td>
                                             <td>
@@ -295,11 +354,6 @@ export function AddPurchaseBill() {
                                                     onChange={(e) => updateLine(line.id, {remarks: e.target.value})}
                                                 />
                                             </td>
-                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.gstAmount)}</td>
-                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.totalTaxBillAmount)}</td>
-                                            <td className="text-right tabular-nums bg-muted/50 font-medium">{fmt(c.totalBillValue)}</td>
-                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.finalRate)}</td>
-                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.finalBillingRate)}</td>
                                             <td>
                                                 <Button
                                                     type="button" variant="ghost" size="icon"
@@ -314,20 +368,29 @@ export function AddPurchaseBill() {
                                     );
                                 })}
                             </tbody>
+                            <tfoot>
+                                <tr className="border-t-2 font-medium [&>td]:px-1.5 [&>td]:py-2">
+                                    <td colSpan={7} className="text-right text-muted-foreground">
+                                        Totals
+                                    </td>
+                                    <td className="bg-muted/50"/>
+                                    <td className="text-right tabular-nums bg-muted/50">
+                                        {fmt(totals.taxBillAmount)}
+                                    </td>
+                                    <td className="text-right tabular-nums bg-muted/50">
+                                        {fmt(totals.billValue)}
+                                    </td>
+                                    <td colSpan={5} className="bg-muted/50"/>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div>
                         <Button type="button" variant="outline" size="sm" onClick={addLine}>
                             <Plus className="size-4"/>
                             Add row
                         </Button>
-                        <div className="text-sm text-muted-foreground">
-                            Bill total:{' '}
-                            <span className="text-base font-semibold tabular-nums text-foreground">
-                                {fmt(grandTotal)}
-                            </span>
-                        </div>
                     </div>
                 </CardContent>
             </Card>

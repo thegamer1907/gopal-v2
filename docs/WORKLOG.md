@@ -6,6 +6,36 @@ reads the top entry first.
 
 ---
 
+## 2026-06-07 — Add Purchase Bill: line-items polish
+**Did:**
+- **`NumberInput`** (`frontend/src/components/NumberInput.tsx`): plain text box, no up/down
+  spinner, accepts digits + one decimal only (`inputMode="decimal"`). Replaced all five
+  numeric line inputs (Tax Qty / Tax Value / D Qty / D Value / Discount).
+- **Reordered + renamed** line-item columns. New order: Item · Pack Size · GST % · Tax Qty ·
+  Tax Value · D Qty · D Value · **GST Amount · Tax Bill Amount · Bill Value · Billing Rate ·
+  Final Rate** (shaded calc band) · Discount · Remarks · delete. Renames: Total Tax Bill Amt
+  → Tax Bill Amount, Total Bill Value → Bill Value, Final Billing Rate → Billing Rate.
+- **Tighter table:** headers now center-aligned + wrapping (dropped `whitespace-nowrap`),
+  qty cols narrowed to `w-14`, reduced padding.
+- **Running totals:** replaced the single "Bill total" with a `<tfoot>` "Totals" row showing
+  live sums under **Tax Bill Amount** and **Bill Value**.
+- **Date field:** kept the `dd/mm/yyyy` text box and **added a calendar popover** (shadcn
+  `calendar` + `popover`). Helpers `fmtDDMMYYYY` / `parseDDMMYYYY` sync both to one `date`
+  string. Note: shadcn pulled **react-day-picker v10**, whose `ClassNames` renamed `table` →
+  `month_grid`; patched the generated `calendar.tsx` accordingly so `tsc` passes.
+- Verified `npm run build` ✅. Docs: updated `docs/UI.md` (NumberInput convention, new
+  column spec, date picker).
+
+**Decision:** Discount + Remarks were absent from the client's column list → confirmed with
+user to **keep both, appended after Final Rate** (not removed).
+
+**Process note:** per user, **ask before moving any feature to Shipped** in `FEATURES.md`.
+Add Purchase Bill stays as-is (already listed Shipped) — still iterating on it.
+
+**Next steps:** unchanged — saved-bills view; items edit/delete; date handling.
+
+---
+
 ## 2026-06-07 — Pushed to GitHub + Windows build/release CI
 **Did:**
 - Created **public** GitHub repo `thegamer1907/gopal-v2` and pushed `main`.

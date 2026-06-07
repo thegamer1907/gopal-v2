@@ -14,6 +14,10 @@ Screens, flows, and visual decisions, recorded as they firm up.
   light-only decision.
 - **Font:** Nunito (bundled at `src/assets/fonts/`, loaded via `@font-face` in `index.css`).
 - **Utility:** `cn()` in `src/lib/utils.ts` merges class names (used by all components).
+- **Numeric fields:** use `NumberInput` (`src/components/NumberInput.tsx`) instead of
+  `<Input type="number">` — a plain text box (no up/down spinner) that accepts digits and a
+  single decimal point only (`inputMode="decimal"`). It takes `value: string` /
+  `onChange: (v) => void`.
 - Icons: **lucide-react**.
 - The **frontend-design** plugin/skill is installed — use it when building the real
   screens for a distinctive, polished look beyond the shadcn defaults.
@@ -38,19 +42,27 @@ Screens, flows, and visual decisions, recorded as they firm up.
 
 ### Add Purchase Bill (`/purchase-bills/new`) — chip label "Add Purchase Bill"
 - **Header card** — Company name, Bill number, Date. Date is a text field in **dd/mm/yyyy**
-  (defaults to today) and is stored as entered.
+  (defaults to today) and is stored as entered. It has **both** a free-typed text box and a
+  **calendar popover** (shadcn `calendar` + `popover`, react-day-picker) behind a calendar
+  icon; both drive one `date` string — picking a day writes `dd/mm/yyyy`, and the calendar
+  opens on the currently-typed date when it parses (`parseDDMMYYYY` / `fmtDDMMYYYY` helpers).
 - **Line items** — a wide, horizontally-scrollable grid. Each line:
   - **Item search** (`ItemCombobox`): all items are cached once on load (`ListItems`); typing
     filters and shows suggestions as “name · pack size”. Selecting one fills the line and
     pulls its Pack Size / GST % (shown read-only, used in formulas). The suggestion list is
     **rendered in a portal** (fixed-positioned under the input) so the horizontally-scrolling
     grid doesn't clip it or gain a stray vertical scrollbar.
-  - Inputs: **Tax Qty, Tax Value, D-Qty, D-Value, Discount, Remarks**.
-  - **Calculated (read-only, muted) columns**, recomputed live:
-    GST Amt = TaxValue×GST%/100 · Total Tax Bill Amt = TaxValue+GST Amt ·
-    Total Bill Value = Total Tax Bill Amt + D-Value ·
-    Final Rate = TotalBillValue/(TaxQty+D-Qty)×PackSize · Final Billing Rate = TaxValue/TaxQty.
-  - **Add row** / per-row delete; a **Bill total** (sum of Total Bill Value) below.
+  - **Column order** (left→right): Item · Pack Size · GST % · **Tax Qty · Tax Value · D Qty ·
+    D Value** (inputs) · **GST Amount · Tax Bill Amount · Bill Value · Billing Rate · Final
+    Rate** (calculated, shaded band) · **Discount · Remarks** (inputs) · delete.
+  - Headers are **center-aligned and wrap** (`leading-tight`, no `whitespace-nowrap`);
+    qty columns are narrow (`w-14`) since values are short. Inputs use `NumberInput`.
+  - **Calculated (read-only, muted) columns**, recomputed live (display names → formula):
+    GST Amount = TaxValue×GST%/100 · Tax Bill Amount = TaxValue+GST Amount ·
+    Bill Value = Tax Bill Amount + D-Value ·
+    Billing Rate = TaxValue/TaxQty · Final Rate = BillValue/(TaxQty+D-Qty)×PackSize.
+  - **Add row** / per-row delete. A **table footer "Totals" row** shows running sums under
+    **Tax Bill Amount** and **Bill Value** (replaces the old single Bill total).
 - **Add new item on the fly** (`NewItemDialog`): if a search has no match, “Add … as new
   item” opens a dialog (Item / Pack Size / GST % / HSN) → `AddItem` → pushed into the cache
   and selected for the line.

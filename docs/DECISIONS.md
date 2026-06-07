@@ -73,3 +73,19 @@ have to re-litigate.
 - **Alternatives:** Hand-rolled `useState` view switch (fine for 2 pages, gets messy as
   pages/links grow); `BrowserRouter` (needs server-side fallback routing — fragile in a
   webview).
+
+### 2026-06-07 — shadcn components are React-19 style on React 18 → avoid `asChild` over our `Button`
+- **Decision:** Don't wrap our shadcn `Button` in a Radix `asChild` trigger
+  (`PopoverTrigger`/`DropdownMenuTrigger`/etc.). Instead let the Radix `*Trigger` render its
+  own real `<button>` and style it with `cn(buttonVariants({...}), "...")`.
+- **Why:** The generated shadcn (new-york) components are the **React 19** style — `Button`
+  is a plain function component that takes `ref` as a prop, with **no `forwardRef`**. The
+  project runs **React 18.3.1**, where a function component can't receive a `ref`. So an
+  `asChild` trigger's ref silently fails to attach (console warns *"Function components
+  cannot be given refs"*), Radix has no element to anchor to, and e.g. the Popover never
+  opens. Hit this with the Add Purchase Bill date picker.
+- **Alternatives:** (a) Upgrade to React 19 — deferred (no need yet; wider blast radius).
+  (b) Add `forwardRef` back to `Button` — diverges from the shadcn template. The styled
+  `*Trigger` approach is local and keeps the templates untouched.
+- **Note:** Calendar day-buttons pass a ref to `Button` too; on React 18 that only disables
+  keyboard focus-follow (harmless), not clicks.
