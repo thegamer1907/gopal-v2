@@ -19,6 +19,9 @@ spec (what it does, key behaviors). Move items between sections as work progress
   dd/mm/yyyy) + searchable line items against the cached item master, live calculated
   columns (GST amt, totals, final rates), add-new-item dialog, and transactional save
   (`AddPurchaseBill` → `purchase_bills` + `purchase_bill_items`).
+- **Windows build/release CI** — `.github/workflows/build-windows.yml` builds the app on
+  `windows-latest` and, on a `v*` tag push, publishes a **GitHub Release** with the `.exe`
+  attached (public no-login download link). Repo: `github.com/thegamer1907/gopal-v2`.
 
 ## In Progress
 _None._

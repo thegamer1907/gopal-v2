@@ -6,6 +6,31 @@ reads the top entry first.
 
 ---
 
+## 2026-06-07 — Pushed to GitHub + Windows build/release CI
+**Did:**
+- Created **public** GitHub repo `thegamer1907/gopal-v2` and pushed `main`.
+- Added **`.github/workflows/build-windows.yml`**: on a `v*` tag push, builds on
+  `windows-latest` (Go 1.25 + Node 20 + Wails v2.12.0, `wails build -platform
+  windows/amd64`), renames the binary to `gopal-v2-<tag>-windows-amd64.exe`, and publishes
+  a **GitHub Release** with the `.exe` attached. Manual `workflow_dispatch` runs upload the
+  `.exe` as an artifact instead (no release).
+- Cut **v0.1.0** to verify the pipeline end-to-end — green. Public direct-download link:
+  `https://github.com/thegamer1907/gopal-v2/releases/download/v0.1.0/gopal-v2-v0.1.0-windows-amd64.exe`
+
+**Notes / decisions:**
+- Chose **Release** over Actions artifact for sharing: artifacts require a GitHub login and
+  expire (≤90 days); Release assets on a public repo are a no-login, non-expiring link.
+- Build is **unsigned** → Windows SmartScreen prompts on first launch ("More info → Run
+  anyway"). Code signing needs a paid cert; skipped for single-user handoff.
+- CI warnings (non-blocking): Node-20 actions deprecation (~Sep 2026) and `windows-latest`
+  redirect to a newer image. Bump action versions later.
+
+**How to release going forward:** `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+**Next steps:** unchanged — saved-bills view; items edit/delete; date handling.
+
+---
+
 ## 2026-06-05 — Layout: full-bleed shell + scroll fixes
 **Did:**
 - Made the app shell **full-width / full-height**: `html/body/#root` are 100% tall
