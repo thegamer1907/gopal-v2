@@ -1,6 +1,7 @@
 import {HashRouter, Routes, Route} from 'react-router-dom';
 import {Package} from 'lucide-react';
 import {Nav} from '@/components/Nav';
+import {UnsavedChangesProvider} from '@/components/UnsavedChanges';
 import {Dashboard} from '@/pages/Dashboard';
 import {AddPurchaseBill} from '@/pages/AddPurchaseBill';
 import {Items} from '@/pages/Items';
@@ -11,6 +12,7 @@ import {Items} from '@/pages/Items';
 function App() {
     return (
         <HashRouter>
+            <UnsavedChangesProvider>
             <div className="flex h-full flex-col bg-background">
                 <header className="shrink-0 border-b">
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-6 py-4">
@@ -32,6 +34,7 @@ function App() {
                     </Routes>
                 </main>
             </div>
+            </UnsavedChangesProvider>
         </HashRouter>
     );
 }

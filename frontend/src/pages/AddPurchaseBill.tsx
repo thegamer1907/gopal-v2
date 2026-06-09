@@ -15,6 +15,7 @@ import {
 import {ItemCombobox} from '@/components/ItemCombobox';
 import {NewItemDialog} from '@/components/NewItemDialog';
 import {NumberInput} from '@/components/NumberInput';
+import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {Calendar} from '@/components/ui/calendar';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {cn} from '@/lib/utils';
@@ -40,6 +41,23 @@ function blankLine(id: number): Line {
 
 function num(v: string): number {
     return parseFloat(v) || 0;
+}
+
+// Mandatory line fields are the item plus the four numeric inputs; Discount and
+// Remarks are optional. A line is "touched" once any field has content, and
+// "complete" only when every mandatory field is filled.
+function lineTouched(l: Line): boolean {
+    return (
+        l.item !== null ||
+        [l.taxQty, l.taxValue, l.dQty, l.dValue, l.discount, l.remarks].some((v) => v.trim() !== '')
+    );
+}
+
+function lineComplete(l: Line): boolean {
+    return (
+        l.item !== null &&
+        [l.taxQty, l.taxValue, l.dQty, l.dValue].every((v) => v.trim() !== '')
+    );
 }
 
 function fmtDDMMYYYY(d: Date): string {
@@ -106,6 +124,7 @@ export function AddPurchaseBill() {
     });
     const [error, setError] = useState('');
     const [saved, setSaved] = useState('');
+    const {setDirty} = useUnsavedChanges();
 
     // Cache all items once on load.
     useEffect(() => {
@@ -113,6 +132,28 @@ export function AddPurchaseBill() {
             .then(setItemsCache)
             .catch((e) => setError(String(e)));
     }, []);
+
+    // The form is valid (Save enabled) when the header is filled with a real date,
+    // at least one line is complete, and no partially-filled line is left over.
+    const headerComplete =
+        company.trim() !== '' &&
+        billNumber.trim() !== '' &&
+        parseDDMMYYYY(date) !== undefined;
+    const isValid =
+        headerComplete &&
+        lines.some(lineComplete) &&
+        lines.every((l) => !lineTouched(l) || lineComplete(l));
+
+    // Has the user entered anything worth warning about before leaving the page?
+    const isDirty =
+        company.trim() !== '' || billNumber.trim() !== '' || lines.some(lineTouched);
+
+    useEffect(() => {
+        setDirty(isDirty);
+    }, [isDirty, setDirty]);
+
+    // Clear the guard if we unmount (e.g. after confirming "switch anyway").
+    useEffect(() => () => setDirty(false), [setDirty]);
 
     function updateLine(id: number, patch: Partial<Line>) {
         setLines((prev) => prev.map((l) => (l.id === id ? {...l, ...patch} : l)));
@@ -398,7 +439,7 @@ export function AddPurchaseBill() {
             <div className="flex items-center justify-end gap-3">
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 {saved && <p className="text-sm text-emerald-600">{saved}</p>}
-                <Button type="submit">
+                <Button type="submit" disabled={!isValid}>
                     <Save className="size-4"/>
                     Save purchase bill
                 </Button>

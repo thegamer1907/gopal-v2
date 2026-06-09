@@ -34,6 +34,11 @@ Screens, flows, and visual decisions, recorded as they firm up.
   color, inactive chips are bordered/muted with a hover state.
 - **Routing:** `react-router-dom` + `HashRouter` (see `DECISIONS.md`). To add a page:
   create it in `src/pages/`, add a `<Route>` in `App.tsx`, add a chip in `Nav.tsx`.
+- **Unsaved-changes guard:** an `UnsavedChangesProvider` (`src/components/UnsavedChanges.tsx`)
+  exposes `{dirty, setDirty}`. A page that holds unsaved edits calls `setDirty(true)` (clearing
+  it on save/reset/unmount). `Nav` intercepts chip clicks while `dirty` and shows an
+  `alert-dialog` — **"Stay and save"** (cancel) vs **"Switch anyway"** (discards and navigates).
+  Add Purchase Bill is the first consumer.
 
 ## Screens
 ### Dashboard (`/`) — placeholder
@@ -67,13 +72,18 @@ Screens, flows, and visual decisions, recorded as they firm up.
   item” opens a dialog (Item / Pack Size / GST % / HSN) → `AddItem` → pushed into the cache
   and selected for the line.
 - **Save** persists the whole bill via `AddPurchaseBill` (header + lines, one transaction);
-  shows a confirmation and resets the form.
+  shows a confirmation and resets the form. The button is **disabled until the form is
+  valid**: header (Company, Bill number, a real dd/mm/yyyy date) filled, **at least one
+  complete line**, and **no partially-filled line** left over. Mandatory line fields are the
+  item + the four numeric inputs (Tax Qty, Tax Value, D Qty, D Value); **Discount and Remarks
+  are optional**.
 - Built with shadcn `Card`, `Input`, `Label`, `Button`, `Dialog` + lucide icons; the line
   grid is a plain scrollable `<table>` (many columns).
 
 ### Items (`/items`) — item master
 - A live item count, an "Add item" card (**Item, Pack Size, GST %, HSN** + Add), and a card
-  with a table of items (Item / Pack Size / GST % / HSN) with an empty state.
+  with a table of items (Item / Pack Size / GST % / HSN) with an empty state. Pack Size / GST %
+  / HSN use `NumberInput` (no spinner); same in the on-the-fly `NewItemDialog`.
 - Built with shadcn `Card`, `Input`, `Label`, `Button`, `Table`. Add-only for now;
   edit/delete to follow.
 

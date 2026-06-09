@@ -4,6 +4,7 @@ import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
+import {NumberInput} from '@/components/NumberInput';
 import {
     Dialog,
     DialogContent,
@@ -92,37 +93,29 @@ export function NewItemDialog({open, onOpenChange, initialName, onCreated}: Prop
                     <div className="grid grid-cols-3 gap-3">
                         <div className="grid gap-2">
                             <Label htmlFor="ni-pack">Pack Size</Label>
-                            <Input
+                            <NumberInput
                                 id="ni-pack"
-                                type="number"
-                                step="0.01"
-                                min="0"
                                 placeholder="100"
                                 value={packSize}
-                                onChange={(e) => setPackSize(e.target.value)}
+                                onChange={setPackSize}
                             />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="ni-gst">GST %</Label>
-                            <Input
+                            <NumberInput
                                 id="ni-gst"
-                                type="number"
-                                step="0.01"
-                                min="0"
                                 placeholder="18"
                                 value={gstPercent}
-                                onChange={(e) => setGstPercent(e.target.value)}
+                                onChange={setGstPercent}
                             />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="ni-hsn">HSN</Label>
-                            <Input
+                            <NumberInput
                                 id="ni-hsn"
-                                type="number"
-                                min="0"
                                 placeholder="3401"
                                 value={hsn}
-                                onChange={(e) => setHsn(e.target.value)}
+                                onChange={setHsn}
                             />
                         </div>
                     </div>

@@ -6,6 +6,31 @@ reads the top entry first.
 
 ---
 
+## 2026-06-08 — Save validation, unsaved-changes guard, NumberInput on Items
+**Did:**
+- **Items spinner fix:** Pack Size / GST % / HSN on the Items page **and** the on-the-fly
+  `NewItemDialog` now use `NumberInput` (no up/down spinner), matching the line-items
+  convention. Only the Item *name* stays a plain text `Input`.
+- **Save gating (Add Purchase Bill):** the "Save purchase bill" button is now
+  `disabled` until the form is valid — header (Company, Bill number, a real dd/mm/yyyy
+  date) filled, **≥1 complete line**, and **no partially-filled line**. Mandatory line
+  fields = item + Tax Qty / Tax Value / D Qty / D Value; **Discount + Remarks optional**.
+  Added `lineTouched` / `lineComplete` helpers.
+- **Unsaved-changes guard:** new `UnsavedChangesProvider` (`src/components/UnsavedChanges.tsx`,
+  `{dirty,setDirty}`) wraps the app in `App.tsx`. Add Purchase Bill reports `isDirty` via
+  effect (clears on save/reset/unmount). `Nav` intercepts chip clicks while dirty and shows a
+  shadcn **`alert-dialog`** — "Stay and save" vs "Switch anyway" (discard + navigate). Added
+  the `alert-dialog` component.
+- Verified `npm run build` ✅. Docs: updated `docs/UI.md` (save validation, nav guard, Items
+  NumberInput).
+
+**Note:** react-router v7 `useBlocker` needs a data router; we use `<HashRouter>`+`<Routes>`,
+so the guard is implemented at the Nav-click level instead (the only nav path in the webview).
+
+**Next steps:** unchanged — saved-bills view; items edit/delete; date handling.
+
+---
+
 ## 2026-06-07 — Add Purchase Bill: line-items polish
 **Did:**
 - **`NumberInput`** (`frontend/src/components/NumberInput.tsx`): plain text box, no up/down

@@ -5,6 +5,7 @@ import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
+import {NumberInput} from '@/components/NumberInput';
 import {
     Card,
     CardContent,
@@ -90,37 +91,29 @@ export function Items() {
                         </div>
                         <div className="grid gap-2 w-32">
                             <Label htmlFor="packSize">Pack Size</Label>
-                            <Input
+                            <NumberInput
                                 id="packSize"
-                                type="number"
-                                min="0"
-                                step="0.01"
                                 placeholder="100"
                                 value={packSize}
-                                onChange={(e) => setPackSize(e.target.value)}
+                                onChange={setPackSize}
                             />
                         </div>
                         <div className="grid gap-2 w-24">
                             <Label htmlFor="gstPercent">GST %</Label>
-                            <Input
+                            <NumberInput
                                 id="gstPercent"
-                                type="number"
-                                min="0"
-                                step="0.01"
                                 placeholder="18"
                                 value={gstPercent}
-                                onChange={(e) => setGstPercent(e.target.value)}
+                                onChange={setGstPercent}
                             />
                         </div>
                         <div className="grid gap-2 w-32">
                             <Label htmlFor="hsn">HSN</Label>
-                            <Input
+                            <NumberInput
                                 id="hsn"
-                                type="number"
-                                min="0"
                                 placeholder="3401"
                                 value={hsn}
-                                onChange={(e) => setHsn(e.target.value)}
+                                onChange={setHsn}
                             />
                         </div>
                         <Button type="submit" disabled={!name.trim()}>
