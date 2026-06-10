@@ -6,6 +6,121 @@ reads the top entry first.
 
 ---
 
+## 2026-06-09 — Master add-forms: submit guard + dirty warning (now a pattern)
+**Did:**
+- **Items** and **Companies** add-forms now follow the Add Purchase Bill convention: **all
+  fields mandatory** → `Add` disabled until `isValid` (every field non-empty after trim; `0`
+  counts as filled), and the **unsaved-changes guard** wired (`setDirty(isDirty)` effect +
+  clear on unmount) so leaving with typed-but-unsaved input warns first.
+- **Codified as a required pattern** for all future data-entry pages in `docs/DECISIONS.md`
+  (+ a pointer in `docs/UI.md` conventions).
+- Verified `npm run build` ✅.
+
+---
+
+## 2026-06-09 — Settings page: Database management
+**Did:**
+- **Configurable DB location, persisted.** New `internal/db/config.go` (`Config{dbPath}`,
+  `LoadConfig`/`SaveConfig`, `ActivePath`) + factored `db.AppDir()` out of `DefaultPath`.
+  `db.WipeAt` deletes the DB file (+ `-wal`/`-shm`/`-journal` sidecars) and re-`OpenAt`s a
+  fresh schema. `app.go` `startup` now opens `ActivePath()` with a **fallback to default**
+  (and config reset) if the saved path fails.
+- **New bound methods:** `GetDatabasePath`, `OpenExistingDatabase`, `CreateNewDatabase`
+  (native Wails `OpenFileDialog`/`SaveFileDialog`, `*.db`), `WipeDatabase`. `switchTo` opens
+  the new DB first and swaps the live `*sql.DB` only on success. Bindings regenerated.
+- **Settings page** (`/settings`, `src/pages/Settings.tsx`) in a new sidebar **footer** (gear).
+  Database section: current path display, Open/Create buttons, and a **Wipe** danger zone
+  behind a **controlled** `AlertDialog` (avoids the React-18 `asChild`-over-Button ref bug).
+  Switching/wiping does `window.location.reload()` so all pages re-read the new DB.
+- Verified `go build ./...`, `go vet ./...`, `go test ./internal/db`, `npm run build` ✅.
+  Updated `docs/DATA_MODEL.md`, `docs/UI.md`, `docs/FEATURES.md`, `docs/DECISIONS.md`.
+
+**Next steps:** verify live in `wails dev` (switch/create/wipe + restart persistence + bad-path
+fallback); then company edit/delete; more settings sections / backup-export later. **Ask before
+marking Settings Shipped.**
+
+---
+
+## 2026-06-09 — Company↔bill FK (surrogate id)
+**Did:** (supersedes the "no FK yet" note in the entry below, same session)
+- **Schema:** `companies` gained an **`id` PK** (`name` now `UNIQUE`); `purchase_bills.company`
+  (TEXT) replaced by **`company_id INTEGER NOT NULL` FK → `companies(id)`**. Reordered
+  migrations so `companies` is **id 2** (before `purchase_bills`, id 3; line items id 4).
+- **Go:** `db.Company` gains `id`; `AddCompany` returns it (LastInsertId). `db.PurchaseBill`
+  swaps `company` for **`companyId`** (written) + read-only **`companyName`** (JOIN on read);
+  `ListPurchaseBills` JOINs `companies`. Bindings regenerated.
+- **Frontend:** `CompanyCombobox` value is now `db.Company | null` (carries the id);
+  `AddPurchaseBill` tracks the selected company object, saves `companyId`, resets to `null`.
+  `SavedBills` reads `bill.companyName`. `Companies` table keyed by `id`.
+- Verified `go build ./...`, `go test ./internal/db`, `npm run build` ✅. Updated
+  `docs/DATA_MODEL.md`, `docs/UI.md`, `docs/FEATURES.md`, `docs/DECISIONS.md`.
+
+**⚠️ Action needed:** this **edits existing migrations**, so the dev DB must be **reset** —
+delete `~/Library/Application Support/gopal-v2/inventory.db` (mac) /
+`%APPDATA%\gopal-v2\inventory.db` (Windows) before next run.
+
+**Next steps:** verify live (after DB reset); company edit/delete + more company columns.
+
+---
+
+## 2026-06-09 — Company master (like Items)
+**Did:**
+- **New `companies` master** (`name` PK, just a name for now). Backend: `internal/db/companies.go`
+  (`Company`, `AddCompany`, `ListCompanies`), migration id 4, exposed on `App`, bindings
+  regenerated.
+- **Companies page** (`/companies`, `src/pages/Companies.tsx`) under *Masters* in the sidebar —
+  mirrors the Items page (count + add card + table, add-only).
+- **Inline pick/add on the bill header:** Company changed from a free-text `Input` to a
+  `CompanyCombobox` (`src/components/CompanyCombobox.tsx`) backed by a cached company list,
+  with **add-new-company on the fly** via `NewCompanyDialog` (`src/components/NewCompanyDialog.tsx`).
+  `AddPurchaseBill` now caches companies on load and sets the company via select/create.
+- `purchase_bills.company` still stores the **name as text** — no FK yet (would need reordering
+  the existing migration; deferred, see `DECISIONS.md`).
+- Verified `go build ./...`, `go test ./internal/db`, `npm run build` ✅. Updated
+  `docs/DATA_MODEL.md`, `docs/UI.md`, `docs/FEATURES.md`, `docs/DECISIONS.md`.
+
+**Next steps:** review/verify live; company edit/delete + more company columns; add the
+`company → companies(name)` FK in a schema-reset pass. **Ask before marking Company master
+Shipped.**
+
+---
+
+## 2026-06-09 — Sidebar navigation + Saved Bills view
+**Did:**
+- **Navigation → persistent collapsible sidebar.** Replaced the top-bar nav chips with a
+  shadcn `sidebar` (`collapsible="icon"`). New `src/components/AppSidebar.tsx` holds the
+  brand + **grouped** links (Dashboard · *Purchases*: Add Purchase Bill / Saved Bills ·
+  *Masters*: Items) and now owns the unsaved-changes guard (moved out of `Nav.tsx`, which is
+  **deleted**). `App.tsx` rewritten to `SidebarProvider` › `AppSidebar` + `SidebarInset`
+  (no top bar). The **collapse toggle is a hamburger in the sidebar header itself** (top-left),
+  not a separate element. Active route uses **exact-path** match so `/purchase-bills` and
+  `/purchase-bills/new` don't both highlight.
+- **Saved Bills view** (`/purchase-bills`, new `src/pages/SavedBills.tsx`). Backend:
+  `ListPurchaseBills` (`internal/db/purchase_bills.go` + exposed on `App`) returns all bills
+  (header + lines), newest first. UI is **list → detail**: a clickable table (Bill # /
+  Company / Date / item count / Bill Value total), clicking opens a read-only line grid (same
+  columns as Add) with a Totals row and a Back button.
+- **Shared formulas.** Extracted `num`/`fmt`/`calcLine` into **`src/lib/purchaseBill.ts`**;
+  both Add and Saved screens use it (one source of truth for the calc columns). `AddPurchaseBill`
+  refactored to a thin wrapper; renamed calc fields (`totalTaxBillAmount`→`taxBillAmount`,
+  `totalBillValue`→`billValue`, `finalBillingRate`→`billingRate`).
+- Verified `go build ./...`, `go test ./internal/db`, and `npm run build` ✅. Regenerated Wails
+  bindings. Updated `docs/UI.md`, `docs/FEATURES.md`, `docs/DECISIONS.md` (2 entries).
+
+**Decisions:** sidebar over burger+chips (desktop app, collapses to rail for width, groups
+pages); Saved-bill calc columns recompute with the **live** item GST% (not stored as-billed) —
+noted snapshotting `gst_percent` onto the line as the future fix. Both in `DECISIONS.md`.
+
+**Note:** No React-18 ref gotcha here — the shadcn sidebar is React-19-style (function
+components + `Slot`), `SidebarTrigger` renders our `Button` without `asChild`, and
+`SidebarProvider` bundles the `TooltipProvider`.
+
+**Next steps:** review/verify Saved Bills live (`wails dev`); then Items edit/delete + search;
+consider snapshotting GST% as-billed; Dashboard content. **Ask before marking Saved Bills
+Shipped** in `FEATURES.md`.
+
+---
+
 ## 2026-06-08 — Save validation, unsaved-changes guard, NumberInput on Items
 **Did:**
 - **Items spinner fix:** Pack Size / GST % / HSN on the Items page **and** the on-the-fly

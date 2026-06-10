@@ -27,21 +27,32 @@ var migrations = []migration{
 			PRIMARY KEY (name, pack_size)
 		);`,
 	},
-	// Purchase bill header (Company, Bill number, Date). Surrogate id so line items
-	// have a clean FK target.
+	// Company master. Surrogate id PK so bills can FK to it without breaking when a
+	// company is renamed; name is unique. For now just a name; more columns to follow.
+	// Created before purchase_bills so the FK target exists.
 	{
 		id: 2,
+		sql: `CREATE TABLE IF NOT EXISTS companies (
+			id   INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL UNIQUE
+		);`,
+	},
+	// Purchase bill header (Company, Bill number, Date). Surrogate id so line items
+	// have a clean FK target; company_id → companies(id).
+	{
+		id: 3,
 		sql: `CREATE TABLE IF NOT EXISTS purchase_bills (
 			id          INTEGER PRIMARY KEY AUTOINCREMENT,
-			company     TEXT NOT NULL,
+			company_id  INTEGER NOT NULL,
 			bill_number TEXT NOT NULL,
-			date        TEXT NOT NULL
+			date        TEXT NOT NULL,
+			FOREIGN KEY (company_id) REFERENCES companies(id)
 		);`,
 	},
 	// Purchase bill line items. References the parent bill and an item in the master
 	// (composite FK, since items' PK is (name, pack_size)).
 	{
-		id: 3,
+		id: 4,
 		sql: `CREATE TABLE IF NOT EXISTS purchase_bill_items (
 			id             INTEGER PRIMARY KEY AUTOINCREMENT,
 			bill_id        INTEGER NOT NULL,

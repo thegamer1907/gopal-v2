@@ -7,9 +7,12 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
-- **App navigation shell** — top-bar **nav chips** (Dashboard · Add Purchase Bill ·
-  Items) routing between pages via `react-router-dom` (`HashRouter`). Add a page → add a
-  `<Route>` in `App.tsx` + a chip in `Nav.tsx`.
+- **App navigation shell** — a **persistent, collapsible left sidebar** (shadcn `sidebar`,
+  `src/components/AppSidebar.tsx`) with **grouped** links (Dashboard · *Purchases*: Add
+  Purchase Bill / Saved Bills · *Masters*: Items), routing via `react-router-dom`
+  (`HashRouter`). The header trigger collapses it to an icon-only rail (tooltips on hover).
+  Add a page → add a `<Route>` in `App.tsx` + an entry in `AppSidebar.tsx`. (Replaced the
+  earlier top-bar nav chips / `Nav.tsx`.)
 - **Dashboard (placeholder)** — landing page; currently shows a centered "Hare Krishna".
   Real dashboard content (KPIs / recent activity) to be defined.
 - **Item master** — `items` is the product catalog: columns **Item, Pack Size, GST %,
@@ -24,10 +27,26 @@ spec (what it does, key behaviors). Move items between sections as work progress
   attached (public no-login download link). Repo: `github.com/thegamer1907/gopal-v2`.
 
 ## In Progress
-_None._
+- **Settings — Database management** — a Settings page (`/settings`, sidebar footer) whose
+  Database section shows the **current DB path** and lets the user **open an existing** `.db`,
+  **create a new** one (native file dialogs), or **wipe** the current DB (recreates the empty
+  schema). The chosen path **persists** across restarts via `config.json` (`db.ActivePath`),
+  with a fallback to the default if a saved path can't be opened. Switching/wiping reloads the
+  app. _Awaiting review before Shipped._ Follow-ups: more settings sections; a backup/export.
+- **Company master** — `companies` is a master list like Items (**`id` PK + `name`** for now,
+  more columns later). Backend `AddCompany`/`ListCompanies` + a dedicated **Companies** page
+  under *Masters* (`/companies`, add-only). On the bill header, Company is now a
+  `CompanyCombobox` (pick from the master) with **add-new-company on the fly**
+  (`NewCompanyDialog`). Bills link to it by **`company_id` FK** → `companies(id)`.
+  _Awaiting review before Shipped._ Follow-ups: company edit/delete; more company columns.
+- **View saved purchase bills** — read UI built: a **list → detail** page at
+  `/purchase-bills` ("Saved Bills" in the sidebar). Backend `ListPurchaseBills` returns all
+  bills (header + lines); the list shows Bill #, Company, Date, item count, and total Bill
+  Value; clicking opens a read-only line-items grid (same columns as Add). Calc columns are
+  recomputed via the shared `src/lib/purchaseBill.ts`. _Awaiting review before Shipped._
+  Possible follow-ups: search/filter, per-bill edit/delete, store GST% as-billed.
 
 ## Planned
-- **View saved purchase bills** — list/detail of bills already entered (no read UI yet).
 - **Items edit/delete** (and search) as the catalog grows.
 - **Dashboard content** — decide the real KPIs / lists.
 

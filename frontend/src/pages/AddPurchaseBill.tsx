@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {Plus, Trash2, Save, Calendar as CalendarIcon} from 'lucide-react';
-import {ListItems, AddPurchaseBill as SavePurchaseBill} from '../../wailsjs/go/main/App';
+import {ListItems, ListCompanies, AddPurchaseBill as SavePurchaseBill} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button, buttonVariants} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -14,11 +14,14 @@ import {
 } from '@/components/ui/card';
 import {ItemCombobox} from '@/components/ItemCombobox';
 import {NewItemDialog} from '@/components/NewItemDialog';
+import {CompanyCombobox} from '@/components/CompanyCombobox';
+import {NewCompanyDialog} from '@/components/NewCompanyDialog';
 import {NumberInput} from '@/components/NumberInput';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {Calendar} from '@/components/ui/calendar';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {cn} from '@/lib/utils';
+import {num, fmt, calcLine} from '@/lib/purchaseBill';
 
 // Add Purchase Bill — header (Company, Bill number, Date) plus searchable line items.
 // Items are cached on load; each line is calculated live. New items can be added on the
@@ -37,10 +40,6 @@ interface Line {
 
 function blankLine(id: number): Line {
     return {id, item: null, taxQty: '', taxValue: '', dQty: '', dValue: '', discount: '', remarks: ''};
-}
-
-function num(v: string): number {
-    return parseFloat(v) || 0;
 }
 
 // Mandatory line fields are the item plus the four numeric inputs; Discount and
@@ -85,31 +84,21 @@ function parseDDMMYYYY(s: string): Date | undefined {
     return d;
 }
 
-// Derived (display-only) values for a line, per the agreed formulas.
+// Derived (display-only) values for an editable line — reads the string inputs and
+// the selected item, then defers to the shared formula in @/lib/purchaseBill.
 function calc(line: Line) {
-    const taxQty = num(line.taxQty);
-    const taxValue = num(line.taxValue);
-    const dQty = num(line.dQty);
-    const dValue = num(line.dValue);
-    const gstPercent = line.item?.gstPercent ?? 0;
-    const packSize = line.item?.packSize ?? 0;
-
-    const gstAmount = (taxValue * gstPercent) / 100;
-    const totalTaxBillAmount = taxValue + gstAmount;
-    const totalBillValue = totalTaxBillAmount + dValue;
-    const qty = taxQty + dQty;
-    const finalRate = qty ? (totalBillValue / qty) * packSize : 0;
-    const finalBillingRate = taxQty ? taxValue / taxQty : 0;
-
-    return {gstAmount, totalTaxBillAmount, totalBillValue, finalRate, finalBillingRate};
-}
-
-function fmt(n: number): string {
-    return n.toFixed(2);
+    return calcLine({
+        taxQty: num(line.taxQty),
+        taxValue: num(line.taxValue),
+        dQty: num(line.dQty),
+        dValue: num(line.dValue),
+        gstPercent: line.item?.gstPercent ?? 0,
+        packSize: line.item?.packSize ?? 0,
+    });
 }
 
 export function AddPurchaseBill() {
-    const [company, setCompany] = useState('');
+    const [company, setCompany] = useState<db.Company | null>(null);
     const [billNumber, setBillNumber] = useState('');
     const [date, setDate] = useState(todayDDMMYYYY());
     const [dateOpen, setDateOpen] = useState(false);
@@ -117,26 +106,34 @@ export function AddPurchaseBill() {
     const [nextId, setNextId] = useState(2);
 
     const [itemsCache, setItemsCache] = useState<db.Item[]>([]);
+    const [companiesCache, setCompaniesCache] = useState<db.Company[]>([]);
     const [dialog, setDialog] = useState<{open: boolean; lineId: number | null; name: string}>({
         open: false,
         lineId: null,
+        name: '',
+    });
+    const [companyDialog, setCompanyDialog] = useState<{open: boolean; name: string}>({
+        open: false,
         name: '',
     });
     const [error, setError] = useState('');
     const [saved, setSaved] = useState('');
     const {setDirty} = useUnsavedChanges();
 
-    // Cache all items once on load.
+    // Cache all items and companies once on load.
     useEffect(() => {
         ListItems()
             .then(setItemsCache)
+            .catch((e) => setError(String(e)));
+        ListCompanies()
+            .then(setCompaniesCache)
             .catch((e) => setError(String(e)));
     }, []);
 
     // The form is valid (Save enabled) when the header is filled with a real date,
     // at least one line is complete, and no partially-filled line is left over.
     const headerComplete =
-        company.trim() !== '' &&
+        company !== null &&
         billNumber.trim() !== '' &&
         parseDDMMYYYY(date) !== undefined;
     const isValid =
@@ -146,7 +143,7 @@ export function AddPurchaseBill() {
 
     // Has the user entered anything worth warning about before leaving the page?
     const isDirty =
-        company.trim() !== '' || billNumber.trim() !== '' || lines.some(lineTouched);
+        company !== null || billNumber.trim() !== '' || lines.some(lineTouched);
 
     useEffect(() => {
         setDirty(isDirty);
@@ -177,11 +174,16 @@ export function AddPurchaseBill() {
         if (dialog.lineId !== null) updateLine(dialog.lineId, {item});
     }
 
+    function onCompanyCreated(created: db.Company) {
+        setCompaniesCache((prev) => [...prev, created]);
+        setCompany(created);
+    }
+
     const totals = lines.reduce(
         (acc, l) => {
             const c = calc(l);
-            acc.taxBillAmount += c.totalTaxBillAmount;
-            acc.billValue += c.totalBillValue;
+            acc.taxBillAmount += c.taxBillAmount;
+            acc.billValue += c.billValue;
             return acc;
         },
         {taxBillAmount: 0, billValue: 0},
@@ -192,6 +194,11 @@ export function AddPurchaseBill() {
         setError('');
         setSaved('');
 
+        if (!company) {
+            setError('Choose a company.');
+            return;
+        }
+
         const filled = lines.filter((l) => l.item !== null);
         if (filled.length === 0) {
             setError('Add at least one line item.');
@@ -200,7 +207,8 @@ export function AddPurchaseBill() {
 
         const bill = {
             id: 0,
-            company: company.trim(),
+            companyId: company.id,
+            companyName: company.name,
             billNumber: billNumber.trim(),
             date: date.trim(),
             items: filled.map((l) => ({
@@ -218,7 +226,7 @@ export function AddPurchaseBill() {
         try {
             const result = await SavePurchaseBill(bill as db.PurchaseBill);
             setSaved(`Saved bill #${result.id} with ${result.items.length} item(s).`);
-            setCompany('');
+            setCompany(null);
             setBillNumber('');
             setDate(todayDDMMYYYY());
             setLines([blankLine(nextId)]);
@@ -239,12 +247,12 @@ export function AddPurchaseBill() {
                     <div className="grid gap-4 sm:grid-cols-3">
                         <div className="grid gap-2">
                             <Label htmlFor="company">Company name</Label>
-                            <Input
+                            <CompanyCombobox
                                 id="company"
-                                placeholder="e.g. Acme Supplies"
-                                autoComplete="off"
+                                companies={companiesCache}
                                 value={company}
-                                onChange={(e) => setCompany(e.target.value)}
+                                onSelect={setCompany}
+                                onAddNew={(name) => setCompanyDialog({open: true, name})}
                             />
                         </div>
                         <div className="grid gap-2">
@@ -376,9 +384,9 @@ export function AddPurchaseBill() {
                                                 />
                                             </td>
                                             <td className="text-right tabular-nums bg-muted/50">{fmt(c.gstAmount)}</td>
-                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.totalTaxBillAmount)}</td>
-                                            <td className="text-right tabular-nums bg-muted/50 font-medium">{fmt(c.totalBillValue)}</td>
-                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.finalBillingRate)}</td>
+                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.taxBillAmount)}</td>
+                                            <td className="text-right tabular-nums bg-muted/50 font-medium">{fmt(c.billValue)}</td>
+                                            <td className="text-right tabular-nums bg-muted/50">{fmt(c.billingRate)}</td>
                                             <td className="text-right tabular-nums bg-muted/50">{fmt(c.finalRate)}</td>
                                             <td>
                                                 <NumberInput
@@ -450,6 +458,13 @@ export function AddPurchaseBill() {
                 initialName={dialog.name}
                 onOpenChange={(open) => setDialog((d) => ({...d, open}))}
                 onCreated={onItemCreated}
+            />
+
+            <NewCompanyDialog
+                open={companyDialog.open}
+                initialName={companyDialog.name}
+                onOpenChange={(open) => setCompanyDialog((d) => ({...d, open}))}
+                onCreated={onCompanyCreated}
             />
         </form>
     );

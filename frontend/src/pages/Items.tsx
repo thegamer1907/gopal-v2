@@ -6,6 +6,7 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {NumberInput} from '@/components/NumberInput';
+import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {
     Card,
     CardContent,
@@ -31,6 +32,20 @@ export function Items() {
     const [gstPercent, setGstPercent] = useState('');
     const [hsn, setHsn] = useState('');
     const [error, setError] = useState('');
+    const {setDirty} = useUnsavedChanges();
+
+    // All fields are mandatory — Add is enabled only when every field is filled
+    // (a field counts as filled when non-empty after trim; 0 is a valid value).
+    const fields = [name, packSize, gstPercent, hsn];
+    const isValid = fields.every((v) => v.trim() !== '');
+    // Dirty (warn before leaving) once any field has content.
+    const isDirty = fields.some((v) => v.trim() !== '');
+
+    useEffect(() => {
+        setDirty(isDirty);
+    }, [isDirty, setDirty]);
+    // Clear the guard if we unmount (e.g. after confirming "switch anyway").
+    useEffect(() => () => setDirty(false), [setDirty]);
 
     async function refresh() {
         try {
@@ -46,10 +61,9 @@ export function Items() {
     }, []);
 
     async function add() {
-        const trimmed = name.trim();
-        if (!trimmed) return;
+        if (!isValid) return;
         try {
-            await AddItem(trimmed, parseFloat(packSize) || 0, parseFloat(gstPercent) || 0, parseInt(hsn, 10) || 0);
+            await AddItem(name.trim(), parseFloat(packSize) || 0, parseFloat(gstPercent) || 0, parseInt(hsn, 10) || 0);
             setName('');
             setPackSize('');
             setGstPercent('');
@@ -116,7 +130,7 @@ export function Items() {
                                 onChange={setHsn}
                             />
                         </div>
-                        <Button type="submit" disabled={!name.trim()}>
+                        <Button type="submit" disabled={!isValid}>
                             <Plus className="size-4"/>
                             Add
                         </Button>

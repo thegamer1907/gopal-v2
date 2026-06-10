@@ -21,10 +21,10 @@ const appDirName = "gopal-v2"
 // dbFileName is the single SQLite file that holds all app data.
 const dbFileName = "inventory.db"
 
-// DefaultPath returns the absolute path to the database file, creating the
-// containing directory if it does not exist. The location is derived from
+// AppDir returns the per-user app folder (creating it if missing), derived from
 // os.UserConfigDir so it works unchanged across macOS (dev) and Windows (ship).
-func DefaultPath() (string, error) {
+// It holds the default database file and config.json.
+func AppDir() (string, error) {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve user config dir: %w", err)
@@ -32,6 +32,16 @@ func DefaultPath() (string, error) {
 	dir := filepath.Join(configDir, appDirName)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create app dir %q: %w", dir, err)
+	}
+	return dir, nil
+}
+
+// DefaultPath returns the absolute path to the default database file, creating the
+// containing directory if it does not exist.
+func DefaultPath() (string, error) {
+	dir, err := AppDir()
+	if err != nil {
+		return "", err
 	}
 	return filepath.Join(dir, dbFileName), nil
 }
@@ -65,4 +75,18 @@ func OpenAt(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	return conn, nil
+}
+
+// WipeAt deletes the database file at path (and its sqlite sidecar files) and
+// reopens it, recreating an empty, freshly-migrated schema. The caller must have
+// closed any existing connection to this path first. Returns the new connection.
+func WipeAt(path string) (*sql.DB, error) {
+	// Remove the main file plus any WAL/SHM/rollback-journal sidecars (best-effort:
+	// they may not exist depending on journal mode).
+	for _, p := range []string{path, path + "-wal", path + "-shm", path + "-journal"} {
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("remove %q: %w", p, err)
+		}
+	}
+	return OpenAt(path)
 }

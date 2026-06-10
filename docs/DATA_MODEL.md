@@ -16,6 +16,19 @@ keep it in sync with the Go DB layer.
 
 ---
 
+## Storage location & config
+The DB file location is **user-configurable** (Settings → Database). On startup the app opens
+the path from **`config.json`** if set, otherwise the default `inventory.db`:
+
+- `config.json` (next to the default DB, e.g. `~/Library/Application Support/gopal-v2/config.json`)
+  holds `{ "dbPath": "<absolute path>" }`. Empty/missing → use the default.
+- Resolution: `db.ActivePath()` → configured `dbPath` or `db.DefaultPath()`; opened via
+  `db.OpenAt`. If the configured path fails to open, startup **falls back to the default** and
+  resets the config (a bad saved path can't brick the app). See `internal/db/config.go`,
+  `app.go` (`startup`, `switchTo`, `WipeDatabase`) and `docs/DECISIONS.md`.
+
+---
+
 ## Tables
 
 ### `items` — item master (product catalog)
@@ -35,14 +48,29 @@ PRIMARY KEY: `(name, pack_size)`.
 > `hsn` number). The Items **UI is intentionally out of sync** right now (still references
 > the old shape) — to be updated in a later UI pass.
 
+### `companies` — company master
+The list of companies bills can be raised against. **Surrogate `id` PK** (so bills FK to it
+and survive renames); `name` is unique. Just those two columns for now; more to follow.
+Created **before** `purchase_bills` so its FK target exists.
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key (FK target for bills) |
+| `name` | TEXT NOT NULL UNIQUE | company name (label: **Company**) |
+
+> Go: `db.Company` (`id`, `name`) + `AddCompany`/`ListCompanies` in `internal/db/companies.go`;
+> exposed via `app.go`. UI mirrors the Items pattern: a master page (`/companies`) plus a
+> `CompanyCombobox` + `NewCompanyDialog` for picking/adding inline on the bill header.
+
 ### `purchase_bills` — purchase bill header
 One row per bill (from the Add Purchase Bill form: Company, Bill number, Date).
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key (FK target for line items) |
-| `company` | TEXT NOT NULL | supplier / company name |
+| `company_id` | INTEGER NOT NULL | → `companies(id)` (FK). The bill references the company by id, not name. |
 | `bill_number` | TEXT NOT NULL | the supplier's bill number |
 | `date` | TEXT NOT NULL | bill date, stored as entered: `dd/mm/yyyy` |
+
+Foreign key: `(company_id)` → `companies(id)`.
 
 ### `purchase_bill_items` — purchase bill line items
 One row per item line on a bill. Links to its parent bill and to an item in the master.
@@ -63,7 +91,12 @@ Foreign keys: `(bill_id)` → `purchase_bills(id)` ON DELETE CASCADE;
 `(item_name, item_pack_size)` → `items(name, pack_size)`. FK enforcement is on
 (`_pragma=foreign_keys(1)` in `internal/db/db.go`).
 
-> Go: `db.PurchaseBill` + `db.PurchaseBillItem` and `AddPurchaseBill` (transactional
-> header + lines insert) in `internal/db/purchase_bills.go`; exposed via `app.go`. The
-> calculated columns (GST amount, totals, final rates) are **derived on the frontend and
-> not stored**. Discount is stored but currently unused by any formula.
+> Go: `db.PurchaseBill` carries `companyId` (written) plus a read-only `companyName`
+> (populated by a JOIN to `companies` on read, ignored on write). `db.PurchaseBillItem` with
+> `AddPurchaseBill` (transactional header + lines insert) and `ListPurchaseBills` (all bills +
+> lines, newest first; JOINs `companies` for the name) in
+> `internal/db/purchase_bills.go`; exposed via `app.go`. The calculated columns (GST amount,
+> totals, final rates) are **derived on the frontend and not stored** (shared helper
+> `frontend/src/lib/purchaseBill.ts`). Note GST% is **not** stored per line, so the Saved
+> Bills view recomputes using the *current* item-master GST% (see `DECISIONS.md`). Discount
+> is stored but currently unused by any formula.
