@@ -7,48 +7,44 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
+_Shipped in **v0.2.1** (2026-06-10): sidebar nav, Company master, items-belong-to-company,
+View/Edit Bills (edit/delete), Settings/DB management, and the batch-1 polish. v0.2.0 shipped
+the sidebar + Saved Bills + Company master + company FK._
+
 - **App navigation shell** — a **persistent, collapsible left sidebar** (shadcn `sidebar`,
-  `src/components/AppSidebar.tsx`) with **grouped** links (Dashboard · *Purchases*: Add
-  Purchase Bill / Saved Bills · *Masters*: Items), routing via `react-router-dom`
-  (`HashRouter`). The header trigger collapses it to an icon-only rail (tooltips on hover).
-  Add a page → add a `<Route>` in `App.tsx` + an entry in `AppSidebar.tsx`. (Replaced the
-  earlier top-bar nav chips / `Nav.tsx`.)
-- **Dashboard (placeholder)** — landing page; currently shows a centered "Hare Krishna".
-  Real dashboard content (KPIs / recent activity) to be defined.
-- **Item master** — `items` is the product catalog: columns **Item, Pack Size, GST %,
-  HSN** (composite PK on name+pack_size). `AddItem`/`ListItems` bound to the Items screen
-  (add form + table). Add-only for now; edit/delete to follow.
-- **Add Purchase Bill** — full data-entry screen: header (Company, Bill number, Date in
-  dd/mm/yyyy) + searchable line items against the cached item master, live calculated
-  columns (GST amt, totals, final rates), add-new-item dialog, and transactional save
-  (`AddPurchaseBill` → `purchase_bills` + `purchase_bill_items`).
-- **Windows build/release CI** — `.github/workflows/build-windows.yml` builds the app on
-  `windows-latest` and, on a `v*` tag push, publishes a **GitHub Release** with the `.exe`
-  attached (public no-login download link). Repo: `github.com/thegamer1907/gopal-v2`.
+  `src/components/AppSidebar.tsx`): grouped links (Dashboard · *Purchases*: Add Purchase Bill /
+  View/Edit Bills · *Masters*: Items / Companies) + a footer (Settings, Logout). Hamburger in
+  the header collapses it to an icon rail. Launches **maximised**; **Logout** quits (confirm).
+  Routing via `react-router-dom` (`HashRouter`).
+- **Dashboard (placeholder)** — landing page; centered "Hare Krishna". Real content TBD.
+- **Company master** — `companies` (surrogate `id` PK + unique `name`). Companies page under
+  *Masters*; picked/created inline on the bill via `CompanyCombobox` + `NewCompanyDialog`.
+- **Item master (company-scoped)** — `items` has `id` PK + **`company_id` FK**, unique
+  `(company_id, name, pack_size)`. Items page has a company picker + Company column.
+- **Add Purchase Bill** — company-first data-entry screen: header (Company combobox, Bill
+  number, Date in **dd-mmm-yyyy**) + searchable line items **fetched per company**, live calc
+  columns (GST amt, totals, Final Rate), running totals, add-new-item/company dialogs,
+  unsaved-changes guard, centered Save, transactional save.
+- **View/Edit Bills** — `/purchase-bills`. List → read-only detail with **Edit** (reopens the
+  bill form prefilled; saving = **complete overwrite** via `UpdatePurchaseBill`) and **Delete**
+  (confirm → cascade). Backend: `ListPurchaseBills` / `GetPurchaseBill` / `UpdatePurchaseBill`
+  / `DeletePurchaseBill`.
+- **Settings — Database management** — `/settings`: shows the active DB path; **open existing**
+  / **create new** (native dialogs) / **wipe**. Path persists in `config.json` (`db.ActivePath`)
+  with fallback to default. Switching/wiping reloads the app.
+- **Windows build/release CI** — `.github/workflows/build-windows.yml` builds on
+  `windows-latest` and, on a `v*` tag push, publishes a **GitHub Release** with the `.exe`.
+  Repo: `github.com/thegamer1907/gopal-v2`.
 
 ## In Progress
-- **Settings — Database management** — a Settings page (`/settings`, sidebar footer) whose
-  Database section shows the **current DB path** and lets the user **open an existing** `.db`,
-  **create a new** one (native file dialogs), or **wipe** the current DB (recreates the empty
-  schema). The chosen path **persists** across restarts via `config.json` (`db.ActivePath`),
-  with a fallback to the default if a saved path can't be opened. Switching/wiping reloads the
-  app. _Awaiting review before Shipped._ Follow-ups: more settings sections; a backup/export.
-- **Company master** — `companies` is a master list like Items (**`id` PK + `name`** for now,
-  more columns later). Backend `AddCompany`/`ListCompanies` + a dedicated **Companies** page
-  under *Masters* (`/companies`, add-only). On the bill header, Company is now a
-  `CompanyCombobox` (pick from the master) with **add-new-company on the fly**
-  (`NewCompanyDialog`). Bills link to it by **`company_id` FK** → `companies(id)`.
-  _Awaiting review before Shipped._ Follow-ups: company edit/delete; more company columns.
-- **View saved purchase bills** — read UI built: a **list → detail** page at
-  `/purchase-bills` ("Saved Bills" in the sidebar). Backend `ListPurchaseBills` returns all
-  bills (header + lines); the list shows Bill #, Company, Date, item count, and total Bill
-  Value; clicking opens a read-only line-items grid (same columns as Add). Calc columns are
-  recomputed via the shared `src/lib/purchaseBill.ts`. _Awaiting review before Shipped._
-  Possible follow-ups: search/filter, per-bill edit/delete, store GST% as-billed.
+_None._
 
 ## Planned
-- **Items edit/delete** (and search) as the catalog grows.
+- **Items edit/delete** (and search / filter by company) as the catalog grows.
+- **Company edit/delete** and more company columns (GSTIN, address, …).
 - **Dashboard content** — decide the real KPIs / lists.
+- **As-billed snapshots** — optionally store GST%/name on the bill line so historical bills
+  don't shift when the master changes.
 
 ## Ideas
 _Capture raw feature ideas here as they come up (from us or the client)._

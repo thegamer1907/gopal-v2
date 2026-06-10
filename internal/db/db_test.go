@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// TestItemsRoundTripAndPersistence verifies that an item added through one
-// connection is readable, and survives reopening the same database file.
+// TestItemsRoundTripAndPersistence verifies that an item added (under a company)
+// through one connection is readable, and survives reopening the same database file.
 func TestItemsRoundTripAndPersistence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "test.db")
 
@@ -15,12 +15,17 @@ func TestItemsRoundTripAndPersistence(t *testing.T) {
 		t.Fatalf("OpenAt: %v", err)
 	}
 
-	added, err := AddItem(conn, "widget", 100, 18, 3402)
+	company, err := AddCompany(conn, "Acme")
+	if err != nil {
+		t.Fatalf("AddCompany: %v", err)
+	}
+
+	added, err := AddItem(conn, company.ID, "widget", 100, 18, 3402)
 	if err != nil {
 		t.Fatalf("AddItem: %v", err)
 	}
-	if added.Name != "widget" || added.PackSize != 100 ||
-		added.GSTPercent != 18 || added.HSN != 3402 {
+	if added.Name != "widget" || added.PackSize != 100 || added.GSTPercent != 18 ||
+		added.HSN != 3402 || added.CompanyID != company.ID {
 		t.Fatalf("unexpected added item: %+v", added)
 	}
 
@@ -28,8 +33,16 @@ func TestItemsRoundTripAndPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListItems: %v", err)
 	}
-	if len(items) != 1 {
-		t.Fatalf("want 1 item, got %d", len(items))
+	if len(items) != 1 || items[0].CompanyName != "Acme" {
+		t.Fatalf("want 1 item with company Acme, got %+v", items)
+	}
+
+	byCompany, err := ListItemsByCompany(conn, company.ID)
+	if err != nil {
+		t.Fatalf("ListItemsByCompany: %v", err)
+	}
+	if len(byCompany) != 1 || byCompany[0].Name != "widget" {
+		t.Fatalf("ListItemsByCompany want 1 widget, got %+v", byCompany)
 	}
 	conn.Close()
 

@@ -177,3 +177,56 @@ have to re-litigate.
   follow it** without re-deciding.
 - **Source of truth for `{dirty,setDirty}`:** `src/components/UnsavedChanges.tsx`
   (`useUnsavedChanges`).
+
+### 2026-06-09 — Client feedback (batch 1): date format, formula, totals, window, borders
+- **Date format = `dd-mmm-yyyy`** (month in words), as a shared pattern. All date display/entry
+  goes through `frontend/src/lib/date.ts` (`formatDate`/`todayDate`/`parseDate`). Future date
+  fields must reuse it (don't hand-roll formats). Client wanted the month spelled out for clarity.
+- **Final Rate formula corrected** to `(Bill Value / (Tax Qty + D Qty)) / Pack Size` (was
+  `× Pack Size`) in the shared `lib/purchaseBill.ts` — applies to Add + Saved Bills.
+- **Running totals** now cover every line column **except** Pack Size, GST %, Billing Rate,
+  Final Rate, Remarks (those don't sum meaningfully) — i.e. Tax Qty, Tax Value, D Qty, D Value,
+  GST Amount, Tax Bill Amount, Bill Value, Discount, in both the Add footer and Saved detail.
+- **Window starts Maximised** (`options.Maximised`), not kiosk fullscreen — keeps the OS title
+  bar. Paired with an in-app **Logout** (sidebar footer → `App.Quit()` → `runtime.Quit`) behind
+  a "Close GopalOne?" confirm, so a misclick can't kill the app mid-entry.
+- **Input borders darkened**: `--input` set heavier than `--border` (cards/tables unchanged) so
+  entry boxes are visible on the client's bright/low-contrast screen.
+
+### 2026-06-10 — Items belong to a company (company FK); bill is company-first
+- **Decision:** An item belongs to a company. `items` gets a surrogate **`id` PK** + **`company_id`
+  FK** → companies(id), unique `(company_id, name, pack_size)` (same item name can exist under
+  different companies). `purchase_bill_items` now references **`item_id`** → items(id) (replacing
+  the stored `item_name`/`item_pack_size` + composite FK); the bill read JOINs `items` for
+  name/pack/GST. Migrations reordered: companies(1) → items(2) → purchase_bills(3) →
+  purchase_bill_items(4).
+- **Bill flow:** the user picks the **company first**; line-item dropdowns are then fetched per
+  company via `ListItemsByCompany` (not a global cache) and are disabled until a company is set.
+  Changing the company when lines already have items **resets the line grid after a confirm**
+  (items are company-scoped). The on-the-fly add-item dialog **defaults its company to the bill's
+  company** but allows changing it; if changed to a *different* company the item is saved to the
+  master only (not attached to the current line).
+- **Why:** Items genuinely belong to a supplier/company in the client's workflow; this prevents
+  cross-company item mix-ups and lets the same name exist per company. Surrogate id keeps it
+  consistent with the companies decision and survives renames.
+- **Supersedes:** the Saved Bills "live-GST-map via ListItems" note — GST/name/pack now come from
+  the `items` JOIN on the line's `item_id` (still the *current* master value, not an as-billed
+  snapshot).
+- **Cost:** edits existing migrations → dev DB must be reset (delete `inventory.db` or Settings →
+  Wipe).
+
+### 2026-06-10 — Bill edit = full overwrite; delete with confirm; reuse the add form
+- **Decision:** Renamed "Saved Bills" → **View/Edit Bills**. Editing a bill opens the **same
+  purchase-bill form** (`AddPurchaseBill`) at `/purchase-bills/:id/edit` (route param), prefilled
+  from `GetPurchaseBill`. Saving is a **complete overwrite**: `UpdatePurchaseBill` does
+  `UPDATE` header + `DELETE` all `purchase_bill_items` + re-insert — no line diffing.
+  **Delete** (`DeletePurchaseBill`) is offered from the bill detail behind a confirm dialog;
+  line items go via the `ON DELETE CASCADE`.
+- **Why:** The form already has all the company-first item logic, calc columns, totals, and
+  dialogs — reusing it avoids duplicating ~500 lines. "Complete overwrite" matches the client's
+  mental model (re-enter the bill) and keeps the backend simple/robust vs. per-line diffing.
+- **Edit entry point:** from the read-only detail (row → view → Edit/Delete), per the screen's
+  view-then-edit flow.
+- **Note:** the delete confirm uses a **controlled** `AlertDialog` (React-18 ref note). Edit
+  navigation is programmatic (`navigate`), so it isn't intercepted by the sidebar unsaved guard;
+  the handler clears `dirty` before navigating.

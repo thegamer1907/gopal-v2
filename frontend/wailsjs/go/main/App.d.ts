@@ -4,20 +4,30 @@ import {db} from '../models';
 
 export function AddCompany(arg1:string):Promise<db.Company>;
 
-export function AddItem(arg1:string,arg2:number,arg3:number,arg4:number):Promise<db.Item>;
+export function AddItem(arg1:number,arg2:string,arg3:number,arg4:number,arg5:number):Promise<db.Item>;
 
 export function AddPurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
 
 export function CreateNewDatabase():Promise<string>;
 
+export function DeletePurchaseBill(arg1:number):Promise<void>;
+
 export function GetDatabasePath():Promise<string>;
+
+export function GetPurchaseBill(arg1:number):Promise<db.PurchaseBill>;
 
 export function ListCompanies():Promise<Array<db.Company>>;
 
 export function ListItems():Promise<Array<db.Item>>;
 
+export function ListItemsByCompany(arg1:number):Promise<Array<db.Item>>;
+
 export function ListPurchaseBills():Promise<Array<db.PurchaseBill>>;
 
 export function OpenExistingDatabase():Promise<string>;
+
+export function Quit():Promise<void>;
+
+export function UpdatePurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
 
 export function WipeDatabase():Promise<void>;

@@ -14,13 +14,15 @@ interface Props {
     value: db.Item | null;
     onSelect: (item: db.Item) => void;
     onAddNew: (query: string) => void;
+    disabled?: boolean;
+    placeholder?: string;
 }
 
 function label(it: db.Item): string {
     return `${it.name} · ${it.packSize}`;
 }
 
-export function ItemCombobox({items, value, onSelect, onAddNew}: Props) {
+export function ItemCombobox({items, value, onSelect, onAddNew, disabled, placeholder}: Props) {
     const [query, setQuery] = useState('');
     const [open, setOpen] = useState(false);
     const [rect, setRect] = useState<{left: number; top: number; width: number} | null>(null);
@@ -68,8 +70,9 @@ export function ItemCombobox({items, value, onSelect, onAddNew}: Props) {
         <div ref={anchorRef} className="relative w-56">
             <Input
                 className="w-56"
-                placeholder="Search item…"
+                placeholder={placeholder ?? 'Search item…'}
                 autoComplete="off"
+                disabled={disabled}
                 value={query}
                 onChange={(e) => {
                     setQuery(e.target.value);
@@ -80,7 +83,7 @@ export function ItemCombobox({items, value, onSelect, onAddNew}: Props) {
                     blurTimer.current = window.setTimeout(() => setOpen(false), 150);
                 }}
             />
-            {open && rect &&
+            {open && !disabled && rect &&
                 createPortal(
                     <div
                         className="fixed z-50 max-h-64 overflow-auto rounded-md border bg-background p-1 shadow-md"

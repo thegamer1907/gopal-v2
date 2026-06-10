@@ -32,14 +32,14 @@ export interface LineCalc {
 //   Tax Bill Amount = TaxValue + GST Amount
 //   Bill Value      = Tax Bill Amount + D Value
 //   Billing Rate    = TaxValue / TaxQty
-//   Final Rate      = Bill Value / (TaxQty + D Qty) × PackSize
+//   Final Rate      = (Bill Value / (TaxQty + D Qty)) / PackSize
 export function calcLine(input: LineCalcInput): LineCalc {
     const {taxQty, taxValue, dQty, dValue, gstPercent, packSize} = input;
     const gstAmount = (taxValue * gstPercent) / 100;
     const taxBillAmount = taxValue + gstAmount;
     const billValue = taxBillAmount + dValue;
     const qty = taxQty + dQty;
-    const finalRate = qty ? (billValue / qty) * packSize : 0;
+    const finalRate = qty && packSize ? billValue / qty / packSize : 0;
     const billingRate = taxQty ? taxValue / taxQty : 0;
     return {gstAmount, taxBillAmount, billValue, billingRate, finalRate};
 }

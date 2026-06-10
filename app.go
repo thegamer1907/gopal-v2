@@ -62,14 +62,19 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 }
 
-// AddItem creates an item master record and returns the stored record.
-func (a *App) AddItem(name string, packSize, gstPercent float64, hsn int64) (db.Item, error) {
-	return db.AddItem(a.db, name, packSize, gstPercent, hsn)
+// AddItem creates an item master record (for a company) and returns the stored record.
+func (a *App) AddItem(companyID int64, name string, packSize, gstPercent float64, hsn int64) (db.Item, error) {
+	return db.AddItem(a.db, companyID, name, packSize, gstPercent, hsn)
 }
 
-// ListItems returns all inventory items, newest first.
+// ListItems returns all inventory items (with their company name), ordered by company then item.
 func (a *App) ListItems() ([]db.Item, error) {
 	return db.ListItems(a.db)
+}
+
+// ListItemsByCompany returns the items belonging to one company.
+func (a *App) ListItemsByCompany(companyID int64) ([]db.Item, error) {
+	return db.ListItemsByCompany(a.db, companyID)
 }
 
 // AddCompany creates a company master record and returns the stored record.
@@ -147,6 +152,11 @@ func (a *App) WipeDatabase() error {
 	return nil
 }
 
+// Quit closes the application (from the sidebar Logout button).
+func (a *App) Quit() {
+	wruntime.Quit(a.ctx)
+}
+
 // switchTo opens the database at path and, only on success, swaps it in as the
 // active connection and persists the choice. On failure the current DB is kept,
 // so a bad/unreadable file never leaves the app without a database.
@@ -172,4 +182,19 @@ func (a *App) AddPurchaseBill(bill db.PurchaseBill) (db.PurchaseBill, error) {
 // ListPurchaseBills returns all saved purchase bills (header + line items), newest first.
 func (a *App) ListPurchaseBills() ([]db.PurchaseBill, error) {
 	return db.ListPurchaseBills(a.db)
+}
+
+// GetPurchaseBill returns a single purchase bill (header + line items) by id.
+func (a *App) GetPurchaseBill(id int64) (db.PurchaseBill, error) {
+	return db.GetPurchaseBill(a.db, id)
+}
+
+// UpdatePurchaseBill overwrites a bill completely (header + all line items).
+func (a *App) UpdatePurchaseBill(bill db.PurchaseBill) (db.PurchaseBill, error) {
+	return db.UpdatePurchaseBill(a.db, bill)
+}
+
+// DeletePurchaseBill removes a bill and its line items.
+func (a *App) DeletePurchaseBill(id int64) error {
+	return db.DeletePurchaseBill(a.db, id)
 }

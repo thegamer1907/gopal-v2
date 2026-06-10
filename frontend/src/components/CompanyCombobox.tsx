@@ -12,7 +12,8 @@ interface Props {
     companies: db.Company[];
     value: db.Company | null;
     onSelect: (company: db.Company) => void;
-    onAddNew: (query: string) => void;
+    // When omitted, the "add … as new company" option isn't offered (pick-only).
+    onAddNew?: (query: string) => void;
     id?: string;
 }
 
@@ -75,7 +76,7 @@ export function CompanyCombobox({companies, value, onSelect, onAddNew, id}: Prop
                     {filtered.length === 0 && (
                         <p className="px-2 py-1.5 text-sm text-muted-foreground">No matches</p>
                     )}
-                    {q && !exact && (
+                    {q && !exact && onAddNew && (
                         <button
                             type="button"
                             onClick={() => {

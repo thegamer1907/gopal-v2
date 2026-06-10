@@ -15,6 +15,9 @@ export namespace db {
 	    }
 	}
 	export class Item {
+	    id: number;
+	    companyId: number;
+	    companyName: string;
 	    name: string;
 	    packSize: number;
 	    gstPercent: number;
@@ -26,6 +29,9 @@ export namespace db {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.companyId = source["companyId"];
+	        this.companyName = source["companyName"];
 	        this.name = source["name"];
 	        this.packSize = source["packSize"];
 	        this.gstPercent = source["gstPercent"];
@@ -33,8 +39,10 @@ export namespace db {
 	    }
 	}
 	export class PurchaseBillItem {
+	    itemId: number;
 	    itemName: string;
 	    itemPackSize: number;
+	    gstPercent: number;
 	    taxQty: number;
 	    taxValue: number;
 	    dQty: number;
@@ -48,8 +56,10 @@ export namespace db {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.itemId = source["itemId"];
 	        this.itemName = source["itemName"];
 	        this.itemPackSize = source["itemPackSize"];
+	        this.gstPercent = source["gstPercent"];
 	        this.taxQty = source["taxQty"];
 	        this.taxValue = source["taxValue"];
 	        this.dQty = source["dQty"];

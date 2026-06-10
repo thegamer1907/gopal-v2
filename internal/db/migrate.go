@@ -17,24 +17,28 @@ type migration struct {
 // directly; the local dev DB is reset when it changes (see docs/DATA_MODEL.md). Real
 // migrations come later, before there's data worth preserving.
 var migrations = []migration{
+	// Company master. Surrogate id PK so items/bills can FK to it without breaking when a
+	// company is renamed; name is unique. Created first so it's a valid FK target.
 	{
 		id: 1,
+		sql: `CREATE TABLE IF NOT EXISTS companies (
+			id   INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL UNIQUE
+		);`,
+	},
+	// Item master. An item belongs to a company (company_id FK). Surrogate id PK so bill
+	// lines FK to it cleanly; (company_id, name, pack_size) is unique within a company.
+	{
+		id: 2,
 		sql: `CREATE TABLE IF NOT EXISTS items (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			company_id  INTEGER NOT NULL,
 			name        TEXT NOT NULL,
 			pack_size   REAL NOT NULL DEFAULT 0,
 			gst_percent REAL NOT NULL DEFAULT 0,
 			hsn         INTEGER NOT NULL DEFAULT 0,
-			PRIMARY KEY (name, pack_size)
-		);`,
-	},
-	// Company master. Surrogate id PK so bills can FK to it without breaking when a
-	// company is renamed; name is unique. For now just a name; more columns to follow.
-	// Created before purchase_bills so the FK target exists.
-	{
-		id: 2,
-		sql: `CREATE TABLE IF NOT EXISTS companies (
-			id   INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL UNIQUE
+			UNIQUE (company_id, name, pack_size),
+			FOREIGN KEY (company_id) REFERENCES companies(id)
 		);`,
 	},
 	// Purchase bill header (Company, Bill number, Date). Surrogate id so line items
@@ -50,22 +54,21 @@ var migrations = []migration{
 		);`,
 	},
 	// Purchase bill line items. References the parent bill and an item in the master
-	// (composite FK, since items' PK is (name, pack_size)).
+	// (item_id → items(id)). Item name/pack/GST are read back via a JOIN, not stored.
 	{
 		id: 4,
 		sql: `CREATE TABLE IF NOT EXISTS purchase_bill_items (
-			id             INTEGER PRIMARY KEY AUTOINCREMENT,
-			bill_id        INTEGER NOT NULL,
-			item_name      TEXT NOT NULL,
-			item_pack_size REAL NOT NULL,
-			tax_qty        REAL NOT NULL DEFAULT 0,
-			tax_value      REAL NOT NULL DEFAULT 0,
-			d_qty          REAL NOT NULL DEFAULT 0,
-			d_value        REAL NOT NULL DEFAULT 0,
-			discount       REAL NOT NULL DEFAULT 0,
-			remarks        TEXT NOT NULL DEFAULT '',
+			id        INTEGER PRIMARY KEY AUTOINCREMENT,
+			bill_id   INTEGER NOT NULL,
+			item_id   INTEGER NOT NULL,
+			tax_qty   REAL NOT NULL DEFAULT 0,
+			tax_value REAL NOT NULL DEFAULT 0,
+			d_qty     REAL NOT NULL DEFAULT 0,
+			d_value   REAL NOT NULL DEFAULT 0,
+			discount  REAL NOT NULL DEFAULT 0,
+			remarks   TEXT NOT NULL DEFAULT '',
 			FOREIGN KEY (bill_id) REFERENCES purchase_bills(id) ON DELETE CASCADE,
-			FOREIGN KEY (item_name, item_pack_size) REFERENCES items(name, pack_size)
+			FOREIGN KEY (item_id) REFERENCES items(id)
 		);`,
 	},
 }

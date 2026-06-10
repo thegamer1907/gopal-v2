@@ -6,6 +6,88 @@ reads the top entry first.
 
 ---
 
+## 2026-06-10 — Client-verified; cut release v0.2.1
+**Did:** Client reviewed and **verified** everything built since v0.2.0 — batch-1 quick wins
+(dd-mmm-yyyy dates, Final Rate fix, fuller totals, darker inputs, maximised + Logout, centered
+Save), **items-belong-to-a-company** (company FK + company-first bill flow), and **View/Edit
+Bills** (edit = full overwrite + delete). Moved those features **Shipped** in `FEATURES.md`.
+Committed, pushed `main`, tagged **v0.2.1** → Windows `.exe` GitHub Release.
+
+**Next steps:** await next client feedback. Open follow-ups in `FEATURES.md → Planned`
+(items/company edit-delete + search, Dashboard content, as-billed snapshots).
+
+---
+
+## 2026-06-10 — View/Edit Bills: edit (full overwrite) + delete
+**Did:** (client feedback, big item #2)
+- **Renamed** sidebar + page "Saved Bills" → **View/Edit Bills** (route unchanged).
+- **Backend:** `GetPurchaseBill(id)`, `UpdatePurchaseBill(bill)` (overwrite: UPDATE header +
+  DELETE all lines + re-insert; extracted shared `insertBillItems`), `DeletePurchaseBill(id)`
+  (cascade). Exposed on `app.go`; bindings regenerated.
+- **Edit reuses the bill form:** `AddPurchaseBill` now also serves `/purchase-bills/:id/edit`
+  (via `useParams`). Edit mode prefills header + lines from `GetPurchaseBill`/`ListItemsByCompany`,
+  shows an "Edit purchase bill" heading + **Update bill** button, and saves via
+  `UpdatePurchaseBill` then `navigate('/purchase-bills')`.
+- **Detail Edit/Delete:** `BillDetail` gained **Edit bill** + **Delete** (controlled confirm
+  `AlertDialog`); parent deletes then refreshes the list.
+- Verified `go build/vet/test`, `npm run build` ✅. Docs updated (UI/DECISIONS/FEATURES).
+
+**Next steps:** verify live in `wails dev` (create → view → edit overwrite → delete). This
+completes the two big client items + batch-1 quick wins → ready to commit and cut **v0.2.1**
+(ask before marking the In-Progress features Shipped).
+
+---
+
+## 2026-06-10 — Items belong to a company (FK) + company-first bill flow
+**Did:** (client feedback, big item #1)
+- **Schema:** `items` reshaped to `id` PK + `company_id` FK → companies, unique
+  `(company_id, name, pack_size)`. `purchase_bill_items` now uses `item_id` FK → items(id)
+  (dropped stored `item_name`/`item_pack_size`). Migrations reordered: companies(1) → items(2)
+  → purchase_bills(3) → purchase_bill_items(4).
+- **Go:** `Item` gains id/companyId/companyName(JOIN); `AddItem(companyID,…)`; new
+  `ListItemsByCompany`; `ListItems` JOINs company name. `PurchaseBillItem` gains
+  itemId(write) + itemName/itemPackSize/gstPercent(JOIN read); `ListPurchaseBills` JOINs
+  items. Updated `db_test.go`. Bindings regenerated.
+- **Frontend:** Items page → company picker (required) + Company column. `ItemCombobox` gains
+  `disabled`/`placeholder`. `NewItemDialog` gains a company picker (defaults to bill company,
+  all-required). `AddPurchaseBill` → company-first: items fetched per company, item dropdown
+  disabled until a company is chosen, company-change confirm+reset (combobox key-bump resync),
+  add-item attaches to the line only if same company, save sends `itemId`. `SavedBills`
+  simplified — dropped the ListItems/GST map; uses `it.gstPercent` from the JOIN. (Also
+  removed a stray NUL byte found in SavedBills' old `itemKey`.)
+- Verified `go build/vet/test`, `npm run build` ✅. Docs updated (DATA_MODEL/DECISIONS/
+  FEATURES). `CompanyCombobox.onAddNew` made optional (pick-only in the item dialog).
+
+**⚠️ Action needed:** edits existing migrations → **reset the dev DB** (delete `inventory.db`
+or Settings → Database → Wipe) before next run.
+
+**Next steps:** verify live in `wails dev` (per the plan's checklist); then client feedback
+big item #2. Ship v0.2.x after this batch. **Ask before marking Shipped.**
+
+---
+
+## 2026-06-09 — Client feedback batch 1 (quick wins)
+**Did:** (six items from the client's v0.2.0 review)
+1. **Date → `dd-mmm-yyyy`** (month in words). New shared `frontend/src/lib/date.ts`
+   (`formatDate`/`todayDate`/`parseDate`); `AddPurchaseBill` uses it (dropped its local
+   `*DDMMYYYY` helpers); made the canonical format/pattern.
+2. **Final Rate** fixed to `(Bill Value / (Tax Qty + D Qty)) / Pack Size` in shared
+   `lib/purchaseBill.ts` (Add + Saved both update).
+3. **Running totals** expanded to Tax Qty, Tax Value, D Qty, D Value, GST Amount, Tax Bill
+   Amount, Bill Value, Discount (excl. Pack Size, GST %, Billing Rate, Final Rate, Remarks) —
+   both the Add footer and the Saved-bill detail footer.
+4. **Darker input borders** — `--input` token darkened (heavier than `--border`) in `index.css`.
+5. **Maximised launch + Logout** — `WindowStartState: options.Maximised` (`main.go`); new
+   `App.Quit()` (`runtime.Quit`); sidebar **footer Logout** with a "Close GopalOne?" confirm.
+6. **Save button centered** on Add Purchase Bill (`justify-end` → `justify-center`).
+- Verified `go build ./...`, `wails generate module`, `npm run build` ✅. Docs updated
+  (`UI.md`, `DECISIONS.md`).
+
+**Next steps:** verify live in `wails dev`; then the rest of the client feedback. Ship a v0.2.x
+release once this batch is confirmed.
+
+---
+
 ## 2026-06-09 — Master add-forms: submit guard + dirty warning (now a pattern)
 **Did:**
 - **Items** and **Companies** add-forms now follow the Add Purchase Bill convention: **all

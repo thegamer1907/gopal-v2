@@ -19,6 +19,10 @@ Screens, flows, and visual decisions, recorded as they firm up.
   single decimal point only (`inputMode="decimal"`). It takes `value: string` /
   `onChange: (v) => void`.
 - Icons: **lucide-react**.
+- **Dates** display/enter as **dd-mmm-yyyy** (month in words) via the shared **`@/lib/date`**
+  (`formatDate` / `todayDate` / `parseDate`) — use it everywhere a date is shown or typed.
+- **Input borders** are deliberately darker than card/table borders: the `--input` token
+  (`index.css`) is a heavier gray than `--border` so entry boxes read clearly on bright screens.
 - **Data-entry pages follow a required pattern** (see `DECISIONS.md`, 2026-06-09): disable the
   submit button until `isValid` (all required fields filled — `0` counts as filled), and wire
   the unsaved-changes guard (`setDirty(isDirty)` via effect + clear on unmount) so navigating
@@ -29,6 +33,8 @@ Screens, flows, and visual decisions, recorded as they firm up.
 ---
 
 ## App shell & navigation
+- **Window:** launches **maximised** (`WindowStartState: options.Maximised` in `main.go`) —
+  fills the screen but keeps the OS title bar.
 - **Layout** (`src/App.tsx`): a **persistent, collapsible left sidebar**
   (`src/components/AppSidebar.tsx`) beside the routed content, via shadcn's `sidebar`
   primitive — `SidebarProvider` (pinned to `h-svh`) › `AppSidebar` + `SidebarInset`. **There
@@ -41,7 +47,8 @@ Screens, flows, and visual decisions, recorded as they firm up.
   `useSidebar().toggleSidebar()`; no separate trigger element). Then **grouped** `NavLink`
   menu items — *(ungrouped)* Dashboard · **Purchases**: Add Purchase Bill / Saved Bills ·
   **Masters**: Items / Companies — and a **`SidebarFooter`** pinned at the bottom with
-  **Settings** (gear). Collapsing hides labels + the wordmark, leaving a thin **icon-only
+  **Settings** (gear) and **Logout** (closes the app via `Quit()` after a "Close GopalOne?"
+  confirm `AlertDialog`). Collapsing hides labels + the wordmark, leaving a thin **icon-only
   rail** (the hamburger stays, to expand again; menu tooltips show labels on hover) to
   reclaim width for wide grids. The active route is highlighted (`SidebarMenuButton
   isActive`, exact-path match so sibling routes like `/purchase-bills` and
@@ -65,11 +72,12 @@ Screens, flows, and visual decisions, recorded as they firm up.
   (mirrors the item search): type to filter the cached company master; pick one, or **"Add
   '…' as new company"** opens `NewCompanyDialog` → `AddCompany` → pushed into the cache and
   selected. The selected value is the full company (id + name); the bill is saved with its
-  `company_id`. Save stays disabled until a company is chosen. Date is a text field in **dd/mm/yyyy**
-  (defaults to today) and is stored as entered. It has **both** a free-typed text box and a
-  **calendar popover** (shadcn `calendar` + `popover`, react-day-picker) behind a calendar
-  icon; both drive one `date` string — picking a day writes `dd/mm/yyyy`, and the calendar
-  opens on the currently-typed date when it parses (`parseDDMMYYYY` / `fmtDDMMYYYY` helpers).
+  `company_id`. Save stays disabled until a company is chosen. Date is a text field in
+  **dd-mmm-yyyy** (month in words, e.g. `09-Jun-2026`; defaults to today) and is stored as
+  entered. It has **both** a free-typed text box and a **calendar popover** (shadcn `calendar`
+  + `popover`, react-day-picker) behind a calendar icon; both drive one `date` string — picking
+  a day writes `dd-mmm-yyyy`, and the calendar opens on the currently-typed date when it parses.
+  Format/parse via the shared **`@/lib/date`** (`formatDate` / `todayDate` / `parseDate`).
 - **Line items** — a wide, horizontally-scrollable grid. Each line:
   - **Item search** (`ItemCombobox`): all items are cached once on load (`ListItems`); typing
     filters and shows suggestions as “name · pack size”. Selecting one fills the line and
@@ -84,35 +92,42 @@ Screens, flows, and visual decisions, recorded as they firm up.
   - **Calculated (read-only, muted) columns**, recomputed live (display names → formula):
     GST Amount = TaxValue×GST%/100 · Tax Bill Amount = TaxValue+GST Amount ·
     Bill Value = Tax Bill Amount + D-Value ·
-    Billing Rate = TaxValue/TaxQty · Final Rate = BillValue/(TaxQty+D-Qty)×PackSize.
-  - **Add row** / per-row delete. A **table footer "Totals" row** shows running sums under
-    **Tax Bill Amount** and **Bill Value** (replaces the old single Bill total).
+    Billing Rate = TaxValue/TaxQty · Final Rate = (BillValue/(TaxQty+D-Qty))/PackSize.
+  - **Add row** / per-row delete. A **table footer "Totals" row** shows running sums for
+    **every column except** Pack Size, GST %, Billing Rate, Final Rate and Remarks — i.e. Tax
+    Qty, Tax Value, D Qty, D Value, GST Amount, Tax Bill Amount, Bill Value, and Discount.
 - **Add new item on the fly** (`NewItemDialog`): if a search has no match, “Add … as new
   item” opens a dialog (Item / Pack Size / GST % / HSN) → `AddItem` → pushed into the cache
   and selected for the line.
 - **Save** persists the whole bill via `AddPurchaseBill` (header + lines, one transaction);
   shows a confirmation and resets the form. The button is **disabled until the form is
-  valid**: header (Company, Bill number, a real dd/mm/yyyy date) filled, **at least one
-  complete line**, and **no partially-filled line** left over. Mandatory line fields are the
+  valid**: header (Company, Bill number, a real dd-mmm-yyyy date) filled, **at least one
+  complete line**, and **no partially-filled line** left over. The **Save button is centered**
+  at the bottom of the page. Mandatory line fields are the
   item + the four numeric inputs (Tax Qty, Tax Value, D Qty, D Value); **Discount and Remarks
   are optional**.
 - Built with shadcn `Card`, `Input`, `Label`, `Button`, `Dialog` + lucide icons; the line
   grid is a plain scrollable `<table>` (many columns).
+- **Doubles as the bill editor:** the same component also serves `/purchase-bills/:id/edit`
+  (route param via `useParams`). In edit mode it prefills the header + lines from
+  `GetPurchaseBill`, shows an "Edit purchase bill" heading + an **Update bill** button, and on
+  save does a **complete overwrite** via `UpdatePurchaseBill` then returns to View/Edit Bills.
 
-### Saved Bills (`/purchase-bills`) — sidebar "Saved Bills"
+### View/Edit Bills (`/purchase-bills`) — sidebar "View/Edit Bills"
 - **List → detail**, single page (`src/pages/SavedBills.tsx`). Loads all bills via
-  `ListPurchaseBills` plus the item master via `ListItems` (for GST% lookup) on mount.
+  `ListPurchaseBills` on mount (`refresh()` is reused after a delete).
 - **List:** a card with a table of bills — **Bill number · Company · Date · Items (count) ·
   Bill value (total)**. Rows are clickable (hover highlight); empty state when none saved.
-- **Detail:** clicking a row swaps in a read-only view — a **"Back to all bills"** button, a
-  header card (Bill number / Company · Date), and the **same line-items grid as Add Purchase
-  Bill** but display-only (no inputs/delete), with the footer **Totals** row.
+- **Detail:** clicking a row swaps in a read-only view — a **"Back to all bills"** button plus
+  **Edit bill** and **Delete** actions, a header card (Bill number / Company · Date), and the
+  **same line-items grid as Add Purchase Bill** but display-only, with the footer **Totals** row.
+  - **Edit bill** → navigates to `/purchase-bills/:id/edit` (the same bill form in edit mode).
+  - **Delete** → a controlled `AlertDialog` confirm → `DeletePurchaseBill` → back to the list
+    (refreshed). Line items are removed by the DB cascade.
 - **Calculated columns** (GST Amount, Tax Bill Amount, Bill Value, Billing Rate, Final Rate)
-  are **not stored** — they're recomputed from the saved raw fields via the shared
-  `calcLine` helper in **`src/lib/purchaseBill.ts`** (same module the Add screen uses, so the
-  formula lives in one place). **GST%** isn't stored on the line; it's looked up from the
-  **current** item master by `(name, pack size)` — i.e. the *live* rate, not an as-billed
-  snapshot (see `DECISIONS.md`; defaults to 0 if the item is no longer in the master).
+  are **not stored** — recomputed from the saved raw fields via the shared `calcLine` helper in
+  **`src/lib/purchaseBill.ts`**. Item **name/pack/GST** come from the backend's JOIN on the
+  line's `item_id` (current master value), so no separate lookup is needed.
 
 ### Items (`/items`) — item master
 - A live item count, an "Add item" card (**Item, Pack Size, GST %, HSN** + Add), and a card

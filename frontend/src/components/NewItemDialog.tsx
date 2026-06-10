@@ -5,6 +5,7 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {NumberInput} from '@/components/NumberInput';
+import {CompanyCombobox} from '@/components/CompanyCombobox';
 import {
     Dialog,
     DialogContent,
@@ -15,16 +16,20 @@ import {
 } from '@/components/ui/dialog';
 
 // Dialog to add a brand-new item to the master while building a purchase bill.
-// On save it persists via AddItem and hands the created item back to the caller
-// (which also pushes it into the in-memory cache).
+// The company defaults to the bill's company but can be changed. On save it
+// persists via AddItem and hands the created item back to the caller (which
+// attaches it to the line only if it belongs to the bill's company).
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     initialName: string;
+    companies: db.Company[];
+    defaultCompany: db.Company | null;
     onCreated: (item: db.Item) => void;
 }
 
-export function NewItemDialog({open, onOpenChange, initialName, onCreated}: Props) {
+export function NewItemDialog({open, onOpenChange, initialName, companies, defaultCompany, onCreated}: Props) {
+    const [company, setCompany] = useState<db.Company | null>(null);
     const [name, setName] = useState('');
     const [packSize, setPackSize] = useState('');
     const [gstPercent, setGstPercent] = useState('');
@@ -32,24 +37,30 @@ export function NewItemDialog({open, onOpenChange, initialName, onCreated}: Prop
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
-    // Seed the name from what the user typed in the search field each time it opens.
+    // Seed the company (from the bill) and the name (from the search) each open.
     useEffect(() => {
         if (open) {
+            setCompany(defaultCompany);
             setName(initialName);
             setPackSize('');
             setGstPercent('');
             setHsn('');
             setError('');
         }
-    }, [open, initialName]);
+    }, [open, initialName, defaultCompany]);
+
+    // All fields mandatory (data-entry pattern).
+    const isValid =
+        company !== null &&
+        [name, packSize, gstPercent, hsn].every((v) => v.trim() !== '');
 
     async function save() {
-        const trimmed = name.trim();
-        if (!trimmed) return;
+        if (!isValid || !company) return;
         setSaving(true);
         try {
             const created = await AddItem(
-                trimmed,
+                company.id,
+                name.trim(),
                 parseFloat(packSize) || 0,
                 parseFloat(gstPercent) || 0,
                 parseInt(hsn, 10) || 0,
@@ -69,7 +80,7 @@ export function NewItemDialog({open, onOpenChange, initialName, onCreated}: Prop
                 <DialogHeader>
                     <DialogTitle>Add new item</DialogTitle>
                     <DialogDescription>
-                        Saved to the item master and available for future bills.
+                        Saved to the item master under the chosen company and available for future bills.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -81,10 +92,18 @@ export function NewItemDialog({open, onOpenChange, initialName, onCreated}: Prop
                     }}
                 >
                     <div className="grid gap-2">
+                        <Label htmlFor="ni-company">Company</Label>
+                        <CompanyCombobox
+                            id="ni-company"
+                            companies={companies}
+                            value={company}
+                            onSelect={setCompany}
+                        />
+                    </div>
+                    <div className="grid gap-2">
                         <Label htmlFor="ni-name">Item</Label>
                         <Input
                             id="ni-name"
-                            autoFocus
                             autoComplete="off"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -126,7 +145,7 @@ export function NewItemDialog({open, onOpenChange, initialName, onCreated}: Prop
                     <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
-                    <Button type="button" onClick={save} disabled={!name.trim() || saving}>
+                    <Button type="button" onClick={save} disabled={!isValid || saving}>
                         Save item
                     </Button>
                 </DialogFooter>

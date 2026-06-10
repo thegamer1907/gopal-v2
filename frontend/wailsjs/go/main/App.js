@@ -6,8 +6,8 @@ export function AddCompany(arg1) {
   return window['go']['main']['App']['AddCompany'](arg1);
 }
 
-export function AddItem(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['AddItem'](arg1, arg2, arg3, arg4);
+export function AddItem(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['AddItem'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function AddPurchaseBill(arg1) {
@@ -18,8 +18,16 @@ export function CreateNewDatabase() {
   return window['go']['main']['App']['CreateNewDatabase']();
 }
 
+export function DeletePurchaseBill(arg1) {
+  return window['go']['main']['App']['DeletePurchaseBill'](arg1);
+}
+
 export function GetDatabasePath() {
   return window['go']['main']['App']['GetDatabasePath']();
+}
+
+export function GetPurchaseBill(arg1) {
+  return window['go']['main']['App']['GetPurchaseBill'](arg1);
 }
 
 export function ListCompanies() {
@@ -30,12 +38,24 @@ export function ListItems() {
   return window['go']['main']['App']['ListItems']();
 }
 
+export function ListItemsByCompany(arg1) {
+  return window['go']['main']['App']['ListItemsByCompany'](arg1);
+}
+
 export function ListPurchaseBills() {
   return window['go']['main']['App']['ListPurchaseBills']();
 }
 
 export function OpenExistingDatabase() {
   return window['go']['main']['App']['OpenExistingDatabase']();
+}
+
+export function Quit() {
+  return window['go']['main']['App']['Quit']();
+}
+
+export function UpdatePurchaseBill(arg1) {
+  return window['go']['main']['App']['UpdatePurchaseBill'](arg1);
 }
 
 export function WipeDatabase() {

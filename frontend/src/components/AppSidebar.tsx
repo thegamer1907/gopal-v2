@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import {NavLink, useLocation, useNavigate} from 'react-router-dom';
-import {LayoutDashboard, FilePlus2, FileText, Package, Building2, Settings, Menu} from 'lucide-react';
+import {LayoutDashboard, FilePlus2, FileText, Package, Building2, Settings, LogOut, Menu} from 'lucide-react';
+import {Quit} from '../../wailsjs/go/main/App';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {Button} from '@/components/ui/button';
 import {
@@ -38,7 +39,7 @@ const groups: {label?: string; items: NavItem[]}[] = [
         label: 'Purchases',
         items: [
             {to: '/purchase-bills/new', label: 'Add Purchase Bill', icon: FilePlus2},
-            {to: '/purchase-bills', label: 'Saved Bills', icon: FileText},
+            {to: '/purchase-bills', label: 'View/Edit Bills', icon: FileText},
         ],
     },
     {
@@ -57,6 +58,8 @@ export function AppSidebar() {
     const location = useLocation();
     // Destination held while the "discard unsaved changes?" prompt is open.
     const [pending, setPending] = useState<string | null>(null);
+    // Whether the "close the app?" confirmation is open.
+    const [confirmQuit, setConfirmQuit] = useState(false);
 
     function isActive(to: string): boolean {
         // Exact match for all routes — '/purchase-bills' and '/purchase-bills/new'
@@ -133,6 +136,12 @@ export function AppSidebar() {
                                 </NavLink>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton tooltip="Logout" onClick={() => setConfirmQuit(true)}>
+                                <LogOut className="size-4"/>
+                                <span>Logout</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarFooter>
             </Sidebar>
@@ -148,6 +157,21 @@ export function AppSidebar() {
                     <AlertDialogFooter>
                         <AlertDialogCancel>Stay and save</AlertDialogCancel>
                         <AlertDialogAction onClick={confirmLeave}>Switch anyway</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={confirmQuit} onOpenChange={setConfirmQuit}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Close GopalOne?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will close the application.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => Quit()}>Close</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

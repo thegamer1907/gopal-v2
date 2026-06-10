@@ -1,11 +1,12 @@
 import {useEffect, useState} from 'react';
 import {Package, Plus} from 'lucide-react';
-import {AddItem, ListItems} from '../../wailsjs/go/main/App';
+import {AddItem, ListItems, ListCompanies} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {NumberInput} from '@/components/NumberInput';
+import {CompanyCombobox} from '@/components/CompanyCombobox';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {
     Card,
@@ -27,6 +28,8 @@ import {
 // See docs/DATA_MODEL.md (items table).
 export function Items() {
     const [items, setItems] = useState<db.Item[]>([]);
+    const [companies, setCompanies] = useState<db.Company[]>([]);
+    const [company, setCompany] = useState<db.Company | null>(null);
     const [name, setName] = useState('');
     const [packSize, setPackSize] = useState('');
     const [gstPercent, setGstPercent] = useState('');
@@ -34,11 +37,12 @@ export function Items() {
     const [error, setError] = useState('');
     const {setDirty} = useUnsavedChanges();
 
-    // All fields are mandatory — Add is enabled only when every field is filled
-    // (a field counts as filled when non-empty after trim; 0 is a valid value).
+    // All fields are mandatory — Add is enabled only when a company is chosen and
+    // every field is filled (filled = non-empty after trim; 0 is a valid value).
     const fields = [name, packSize, gstPercent, hsn];
-    const isValid = fields.every((v) => v.trim() !== '');
-    // Dirty (warn before leaving) once any field has content.
+    const isValid = company !== null && fields.every((v) => v.trim() !== '');
+    // Dirty (warn before leaving) once any item field has content (company alone
+    // isn't "unsaved work").
     const isDirty = fields.some((v) => v.trim() !== '');
 
     useEffect(() => {
@@ -49,7 +53,9 @@ export function Items() {
 
     async function refresh() {
         try {
-            setItems(await ListItems());
+            const [its, cos] = await Promise.all([ListItems(), ListCompanies()]);
+            setItems(its);
+            setCompanies(cos);
             setError('');
         } catch (e: any) {
             setError(String(e));
@@ -61,9 +67,10 @@ export function Items() {
     }, []);
 
     async function add() {
-        if (!isValid) return;
+        if (!isValid || !company) return;
         try {
-            await AddItem(name.trim(), parseFloat(packSize) || 0, parseFloat(gstPercent) || 0, parseInt(hsn, 10) || 0);
+            await AddItem(company.id, name.trim(), parseFloat(packSize) || 0, parseFloat(gstPercent) || 0, parseInt(hsn, 10) || 0);
+            // Keep the company selected for quick consecutive adds; clear the rest.
             setName('');
             setPackSize('');
             setGstPercent('');
@@ -93,6 +100,15 @@ export function Items() {
                             add();
                         }}
                     >
+                        <div className="grid gap-2 w-56">
+                            <Label htmlFor="company">Company</Label>
+                            <CompanyCombobox
+                                id="company"
+                                companies={companies}
+                                value={company}
+                                onSelect={setCompany}
+                            />
+                        </div>
                         <div className="grid flex-1 gap-2 min-w-48">
                             <Label htmlFor="name">Item</Label>
                             <Input
@@ -153,6 +169,7 @@ export function Items() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead>Company</TableHead>
                                     <TableHead>Item</TableHead>
                                     <TableHead>Pack Size</TableHead>
                                     <TableHead className="text-right">GST %</TableHead>
@@ -161,7 +178,8 @@ export function Items() {
                             </TableHeader>
                             <TableBody>
                                 {items.map((it) => (
-                                    <TableRow key={`${it.name}-${it.packSize}`}>
+                                    <TableRow key={it.id}>
+                                        <TableCell className="text-muted-foreground">{it.companyName}</TableCell>
                                         <TableCell className="font-medium">{it.name}</TableCell>
                                         <TableCell>{it.packSize}</TableCell>
                                         <TableCell className="text-right tabular-nums">{it.gstPercent}</TableCell>

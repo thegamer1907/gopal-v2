@@ -20,6 +20,9 @@ func main() {
 		Title:  "gopal-v2",
 		Width:  1024,
 		Height: 768,
+		// Start filling the screen (keeps the OS title bar); the in-app sidebar
+		// Logout button quits the app.
+		WindowStartState: options.Maximised,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

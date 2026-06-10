@@ -26,6 +26,7 @@ function App() {
                             <Routes>
                                 <Route path="/" element={<Dashboard/>}/>
                                 <Route path="/purchase-bills/new" element={<AddPurchaseBill/>}/>
+                                <Route path="/purchase-bills/:id/edit" element={<AddPurchaseBill/>}/>
                                 <Route path="/purchase-bills" element={<SavedBills/>}/>
                                 <Route path="/items" element={<Items/>}/>
                                 <Route path="/companies" element={<Companies/>}/>
