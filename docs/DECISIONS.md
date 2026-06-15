@@ -140,7 +140,8 @@ have to re-litigate.
   guarantees every bill points at a real company. Worth doing now while there's no data.
 - **Cost:** This **edits existing migrations**, so the dev DB must be reset (delete
   `inventory.db`) to pick it up — fine per the current iteration policy (no real data yet).
-- **Still open:** company edit/delete; more company columns (GSTIN, address, …).
+- **Still open (at the time):** company edit/delete. (Shipped 2026-06-15; company stays
+  name-only — no extra columns planned.)
 
 ### 2026-06-09 — Configurable DB location, persisted in config.json
 - **Decision:** The database file is user-selectable (Settings → Database). The active path is
@@ -230,3 +231,57 @@ have to re-litigate.
 - **Note:** the delete confirm uses a **controlled** `AlertDialog` (React-18 ref note). Edit
   navigation is programmatic (`navigate`), so it isn't intercepted by the sidebar unsaved guard;
   the handler clears `dirty` before navigating.
+
+### 2026-06-15 — Masters edit/delete; reference-guarded delete; rename-only company
+- **Decision:** Items and Companies each get per-row **Edit** + **Delete**. Edit opens a
+  **controlled dialog** (`EditItemDialog` / `EditCompanyDialog`) reusing the add fields —
+  the item edit can also reassign the item's company. Delete uses a **controlled
+  `AlertDialog`** (React-18 ref note). Backend: `UpdateItem`/`DeleteItem`,
+  `UpdateCompany`/`DeleteCompany`.
+- **Reference guard:** delete is refused in Go (an explicit COUNT, not raw FK failure) when
+  rows still reference the master — items/bills for a company, bill lines for an item — and
+  returns a friendly count message surfaced on the page.
+- **Company stays name-only:** the client scope here is **edit/delete only, no schema change**.
+  (GSTIN/address columns are **not** planned — don't add them unless the client asks.)
+- **Items search:** a single search box filtering by item **or** company name (doubles as
+  filter-by-company), instead of a separate company dropdown — no new Select component, and it
+  covers the "search / filter by company" need in one control.
+
+### 2026-06-15 — Indian number format; lightweight sortable/filterable tables; bills sorted by date
+- **Decision:** All money renders **Indian-style** (`en-IN` lakh/crore grouping, 2 decimals) and
+  quantities as **whole numbers** with the same grouping. Implemented as two helpers in
+  `frontend/src/lib/purchaseBill.ts`: `fmt` (money) keeps its name so existing money render sites
+  need no change; `fmtQty` (qty) is applied to the quantity totals/cells (SavedBills detail +
+  AddPurchaseBill totals). Both use module-level `Intl.NumberFormat` instances and NaN-guard.
+- **Tables:** list tables are made sortable + filterable with **lightweight custom** helpers, not a
+  table library (user choice): `useTableSort` hook (`@/hooks`) + `SortableHeader` (`@/components`),
+  paired with the existing `useMemo` search pattern. Tables with a date column add a
+  `DateRangeFilter` (Popover + range `Calendar`, reusing the single-date picker pattern from
+  AddPurchaseBill; trigger styled via `buttonVariants`, not `asChild`, per the React-18 ref note).
+- **View/Edit Bills list** columns reordered to **Company · Date · Bill number · Qty · Amount**
+  (Qty = Σ(taxQty+dQty); replaces the item-count column) and **defaults to date-descending**
+  (newest first); unparseable dates sort to the bottom (epoch fallback). Date-range `to` bound is
+  treated as **end-of-day** so the upper day is inclusive.
+- **Why:** client feedback. `en-IN` is the correct grouping for the client's locale; a shared
+  formatter keeps it consistent and one-line to change. Lightweight helpers avoid a dependency for
+  3 small tables while still giving consistent sort/search/range UX. No backend/schema change.
+- **Alternatives:** TanStack Table (rejected for now — overkill for 3 tables, adds a dep);
+  per-site `toLocaleString` (rejected — drifts, easy to miss a site).
+
+### 2026-06-15 — Navigation: flat top bar (supersedes the 2026-06-09 collapsible sidebar)
+- **Decision:** Replace the persistent collapsible **left sidebar** with a **flat, always-visible
+  top navigation bar** (`src/components/TopNav.tsx`): the GopalOne wordmark + every page as a link
+  in one horizontal row (Dashboard · Add Purchase Bill · View/Edit Bills · Items · Companies), with
+  Settings + Logout on the right. App shell becomes `div.flex.h-svh.flex-col` › `TopNav` ›
+  `<main className="flex-1 overflow-auto …">`. Deleted `AppSidebar.tsx` and the now-unused
+  `ui/sidebar.tsx` primitive. The unsaved-changes guard + quit confirm moved into `TopNav` unchanged.
+- **Why:** Client feedback — he's uncomfortable with the sidebar, keeps **forgetting it's
+  collapsible** (forgets to open/close it), and finds **vertical scrolling more natural** than a
+  side rail. A flat bar keeps every page one click away with **nothing hidden** to forget about.
+- **Supersedes:** the 2026-06-09 "persistent collapsible sidebar" decision. The sidebar's main
+  justification was reclaiming width for the wide Add-Bill grid by collapsing — a top bar gives
+  every page **full width permanently**, so that need is gone (bonus: smaller bundle, no sidebar
+  primitive).
+- **Chosen layout:** flat/all-visible over grouped dropdowns — dropdowns would re-introduce the
+  same "hidden behind a click" problem that bothered the client. Group labels (Purchases/Masters)
+  dropped; only 5 destinations, so a single row is clear on the maximised window.

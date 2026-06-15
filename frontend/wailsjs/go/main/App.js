@@ -18,6 +18,14 @@ export function CreateNewDatabase() {
   return window['go']['main']['App']['CreateNewDatabase']();
 }
 
+export function DeleteCompany(arg1) {
+  return window['go']['main']['App']['DeleteCompany'](arg1);
+}
+
+export function DeleteItem(arg1) {
+  return window['go']['main']['App']['DeleteItem'](arg1);
+}
+
 export function DeletePurchaseBill(arg1) {
   return window['go']['main']['App']['DeletePurchaseBill'](arg1);
 }
@@ -52,6 +60,14 @@ export function OpenExistingDatabase() {
 
 export function Quit() {
   return window['go']['main']['App']['Quit']();
+}
+
+export function UpdateCompany(arg1, arg2) {
+  return window['go']['main']['App']['UpdateCompany'](arg1, arg2);
+}
+
+export function UpdateItem(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['UpdateItem'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function UpdatePurchaseBill(arg1) {

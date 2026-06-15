@@ -6,6 +6,64 @@ reads the top entry first.
 
 ---
 
+## 2026-06-15 — Navigation moved from left sidebar to a flat top bar
+**Did:** (client feedback — uncomfortable with the sidebar, keeps forgetting it's collapsible,
+prefers top nav + natural vertical scroll)
+- New **`TopNav.tsx`**: flat, always-visible horizontal bar — wordmark + all 5 page links in one
+  row, Settings + Logout on the right. Active route highlighted (exact-match). Carried the
+  unsaved-changes guard (intercept + reworded dialog) and the quit confirm over from the sidebar.
+- **`App.tsx`** shell reworked to `div.flex.h-svh.flex-col` › `TopNav` › `<main flex-1 overflow-auto>`.
+- **Deleted** `AppSidebar.tsx` and the now-unused `ui/sidebar.tsx` primitive (nothing else imports
+  it). Bundle shrank (CSS 60→48 kB, JS 437→418 kB).
+- Verified `npm run build` (tsc + vite) ✅. Docs updated (UI app-shell section; DECISIONS entry
+  superseding the 2026-06-09 sidebar decision).
+
+**Next steps:** verify live in `wails dev` — all links navigate + active highlight, Dashboard still
+centers, wide Add-Bill grid uses full width, unsaved-guard fires on a nav click, Logout confirm →
+quit. Then ask before marking Shipped / cutting a release. Frontend-only, **no DB reset**.
+
+---
+
+## 2026-06-15 — Sortable/filterable tables, bills list rework, Indian number format
+**Did:** (client feedback batch)
+- **Indian number format:** split `fmt` in `lib/purchaseBill.ts` into `fmt` (money, `en-IN`,
+  2-dec) + `fmtQty` (qty, whole). Money sites unchanged (name kept); switched qty totals/cells in
+  SavedBills + AddPurchaseBill to `fmtQty`. Amounts now show `1,20,300.00`.
+- **Shared table helpers (lightweight, no library):** `hooks/useTableSort.ts`,
+  `components/SortableHeader.tsx`, `components/DateRangeFilter.tsx` (Popover + range Calendar).
+- **View/Edit Bills list reworked:** columns now **Company · Date · Bill number · Qty · Amount**
+  (Qty = Σ taxQty+dQty), migrated to shadcn `Table`, **default sort date-desc**, sortable headers,
+  a **search box** (company/bill no.) and a **date-range filter** (end-of-day upper bound).
+- **Items + Companies:** sortable headers; added a search box to Companies (Items already had one).
+- Verified `npm run build` (tsc + vite) ✅. Docs updated (FEATURES, DECISIONS, UI).
+
+**Next steps:** verify live in `wails dev` — bills column order/default sort/header sorting,
+search + date-range filtering, and Indian commas (esp. a value > ₹1,00,000 and whole-number qty).
+Then ask before marking In-Progress → Shipped and cutting a release. **No DB reset** (frontend-only).
+
+---
+
+## 2026-06-15 — Masters edit/delete (Items + Companies) + items search
+**Did:** (Planned items #1 and #2)
+- **Backend:** `UpdateItem`/`DeleteItem` and `UpdateCompany`/`DeleteCompany` in
+  `internal/db` + exposed on `app.go`; bindings regenerated. **Delete is reference-guarded**
+  (explicit COUNT, friendly error): a company is blocked while items/bills use it; an item is
+  blocked while bill lines use it. Added `TestMastersEditAndDelete`. `go build/vet/test` ✅.
+- **Frontend:** new controlled dialogs `EditItemDialog` (reuses the add fields; can move the
+  item to another company) and `EditCompanyDialog` (rename). Items + Companies tables gained an
+  **Actions** column (Edit pencil / Delete trash) wired to those dialogs and a controlled
+  delete `AlertDialog`. **Items search box** filters by item **or** company name. `npm run build` ✅.
+- **Scope correction:** dropped the GSTIN/address columns I'd started on — client wanted
+  **edit/delete only, no schema change**. Those columns are **not** planned (removed from the
+  backlog); don't re-add unless the client asks.
+- Docs updated (FEATURES → In Progress, DECISIONS).
+
+**Next steps:** verify live in `wails dev` (edit item incl. company move, delete blocked-vs-
+allowed for both masters, search). Then ask before marking In-Progress → Shipped and cutting a
+release. **No DB reset needed** (no schema change this round).
+
+---
+
 ## 2026-06-10 — Client-verified; cut release v0.2.1
 **Did:** Client reviewed and **verified** everything built since v0.2.0 — batch-1 quick wins
 (dd-mmm-yyyy dates, Final Rate fix, fuller totals, darker inputs, maximised + Logout, centered

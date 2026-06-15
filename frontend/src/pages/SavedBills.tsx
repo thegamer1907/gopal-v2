@@ -1,9 +1,11 @@
 import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {ArrowLeft, FileText, Pencil, Trash2} from 'lucide-react';
+import {ArrowLeft, FileText, Pencil, Search, Trash2} from 'lucide-react';
+import type {DateRange} from 'react-day-picker';
 import {ListPurchaseBills, DeletePurchaseBill} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
 import {
     Card,
     CardContent,
@@ -11,6 +13,13 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -21,7 +30,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {fmt, calcLine, LineCalc} from '@/lib/purchaseBill';
+import {SortableHeader} from '@/components/SortableHeader';
+import {DateRangeFilter} from '@/components/DateRangeFilter';
+import {useTableSort} from '@/hooks/useTableSort';
+import {parseDate} from '@/lib/date';
+import {fmt, fmtQty, calcLine, LineCalc} from '@/lib/purchaseBill';
 
 // View/Edit Bills — a list of every saved bill that opens a read-only detail, from
 // which the bill can be edited (full overwrite) or deleted. The calculated columns
@@ -40,12 +53,30 @@ function lineCalc(it: db.PurchaseBillItem): LineCalc {
     });
 }
 
+// Per-bill summaries used by the list columns/sort.
+const billValueOf = (bill: db.PurchaseBill): number =>
+    bill.items.reduce((sum, it) => sum + lineCalc(it).billValue, 0);
+const totalQtyOf = (bill: db.PurchaseBill): number =>
+    bill.items.reduce((sum, it) => sum + it.taxQty + it.dQty, 0);
+
+// Sort accessors for the bills list. Unparseable dates fall back to the epoch so they
+// sort to the bottom under the default newest-first order.
+const billSortAccessors = {
+    company: (b: db.PurchaseBill) => b.companyName,
+    date: (b: db.PurchaseBill) => parseDate(b.date) ?? new Date(0),
+    billNumber: (b: db.PurchaseBill) => b.billNumber,
+    qty: totalQtyOf,
+    amount: billValueOf,
+};
+
 export function SavedBills() {
     const navigate = useNavigate();
     const [bills, setBills] = useState<db.PurchaseBill[]>([]);
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [search, setSearch] = useState('');
+    const [range, setRange] = useState<DateRange | undefined>(undefined);
 
     function refresh() {
         return ListPurchaseBills()
@@ -58,14 +89,35 @@ export function SavedBills() {
         refresh();
     }, []);
 
-    // Per-bill summary: total Bill Value.
-    const billValueOf = (bill: db.PurchaseBill): number =>
-        bill.items.reduce((sum, it) => sum + lineCalc(it).billValue, 0);
-
     const selected = useMemo(
         () => bills.find((b) => b.id === selectedId) ?? null,
         [bills, selectedId],
     );
+
+    // Filter by search (company or bill number) and by date range (inclusive, either
+    // bound optional), then sort. The date range's `to` is taken as end-of-day.
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const from = range?.from;
+        const to = range?.to;
+        return bills.filter((b) => {
+            if (q && !b.companyName.toLowerCase().includes(q) && !b.billNumber.toLowerCase().includes(q)) {
+                return false;
+            }
+            if (from || to) {
+                const d = parseDate(b.date);
+                if (!d) return false;
+                if (from && d < from) return false;
+                if (to && d > new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999)) return false;
+            }
+            return true;
+        });
+    }, [bills, search, range]);
+
+    const {sorted, sortKey, sortDir, toggle} = useTableSort(filtered, billSortAccessors, {
+        key: 'date',
+        dir: 'desc',
+    });
 
     async function deleteBill(id: number) {
         try {
@@ -104,49 +156,68 @@ export function SavedBills() {
                 </p>
             </div>
 
-            <Card>
-                <CardContent className="p-0">
-                    {bills.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-                            <FileText className="size-8 text-muted-foreground"/>
-                            <p className="text-sm text-muted-foreground">
-                                No purchase bills saved yet.
-                            </p>
+            {bills.length === 0 ? (
+                <Card>
+                    <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                        <FileText className="size-8 text-muted-foreground"/>
+                        <p className="text-sm text-muted-foreground">No purchase bills saved yet.</p>
+                    </CardContent>
+                </Card>
+            ) : (
+                <>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="relative w-64">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
+                            <Input
+                                className="pl-8"
+                                placeholder="Search company or bill no.…"
+                                autoComplete="off"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
                         </div>
-                    ) : (
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b text-left text-muted-foreground [&>th]:px-4 [&>th]:py-3 [&>th]:font-medium">
-                                    <th>Bill number</th>
-                                    <th>Company</th>
-                                    <th>Date</th>
-                                    <th className="text-right">Items</th>
-                                    <th className="text-right">Bill value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {bills.map((bill) => (
-                                    <tr
-                                        key={bill.id}
-                                        onClick={() => setSelectedId(bill.id)}
-                                        className="cursor-pointer border-b last:border-0 transition-colors hover:bg-muted/50 [&>td]:px-4 [&>td]:py-3"
-                                    >
-                                        <td className="font-medium">{bill.billNumber}</td>
-                                        <td>{bill.companyName}</td>
-                                        <td className="tabular-nums text-muted-foreground">{bill.date}</td>
-                                        <td className="text-right tabular-nums text-muted-foreground">
-                                            {bill.items.length}
-                                        </td>
-                                        <td className="text-right tabular-nums font-medium">
-                                            {fmt(billValueOf(bill))}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </CardContent>
-            </Card>
+                        <DateRangeFilter value={range} onChange={setRange}/>
+                    </div>
+
+                    <Card>
+                        <CardContent className="p-0">
+                            {sorted.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+                                    <Search className="size-8 opacity-40"/>
+                                    <p className="text-sm">No bills match the current filters.</p>
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <SortableHeader label="Company" sortKey="company" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
+                                            <SortableHeader label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
+                                            <SortableHeader label="Bill number" sortKey="billNumber" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
+                                            <SortableHeader label="Qty" sortKey="qty" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
+                                            <SortableHeader label="Amount" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right" className="pr-4"/>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {sorted.map((bill) => (
+                                            <TableRow
+                                                key={bill.id}
+                                                onClick={() => setSelectedId(bill.id)}
+                                                className="cursor-pointer"
+                                            >
+                                                <TableCell className="pl-4 font-medium">{bill.companyName}</TableCell>
+                                                <TableCell className="tabular-nums text-muted-foreground">{bill.date}</TableCell>
+                                                <TableCell>{bill.billNumber}</TableCell>
+                                                <TableCell className="text-right tabular-nums text-muted-foreground">{fmtQty(totalQtyOf(bill))}</TableCell>
+                                                <TableCell className="pr-4 text-right tabular-nums font-medium">{fmt(billValueOf(bill))}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                </>
+            )}
         </div>
     );
 }
@@ -242,9 +313,9 @@ function BillDetail({
                                         <td className="font-medium">{it.itemName}</td>
                                         <td className="text-right tabular-nums text-muted-foreground">{it.itemPackSize}</td>
                                         <td className="text-right tabular-nums text-muted-foreground">{it.gstPercent}</td>
-                                        <td className="text-right tabular-nums">{it.taxQty}</td>
+                                        <td className="text-right tabular-nums">{fmtQty(it.taxQty)}</td>
                                         <td className="text-right tabular-nums">{fmt(it.taxValue)}</td>
-                                        <td className="text-right tabular-nums">{it.dQty}</td>
+                                        <td className="text-right tabular-nums">{fmtQty(it.dQty)}</td>
                                         <td className="text-right tabular-nums">{fmt(it.dValue)}</td>
                                         <td className="text-right tabular-nums bg-muted/50">{fmt(c.gstAmount)}</td>
                                         <td className="text-right tabular-nums bg-muted/50">{fmt(c.taxBillAmount)}</td>
@@ -259,9 +330,9 @@ function BillDetail({
                             <tfoot>
                                 <tr className="border-t-2 font-medium [&>td]:px-2 [&>td]:py-2 [&>td]:tabular-nums">
                                     <td colSpan={3} className="text-right text-muted-foreground">Totals</td>
-                                    <td className="text-right">{fmt(totals.taxQty)}</td>
+                                    <td className="text-right">{fmtQty(totals.taxQty)}</td>
                                     <td className="text-right">{fmt(totals.taxValue)}</td>
-                                    <td className="text-right">{fmt(totals.dQty)}</td>
+                                    <td className="text-right">{fmtQty(totals.dQty)}</td>
                                     <td className="text-right">{fmt(totals.dValue)}</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.gstAmount)}</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.taxBillAmount)}</td>

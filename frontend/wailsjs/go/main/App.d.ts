@@ -10,6 +10,10 @@ export function AddPurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
 
 export function CreateNewDatabase():Promise<string>;
 
+export function DeleteCompany(arg1:number):Promise<void>;
+
+export function DeleteItem(arg1:number):Promise<void>;
+
 export function DeletePurchaseBill(arg1:number):Promise<void>;
 
 export function GetDatabasePath():Promise<string>;
@@ -27,6 +31,10 @@ export function ListPurchaseBills():Promise<Array<db.PurchaseBill>>;
 export function OpenExistingDatabase():Promise<string>;
 
 export function Quit():Promise<void>;
+
+export function UpdateCompany(arg1:number,arg2:string):Promise<db.Company>;
+
+export function UpdateItem(arg1:number,arg2:number,arg3:string,arg4:number,arg5:number,arg6:number):Promise<db.Item>;
 
 export function UpdatePurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
 

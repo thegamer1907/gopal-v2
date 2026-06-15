@@ -6,8 +6,18 @@ export function num(v: string): number {
     return parseFloat(v) || 0;
 }
 
+// Indian-style number formatting (lakh/crore grouping, e.g. 1,20,300). `fmt` is for
+// monetary amounts (always 2 decimals); `fmtQty` is for quantities (whole numbers).
+// Both NaN-guard so a stray non-finite value renders as 0 rather than "NaN".
+const amountFmt = new Intl.NumberFormat('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const qtyFmt = new Intl.NumberFormat('en-IN', {maximumFractionDigits: 0});
+
 export function fmt(n: number): string {
-    return n.toFixed(2);
+    return amountFmt.format(Number.isFinite(n) ? n : 0);
+}
+
+export function fmtQty(n: number): string {
+    return qtyFmt.format(Number.isFinite(n) ? n : 0);
 }
 
 export interface LineCalcInput {

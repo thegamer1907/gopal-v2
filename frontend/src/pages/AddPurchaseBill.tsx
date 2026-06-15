@@ -38,7 +38,7 @@ import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {Calendar} from '@/components/ui/calendar';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {cn} from '@/lib/utils';
-import {num, fmt, calcLine} from '@/lib/purchaseBill';
+import {num, fmt, fmtQty, calcLine} from '@/lib/purchaseBill';
 import {formatDate, todayDate, parseDate} from '@/lib/date';
 
 // Add Purchase Bill — header (Company, Bill number, Date) plus searchable line items.
@@ -511,9 +511,9 @@ export function AddPurchaseBill() {
                             <tfoot>
                                 <tr className="border-t-2 font-medium [&>td]:px-2 [&>td]:py-2 [&>td]:tabular-nums">
                                     <td colSpan={3} className="text-right text-muted-foreground">Totals</td>
-                                    <td className="text-right">{fmt(totals.taxQty)}</td>
+                                    <td className="text-right">{fmtQty(totals.taxQty)}</td>
                                     <td className="text-right">{fmt(totals.taxValue)}</td>
-                                    <td className="text-right">{fmt(totals.dQty)}</td>
+                                    <td className="text-right">{fmtQty(totals.dQty)}</td>
                                     <td className="text-right">{fmt(totals.dValue)}</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.gstAmount)}</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.taxBillAmount)}</td>

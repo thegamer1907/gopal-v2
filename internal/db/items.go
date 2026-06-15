@@ -35,6 +35,34 @@ func AddItem(conn *sql.DB, companyID int64, name string, packSize, gstPercent fl
 	return Item{ID: id, CompanyID: companyID, Name: name, PackSize: packSize, GSTPercent: gstPercent, HSN: hsn}, nil
 }
 
+// UpdateItem overwrites an item's editable fields (including its company) and
+// returns the updated record (company name is left empty; callers re-list to refresh).
+func UpdateItem(conn *sql.DB, id, companyID int64, name string, packSize, gstPercent float64, hsn int64) (Item, error) {
+	if _, err := conn.Exec(
+		`UPDATE items SET company_id = ?, name = ?, pack_size = ?, gst_percent = ?, hsn = ? WHERE id = ?`,
+		companyID, name, packSize, gstPercent, hsn, id,
+	); err != nil {
+		return Item{}, fmt.Errorf("update item: %w", err)
+	}
+	return Item{ID: id, CompanyID: companyID, Name: name, PackSize: packSize, GSTPercent: gstPercent, HSN: hsn}, nil
+}
+
+// DeleteItem removes an item. It refuses (with a friendly error) when purchase bill
+// lines still reference the item, since FK enforcement would otherwise fail opaquely.
+func DeleteItem(conn *sql.DB, id int64) error {
+	var lines int
+	if err := conn.QueryRow(`SELECT COUNT(1) FROM purchase_bill_items WHERE item_id = ?`, id).Scan(&lines); err != nil {
+		return fmt.Errorf("count bill lines: %w", err)
+	}
+	if lines > 0 {
+		return fmt.Errorf("can't delete: %d bill line(s) still use this item", lines)
+	}
+	if _, err := conn.Exec(`DELETE FROM items WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete item: %w", err)
+	}
+	return nil
+}
+
 const itemSelect = `SELECT i.id, i.company_id, c.name, i.name, i.pack_size, i.gst_percent, i.hsn
 	FROM items i JOIN companies c ON c.id = i.company_id`
 

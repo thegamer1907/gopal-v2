@@ -7,15 +7,16 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
-_Shipped in **v0.2.1** (2026-06-10): sidebar nav, Company master, items-belong-to-company,
-View/Edit Bills (edit/delete), Settings/DB management, and the batch-1 polish. v0.2.0 shipped
-the sidebar + Saved Bills + Company master + company FK._
+_Shipped in **v0.3.0** (2026-06-15): masters edit/delete, sortable + filterable tables with a
+date-range filter, Indian (en-IN) number formatting, the reworded unsaved-changes dialog, and the
+**top-nav redesign** (sidebar → flat top bar). v0.2.1 (2026-06-10): Company master,
+items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, batch-1 polish._
 
-- **App navigation shell** — a **persistent, collapsible left sidebar** (shadcn `sidebar`,
-  `src/components/AppSidebar.tsx`): grouped links (Dashboard · *Purchases*: Add Purchase Bill /
-  View/Edit Bills · *Masters*: Items / Companies) + a footer (Settings, Logout). Hamburger in
-  the header collapses it to an icon rail. Launches **maximised**; **Logout** quits (confirm).
-  Routing via `react-router-dom` (`HashRouter`).
+- **App navigation shell** — a **flat, always-visible top navigation bar** (`src/components/TopNav.tsx`):
+  wordmark + all page links in one row (Dashboard · Add Purchase Bill · View/Edit Bills · Items ·
+  Companies) with Settings + Logout on the right; active route highlighted. Launches **maximised**;
+  **Logout** quits (confirm). Routing via `react-router-dom` (`HashRouter`). (Replaced the original
+  collapsible left sidebar per client feedback.)
 - **Dashboard (placeholder)** — landing page; centered "Hare Krishna". Real content TBD.
 - **Company master** — `companies` (surrogate `id` PK + unique `name`). Companies page under
   *Masters*; picked/created inline on the bill via `CompanyCombobox` + `NewCompanyDialog`.
@@ -35,13 +36,21 @@ the sidebar + Saved Bills + Company master + company FK._
 - **Windows build/release CI** — `.github/workflows/build-windows.yml` builds on
   `windows-latest` and, on a `v*` tag push, publishes a **GitHub Release** with the `.exe`.
   Repo: `github.com/thegamer1907/gopal-v2`.
+- **Masters edit/delete** — Items and Companies tables each have per-row **Edit** (dialog reusing
+  the add fields; item edit can also move it to another company) and **Delete** (controlled confirm;
+  **reference-guarded** in Go — refuses with a friendly count when items/bills/lines still use it).
+  Backend: `UpdateItem`/`DeleteItem`, `UpdateCompany`/`DeleteCompany`.
+- **Sortable + filterable tables; Indian number format** — all list tables (Items, Companies,
+  View/Edit Bills) have clickable **sortable column headers** (`useTableSort` + `SortableHeader`)
+  and a **search box**; dated tables get a **date-range filter** (`DateRangeFilter`). The
+  **View/Edit Bills** list is reordered to **Company · Date · Bill number · Qty · Amount**
+  (Qty = Σ taxQty+dQty), defaults to **newest date first**. Amounts render **Indian-style**
+  (`1,20,300.00`) via `fmt`; quantities whole via `fmtQty`.
 
 ## In Progress
 _None._
 
 ## Planned
-- **Items edit/delete** (and search / filter by company) as the catalog grows.
-- **Company edit/delete** and more company columns (GSTIN, address, …).
 - **Dashboard content** — decide the real KPIs / lists.
 - **As-billed snapshots** — optionally store GST%/name on the bill line so historical bills
   don't shift when the master changes.

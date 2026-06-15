@@ -61,3 +61,58 @@ func TestItemsRoundTripAndPersistence(t *testing.T) {
 		t.Fatalf("persistence failed, got %+v", items)
 	}
 }
+
+// TestMastersEditAndDelete covers updating/deleting companies and items, including
+// the reference guards that block deleting a company/item still in use.
+func TestMastersEditAndDelete(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+	conn, err := OpenAt(path)
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+	defer conn.Close()
+
+	company, err := AddCompany(conn, "Acme")
+	if err != nil {
+		t.Fatalf("AddCompany: %v", err)
+	}
+
+	// Rename the company.
+	if _, err := UpdateCompany(conn, company.ID, "Acme Corp"); err != nil {
+		t.Fatalf("UpdateCompany: %v", err)
+	}
+	cos, _ := ListCompanies(conn)
+	if len(cos) != 1 || cos[0].Name != "Acme Corp" {
+		t.Fatalf("UpdateCompany not applied: %+v", cos)
+	}
+
+	item, err := AddItem(conn, company.ID, "widget", 100, 18, 3402)
+	if err != nil {
+		t.Fatalf("AddItem: %v", err)
+	}
+
+	// A company with items can't be deleted.
+	if err := DeleteCompany(conn, company.ID); err == nil {
+		t.Fatalf("DeleteCompany should fail while items reference it")
+	}
+
+	// Update the item, then delete it; afterwards the company can be deleted.
+	if _, err := UpdateItem(conn, item.ID, company.ID, "gadget", 50, 12, 1111); err != nil {
+		t.Fatalf("UpdateItem: %v", err)
+	}
+	items, _ := ListItems(conn)
+	if len(items) != 1 || items[0].Name != "gadget" || items[0].PackSize != 50 || items[0].GSTPercent != 12 || items[0].HSN != 1111 {
+		t.Fatalf("UpdateItem not applied: %+v", items)
+	}
+
+	if err := DeleteItem(conn, item.ID); err != nil {
+		t.Fatalf("DeleteItem: %v", err)
+	}
+	if err := DeleteCompany(conn, company.ID); err != nil {
+		t.Fatalf("DeleteCompany after item removed: %v", err)
+	}
+	cos, _ = ListCompanies(conn)
+	if len(cos) != 0 {
+		t.Fatalf("company should be gone, got %+v", cos)
+	}
+}

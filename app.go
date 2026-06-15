@@ -77,9 +77,29 @@ func (a *App) ListItemsByCompany(companyID int64) ([]db.Item, error) {
 	return db.ListItemsByCompany(a.db, companyID)
 }
 
+// UpdateItem overwrites an item's editable fields (including its company).
+func (a *App) UpdateItem(id, companyID int64, name string, packSize, gstPercent float64, hsn int64) (db.Item, error) {
+	return db.UpdateItem(a.db, id, companyID, name, packSize, gstPercent, hsn)
+}
+
+// DeleteItem removes an item (refused if bill lines still reference it).
+func (a *App) DeleteItem(id int64) error {
+	return db.DeleteItem(a.db, id)
+}
+
 // AddCompany creates a company master record and returns the stored record.
 func (a *App) AddCompany(name string) (db.Company, error) {
 	return db.AddCompany(a.db, name)
+}
+
+// UpdateCompany renames a company and returns the updated record.
+func (a *App) UpdateCompany(id int64, name string) (db.Company, error) {
+	return db.UpdateCompany(a.db, id, name)
+}
+
+// DeleteCompany removes a company (refused if items/bills still reference it).
+func (a *App) DeleteCompany(id int64) error {
+	return db.DeleteCompany(a.db, id)
 }
 
 // ListCompanies returns all companies in the master, ordered by name.

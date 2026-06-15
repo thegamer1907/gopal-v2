@@ -21,6 +21,18 @@ Screens, flows, and visual decisions, recorded as they firm up.
 - Icons: **lucide-react**.
 - **Dates** display/enter as **dd-mmm-yyyy** (month in words) via the shared **`@/lib/date`**
   (`formatDate` / `todayDate` / `parseDate`) — use it everywhere a date is shown or typed.
+- **Numbers** render Indian-style (lakh/crore grouping) via **`@/lib/purchaseBill`**: **`fmt`**
+  for monetary amounts (always 2 decimals, e.g. `1,20,300.00`) and **`fmtQty`** for quantities
+  (whole numbers, e.g. `1,250`). Both `Intl.NumberFormat('en-IN', …)` + NaN-guarded. Use them
+  everywhere a value is shown; never `toFixed`/`toLocaleString` ad hoc. Raw catalog numerics
+  (Pack Size, GST %, HSN) stay unformatted.
+- **List tables are sortable + filterable.** Reusable bits: **`useTableSort`** (`@/hooks`) takes
+  the rows + a `{key: accessor}` map (accessor returns string/number/Date) and returns
+  `{sorted, sortKey, sortDir, toggle}`; **`SortableHeader`** (`@/components`) renders a clickable
+  `TableHead` with the direction chevron. Pair with a `useMemo` search filter (Search-icon
+  `Input`) feeding the rows into `useTableSort`. Tables with a **date** column also get a
+  **`DateRangeFilter`** (`@/components`, Popover + range `Calendar`) — feed its `{from,to}` into
+  the same filter `useMemo`.
 - **Input borders** are deliberately darker than card/table borders: the `--input` token
   (`index.css`) is a heavier gray than `--border` so entry boxes read clearly on bright screens.
 - **Data-entry pages follow a required pattern** (see `DECISIONS.md`, 2026-06-09): disable the
@@ -35,32 +47,31 @@ Screens, flows, and visual decisions, recorded as they firm up.
 ## App shell & navigation
 - **Window:** launches **maximised** (`WindowStartState: options.Maximised` in `main.go`) —
   fills the screen but keeps the OS title bar.
-- **Layout** (`src/App.tsx`): a **persistent, collapsible left sidebar**
-  (`src/components/AppSidebar.tsx`) beside the routed content, via shadcn's `sidebar`
-  primitive — `SidebarProvider` (pinned to `h-svh`) › `AppSidebar` + `SidebarInset`. **There
-  is no top bar** — the inset is just a **full-width**, padded content area (`flex-1
-  overflow-auto px-6 py-8`) that fills the window and scrolls internally. No max-width cap,
-  so wide screens (e.g. the bill line-items grid) use the whole window. Each page lives in
-  `src/pages/`.
-- **Sidebar** (`collapsible="icon"`): the header is a **hamburger toggle (top-left) + the
-  GopalOne wordmark** — the hamburger **is** the collapse control (a ghost `Button` calling
-  `useSidebar().toggleSidebar()`; no separate trigger element). Then **grouped** `NavLink`
-  menu items — *(ungrouped)* Dashboard · **Purchases**: Add Purchase Bill / Saved Bills ·
-  **Masters**: Items / Companies — and a **`SidebarFooter`** pinned at the bottom with
-  **Settings** (gear) and **Logout** (closes the app via `Quit()` after a "Close GopalOne?"
-  confirm `AlertDialog`). Collapsing hides labels + the wordmark, leaving a thin **icon-only
-  rail** (the hamburger stays, to expand again; menu tooltips show labels on hover) to
-  reclaim width for wide grids. The active route is highlighted (`SidebarMenuButton
-  isActive`, exact-path match so sibling routes like `/purchase-bills` and
-  `/purchase-bills/new` don't both light up).
+- **Layout** (`src/App.tsx`): a **flat, always-visible top navigation bar**
+  (`src/components/TopNav.tsx`) above the routed content — an outer `div.flex.h-svh.flex-col`
+  › `TopNav` + `<main className="flex-1 overflow-auto px-6 py-8">`. The `<main>` is the
+  **full-width** padded content area that fills the window and scrolls **vertically**. No
+  max-width cap, so wide screens (e.g. the bill line-items grid) use the whole window — and
+  there's no sidebar eating width. Each page lives in `src/pages/`. (Replaced the old
+  collapsible left sidebar — see `DECISIONS.md` 2026-06-15.)
+- **Top bar** (`h-14`, `border-b`): left side is the **GopalOne wordmark** + the primary
+  `NavLink`s in one row — Dashboard · Add Purchase Bill · View/Edit Bills · Items · Companies;
+  right side (`ml-auto`) is **Settings** (gear) and **Logout** (closes the app via `Quit()`
+  after a "Close GopalOne?" confirm `AlertDialog`). Links are styled with
+  `buttonVariants({variant:'ghost', size:'sm'})`; the **active route** gets a filled
+  `bg-muted`/`font-medium` look via an exact-path `isActive` (so sibling routes like
+  `/purchase-bills` and `/purchase-bills/new` don't both light up). Everything is always
+  visible — nothing to collapse or open.
 - **Routing:** `react-router-dom` + `HashRouter` (see `DECISIONS.md`). To add a page:
-  create it in `src/pages/`, add a `<Route>` in `App.tsx`, add an entry to a group in
-  `AppSidebar.tsx`.
+  create it in `src/pages/`, add a `<Route>` in `App.tsx`, add an entry to the `links` array
+  in `TopNav.tsx`.
 - **Unsaved-changes guard:** an `UnsavedChangesProvider` (`src/components/UnsavedChanges.tsx`)
   exposes `{dirty, setDirty}`. A page that holds unsaved edits calls `setDirty(true)` (clearing
-  it on save/reset/unmount). `AppSidebar` intercepts menu clicks while `dirty` and shows an
-  `alert-dialog` — **"Stay and save"** (cancel) vs **"Switch anyway"** (discards and navigates).
-  Add Purchase Bill is the first consumer.
+  it on save/reset/unmount). `TopNav` intercepts nav-link clicks while `dirty` and shows an
+  `alert-dialog` titled **"Save your changes before leaving?"** with a **top-right ✕** (closes =
+  keep editing) and two buttons: **"Discard changes"** (outline; discards and navigates) and
+  **"Continue editing"** (primary/default, auto-focused; just closes). Add Purchase Bill is the
+  first consumer.
 
 ## Screens
 ### Dashboard (`/`) — placeholder
@@ -116,8 +127,13 @@ Screens, flows, and visual decisions, recorded as they firm up.
 ### View/Edit Bills (`/purchase-bills`) — sidebar "View/Edit Bills"
 - **List → detail**, single page (`src/pages/SavedBills.tsx`). Loads all bills via
   `ListPurchaseBills` on mount (`refresh()` is reused after a delete).
-- **List:** a card with a table of bills — **Bill number · Company · Date · Items (count) ·
-  Bill value (total)**. Rows are clickable (hover highlight); empty state when none saved.
+- **List:** a card with a table of bills — columns **Company · Date · Bill number · Qty · Amount**,
+  where **Qty** = Σ(taxQty + dQty) over the bill's lines (`fmtQty`) and **Amount** = total Bill
+  Value (`fmt`). **Default sort: Date, newest first**; every column header is a `SortableHeader`.
+  Above the table: a **search box** (filters by company **or** bill number) and a **`DateRangeFilter`**
+  (keeps bills whose date falls in the chosen inclusive window; `to` is treated as end-of-day).
+  Rows are clickable (hover highlight); empty state when none saved, and a "no match" state when
+  filters exclude everything.
 - **Detail:** clicking a row swaps in a read-only view — a **"Back to all bills"** button plus
   **Edit bill** and **Delete** actions, a header card (Bill number / Company · Date), and the
   **same line-items grid as Add Purchase Bill** but display-only, with the footer **Totals** row.
@@ -130,16 +146,20 @@ Screens, flows, and visual decisions, recorded as they firm up.
   line's `item_id` (current master value), so no separate lookup is needed.
 
 ### Items (`/items`) — item master
-- A live item count, an "Add item" card (**Item, Pack Size, GST %, HSN** + Add), and a card
-  with a table of items (Item / Pack Size / GST % / HSN) with an empty state. Pack Size / GST %
-  / HSN use `NumberInput` (no spinner); same in the on-the-fly `NewItemDialog`.
-- Built with shadcn `Card`, `Input`, `Label`, `Button`, `Table`. Add-only for now;
-  edit/delete to follow.
+- A live item count, a company-scoped "Add item" card (**Company, Item, Pack Size, GST %, HSN** +
+  Add), and a card with the items table (Company / Item / Pack Size / GST % / HSN + **Actions**).
+  Pack Size / GST % / HSN use `NumberInput` (no spinner); same in the on-the-fly `NewItemDialog`.
+- **Search box** (item or company name) + **sortable headers** (`useTableSort`, default by
+  company). Each row has **Edit** (`EditItemDialog` — prefilled, can move the item to another
+  company) and **Delete** (controlled `AlertDialog`; backend refuses if bill lines reference it).
 
 ### Companies (`/companies`) — company master
-- Mirrors the Items page: a live company count, an "Add company" card (just **Company name**
-  + Add for now — more columns later), and a card with a table of companies (with an empty
-  state). Built with the same shadcn `Card`/`Input`/`Label`/`Button`/`Table`. Add-only for now.
+- A live company count, an "Add company" card (just **Company name** + Add — name only), and a
+  card with the companies table (Company + **Actions**). Built with shadcn
+  `Card`/`Input`/`Label`/`Button`/`Table`.
+- **Search box** (by name) + a **sortable** Company header. Each row has **Edit**
+  (`EditCompanyDialog` rename) and **Delete** (controlled `AlertDialog`; backend refuses if items
+  or bills reference it).
 - Companies are also pickable/creatable inline on the bill header via `CompanyCombobox` +
   `NewCompanyDialog` (see Add Purchase Bill).
 
