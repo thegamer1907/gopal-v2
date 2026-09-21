@@ -7,12 +7,24 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
-_Shipped in **v0.4.0** (2026-09-20): **Reports** page + Purchase Summary Excel export.
+_Shipped in **v0.5.0** (2026-09-20): in-app self-update (Settings → Updates). v0.4.0
+(2026-09-20): **Reports** page + Purchase Summary Excel export.
 v0.3.0 (2026-06-15): masters edit/delete, sortable + filterable tables with a
 date-range filter, Indian (en-IN) number formatting, the reworded unsaved-changes dialog, and the
 **top-nav redesign** (sidebar → flat top bar). v0.2.1 (2026-06-10): Company master,
 items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, batch-1 polish._
 
+- **In-app self-update** — new **Updates** section on Settings: shows the running version,
+  a **Check for Updates** button (polls the GitHub Releases API), and — when a newer release
+  exists — the release notes plus a **Download & Install** button that downloads the new
+  `.exe`, verifies it against a published SHA-256 checksum, replaces the running binary
+  (`github.com/minio/selfupdate`, one-generation rollback backup), relaunches, and quits.
+  Version is embedded at build time via `-ldflags -X main.version=...` in
+  `build-windows.yml`. The destructive replace step is hard-guarded to Windows (the only
+  platform this app ships on); the check itself is safe to run anywhere, including
+  `wails dev`, where it always reports "no update" by design. **v0.5.0 is the first
+  release that carries this — the actual replace-and-relaunch mechanic hasn't been
+  exercised on real Windows yet; that's the client's plan for this release.**
 - **Reports — Purchase Summary** — new `/reports` page (own top-nav link), a card-grid of
   downloadable reports (extensible — more report types are just more cards). First report:
   **Purchase Summary**, a line-item register of every purchase-bill line across a chosen date
@@ -68,6 +80,8 @@ _None._
   don't shift when the master changes.
 - **More Reports cards** — additional report types on `/reports` (e.g. sales/stock summaries),
   each just another card in the same grid.
+- **Auto-check for updates on launch** — a silent background check (today's Check for
+  Updates button is manual-only, deliberately, per the client's ask).
 
 ## Ideas
 _Capture raw feature ideas here as they come up (from us or the client)._

@@ -36,24 +36,26 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Build
-        run: wails build -platform windows/amd64 -clean
+        run: wails build -platform windows/amd64 -clean -ldflags "-X main.version=${{ github.ref_name }}"
 
-      - name: Rename binary with version
+      - name: Rename binary with version, compute checksum
         shell: bash
         run: |
           mkdir -p dist
           tag="${GITHUB_REF_NAME}"
-          cp build/bin/gopal-v2.exe "dist/gopal-v2-${tag}-windows-amd64.exe"
+          exe="dist/gopal-v2-${tag}-windows-amd64.exe"
+          cp build/bin/gopal-v2.exe "$exe"
+          sha256sum "$exe" | awk '{print $1}' > "$exe.sha256"
 
       - name: Upload artifact (for manual runs)
         uses: actions/upload-artifact@v4
         with:
           name: gopal-v2-windows-amd64
-          path: dist/*.exe
+          path: dist/*
 
       - name: Publish Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.exe
+          files: dist/*
           generate_release_notes: true

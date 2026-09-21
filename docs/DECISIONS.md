@@ -315,3 +315,45 @@ have to re-litigate.
   summary) workbook — client chose the detailed line-item register for v1; other layouts
   (single-purpose page, list+detail panel) were considered for the Reports page and rejected in
   favor of the card grid for extensibility.
+
+### 2026-09-20 — In-app self-update: minio/selfupdate, ldflags version, checksum-verified
+- **Decision:** Add a manual **"Check for Updates"** button (Settings → Updates), not a
+  background/startup auto-check — the app ships as a single portable `.exe` (no
+  installer), so the previously-manual "download and replace the file" step is now
+  automated on request. Used **`github.com/minio/selfupdate`** to actually replace the
+  running executable rather than hand-rolling the rename/relaunch dance — it has explicit
+  Windows support and handles the platform-specific edge cases of overwriting a currently
+  running binary, which is genuinely tricky and not something worth re-inventing/risking
+  for a feature that can't be end-to-end tested on the macOS dev machine. It keeps the
+  previous binary as `<exe>.old` (`Options.OldSavePath`) — one rollback generation instead
+  of deleting the old build outright.
+- **Version embedding:** the binary previously had **no version string anywhere** — added
+  `var version = "dev"` in `main.go`, set at release-build time via
+  `wails build -ldflags "-X main.version=$tag"` in `build-windows.yml` (confirmed `wails
+  build` passes `-ldflags` through to the Go linker). `"dev"` (the `wails dev` default)
+  doubles as a safety marker: the version-compare logic never reports an update available
+  when the current version fails to parse as `vMAJOR.MINOR.PATCH`, so a stray click during
+  local development can't trigger the destructive replace path.
+- **Integrity check:** `build-windows.yml` now also emits a `.sha256` file next to the
+  `.exe` (one extra `sha256sum` line) and publishes it as a release asset; the update
+  check fetches it and passes it to `selfupdate.Apply` for verification before the binary
+  is replaced. An older release cut before this shipped simply has no checksum asset —
+  tolerated, verification is just skipped for that case.
+- **Split for testability:** `internal/updater.Check` (network + JSON + numeric version
+  comparison) is pure/portable and unit-tested directly (table-driven `isNewer` cases incl.
+  the `"v0.10.0" > "v0.9.0"` double-digit case that a naive string comparison gets wrong,
+  plus an `httptest`-mocked GitHub API response) — verified live against the real repo too
+  (`go run` a throwaway script hitting `api.github.com/repos/thegamer1907/gopal-v2` for
+  real). The actual file-replace (`App.DownloadAndInstallUpdate`) is hard-guarded to
+  `runtime.GOOS == "windows"` and **could not be exercised on the macOS dev machine** —
+  it needs a real Windows run (or a `windows-latest` CI job) to fully verify.
+- **Why:** client asked specifically for an in-app button, not an automated background
+  check. Numeric version comparison avoids a real bug class (lexicographic string compare
+  breaks past single digits). Checksum verification and the rollback backup are cheap
+  additions given the library and CI already do most of the work.
+- **Alternatives considered:** hand-written PowerShell helper script + detached process
+  (rejected — more code to get right on a platform I can't test locally, and a
+  dynamically-written-and-executed script is also more likely to draw antivirus/Defender
+  suspicion than a library-driven in-process replace); switching to an NSIS
+  installer (rejected — bigger change to the whole release pipeline for a problem the
+  portable-`.exe` self-replace pattern already solves).

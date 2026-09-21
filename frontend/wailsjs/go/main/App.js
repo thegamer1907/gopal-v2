@@ -14,6 +14,10 @@ export function AddPurchaseBill(arg1) {
   return window['go']['main']['App']['AddPurchaseBill'](arg1);
 }
 
+export function CheckForUpdate() {
+  return window['go']['main']['App']['CheckForUpdate']();
+}
+
 export function CreateNewDatabase() {
   return window['go']['main']['App']['CreateNewDatabase']();
 }
@@ -30,8 +34,16 @@ export function DeletePurchaseBill(arg1) {
   return window['go']['main']['App']['DeletePurchaseBill'](arg1);
 }
 
+export function DownloadAndInstallUpdate(arg1, arg2) {
+  return window['go']['main']['App']['DownloadAndInstallUpdate'](arg1, arg2);
+}
+
 export function ExportPurchaseSummary(arg1, arg2) {
   return window['go']['main']['App']['ExportPurchaseSummary'](arg1, arg2);
+}
+
+export function GetAppVersion() {
+  return window['go']['main']['App']['GetAppVersion']();
 }
 
 export function GetDatabasePath() {

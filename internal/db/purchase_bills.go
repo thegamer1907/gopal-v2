@@ -21,11 +21,11 @@ type PurchaseBill struct {
 // via a JOIN (not stored). The calculated columns (GST amount, totals, final rates)
 // are derived on the frontend and not stored.
 type PurchaseBillItem struct {
-	ItemID       int64   `json:"itemId"`      // written; → items(id)
-	ItemName     string  `json:"itemName"`    // read (JOIN)
+	ItemID       int64   `json:"itemId"`       // written; → items(id)
+	ItemName     string  `json:"itemName"`     // read (JOIN)
 	ItemPackSize float64 `json:"itemPackSize"` // read (JOIN)
-	GSTPercent   float64 `json:"gstPercent"`  // read (JOIN)
-	HSN          int64   `json:"hsn"`         // read (JOIN)
+	GSTPercent   float64 `json:"gstPercent"`   // read (JOIN)
+	HSN          int64   `json:"hsn"`          // read (JOIN)
 	TaxQty       float64 `json:"taxQty"`
 	TaxValue     float64 `json:"taxValue"`
 	DQty         float64 `json:"dQty"`

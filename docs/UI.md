@@ -202,6 +202,14 @@ Screens, flows, and visual decisions, recorded as they firm up.
     (not a Radix `asChild` trigger — see the React-18 ref note in `DECISIONS.md`); confirming
     calls `WipeDatabase()` then reloads.
   - A `busy` flag disables the buttons during a call; errors render in `text-destructive`.
+- **Updates** (second section, same page): shows the running version (`GetAppVersion`); a
+  **Check for Updates** button (`CheckForUpdate`) reports either "You're up to date" or an
+  "Update available: vX.Y.Z" panel with the release notes and a **Download & Install**
+  button (`DownloadAndInstallUpdate`). Clicking Download & Install shows an immediate
+  status line ("Downloading and installing… the app will restart automatically") since a
+  successful call ends with the app quitting itself — there's no further success message
+  to show, just the window closing and reopening. Errors render `text-destructive`, same
+  as Database.
 
 ## Open decisions
 _None blocking._

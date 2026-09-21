@@ -11,6 +11,12 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// version is the app's release version, embedded at build time via
+// `wails build -ldflags "-X main.version=vX.Y.Z"` (see .github/workflows/build-windows.yml).
+// Unset in `wails dev` — the "dev" value doubles as a signal that self-update should
+// never report an update as available (see internal/updater).
+var version = "dev"
+
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()

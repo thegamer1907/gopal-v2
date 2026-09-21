@@ -6,6 +6,43 @@ reads the top entry first.
 
 ---
 
+## 2026-09-20 — In-app self-update ("Check for Updates" button)
+**Did:**
+- New **Updates** section on Settings: shows the running version, a **Check for Updates**
+  button, and — when newer — release notes + a **Download & Install** button.
+- **Version embedding:** `main.go` gained `var version = "dev"`; `build-windows.yml` now
+  builds with `-ldflags "-X main.version=$tag"` and also emits a `.sha256` checksum file
+  next to the `.exe`, both published as release assets.
+- **Backend:** new `internal/updater` package — `Check` (portable: hits the GitHub
+  Releases API, numeric `vMAJOR.MINOR.PATCH` comparison so `v0.10.0 > v0.9.0` compares
+  correctly, tolerates a release with no checksum asset) and `Apply` (wraps
+  `github.com/minio/selfupdate`, verifies the checksum when present, keeps the previous
+  binary as `<exe>.old` for rollback). Three new `App` methods: `GetAppVersion`,
+  `CheckForUpdate`, `DownloadAndInstallUpdate` — the last hard-guarded to
+  `runtime.GOOS == "windows"` so a stray click during `wails dev` on macOS can't corrupt
+  the dev binary.
+- `go test ./...` — added table-driven tests for the version comparator + an
+  `httptest`-mocked GitHub API check (both pass without network/Windows). Also verified
+  `Check` live against the real `thegamer1907/gopal-v2` repo via a throwaway script:
+  correctly found v0.4.0, resolved the right download URL, and (correctly) reported no
+  checksum since v0.4.0 predates this feature. `go build/vet/test` ✅ on macOS, plus a
+  `GOOS=windows GOARCH=amd64` cross-compile check ✅. `npm run build` ✅.
+- Docs updated (FEATURES → In Progress, UI.md Updates section, DECISIONS entry).
+
+**Not yet verified:** the actual file-replace + relaunch (`DownloadAndInstallUpdate`)
+can't be exercised on this Mac — it's guarded to Windows by design, and even ungated, a
+downloaded Windows `.exe` can't run here. Needs a real test on Windows after this ships:
+install the current build, cut one more tag, then Check for Updates → Download & Install
+and confirm it replaces itself in place and relaunches cleanly.
+
+Client reviewed the check-only flow live in `wails dev` and said to ship it — committed,
+pushed to `main`, tagged **v0.5.0**, marked Shipped in FEATURES.md. **Next step is the
+client's own real-Windows test**, exactly as described above: once v0.5.0 is installed,
+cut one more small release and use the in-app button to update to it, confirming the
+replace-and-relaunch actually works before relying on it for real.
+
+---
+
 ## 2026-09-20 — Reports page + Purchase Summary Excel export (new feature)
 **Did:**
 - New **Reports** area: `/reports` route + top-nav link, `src/pages/Reports.tsx`. A card-grid

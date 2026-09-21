@@ -3,13 +3,22 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"net/http"
+	"os"
+	"os/exec"
+	"runtime"
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"gopal-v2/internal/db"
 	"gopal-v2/internal/reports"
+	"gopal-v2/internal/updater"
 )
+
+// updateRepo is the GitHub repo ("owner/name") that in-app update checks poll.
+const updateRepo = "thegamer1907/gopal-v2"
 
 // App struct
 type App struct {
@@ -243,4 +252,58 @@ func (a *App) ExportPurchaseSummary(rows []reports.PurchaseSummaryRow, defaultFi
 		return "", err
 	}
 	return path, nil
+}
+
+// --- Self-update (Settings → Updates) ---
+
+// GetAppVersion returns the running build's version — "dev" outside a tagged release
+// build (see the `version` var in main.go).
+func (a *App) GetAppVersion() string {
+	return version
+}
+
+// CheckForUpdate polls GitHub for the latest release and compares it against the
+// running version. Safe to call on any OS/build — it only reads.
+func (a *App) CheckForUpdate() (updater.Info, error) {
+	return updater.Check(a.ctx, updateRepo, version)
+}
+
+// DownloadAndInstallUpdate downloads the given release asset, verifies it against
+// checksumHex when provided, replaces the running executable, and relaunches — then
+// quits this process. Only supported on Windows (the only platform this app ships on);
+// guarded here so a stray click during macOS development can't corrupt a dev binary.
+func (a *App) DownloadAndInstallUpdate(downloadURL, checksumHex string) error {
+	if runtime.GOOS != "windows" {
+		return fmt.Errorf("updates are only supported on Windows builds")
+	}
+
+	resp, err := http.Get(downloadURL)
+	if err != nil {
+		return fmt.Errorf("download update: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download update: server returned %s", resp.Status)
+	}
+
+	var checksum []byte
+	if checksumHex != "" {
+		if checksum, err = hex.DecodeString(checksumHex); err != nil {
+			checksum = nil // don't fail the update over a malformed checksum string
+		}
+	}
+
+	exePath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("locate running executable: %w", err)
+	}
+	if err := updater.Apply(resp.Body, exePath, checksum); err != nil {
+		return err
+	}
+
+	if err := exec.Command(exePath).Start(); err != nil {
+		return fmt.Errorf("update installed, but failed to relaunch automatically — please start the app again: %w", err)
+	}
+	wruntime.Quit(a.ctx)
+	return nil
 }

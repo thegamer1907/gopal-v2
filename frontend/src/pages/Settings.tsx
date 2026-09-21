@@ -1,11 +1,15 @@
 import {useEffect, useState} from 'react';
-import {Database, FolderOpen, FilePlus2, Trash2, AlertTriangle} from 'lucide-react';
+import {Database, FolderOpen, FilePlus2, Trash2, AlertTriangle, Download, RefreshCw} from 'lucide-react';
 import {
     GetDatabasePath,
     OpenExistingDatabase,
     CreateNewDatabase,
     WipeDatabase,
+    GetAppVersion,
+    CheckForUpdate,
+    DownloadAndInstallUpdate,
 } from '../../wailsjs/go/main/App';
+import {updater} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {
     Card,
@@ -42,9 +46,45 @@ export function Settings() {
     const [error, setError] = useState('');
     const [confirmWipe, setConfirmWipe] = useState(false);
 
+    const [version, setVersion] = useState('');
+    const [checking, setChecking] = useState(false);
+    const [installing, setInstalling] = useState(false);
+    const [updateInfo, setUpdateInfo] = useState<updater.Info | null>(null);
+    const [updateError, setUpdateError] = useState('');
+    const [installStatus, setInstallStatus] = useState('');
+
     useEffect(() => {
         GetDatabasePath().then(setPath).catch((e) => setError(String(e)));
+        GetAppVersion().then(setVersion);
     }, []);
+
+    async function checkForUpdate() {
+        setUpdateError('');
+        setInstallStatus('');
+        setChecking(true);
+        try {
+            setUpdateInfo(await CheckForUpdate());
+        } catch (e: any) {
+            setUpdateError(String(e));
+        } finally {
+            setChecking(false);
+        }
+    }
+
+    async function installUpdate() {
+        if (!updateInfo) return;
+        setUpdateError('');
+        setInstallStatus('Downloading and installing the update — the app will restart automatically…');
+        setInstalling(true);
+        try {
+            await DownloadAndInstallUpdate(updateInfo.downloadUrl, updateInfo.checksumHex);
+        } catch (e: any) {
+            setInstallStatus('');
+            setUpdateError(String(e));
+        } finally {
+            setInstalling(false);
+        }
+    }
 
     // Run a DB action; on a non-empty/successful result, reload so all pages
     // re-read from the new database. `expectsPath` ops return '' when cancelled.
@@ -156,6 +196,54 @@ export function Settings() {
                             </div>
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Download className="size-5 text-muted-foreground"/>
+                        <CardTitle>Updates</CardTitle>
+                    </div>
+                    <CardDescription>Current version: {version || '—'}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Button
+                        variant="outline"
+                        disabled={checking || installing}
+                        onClick={checkForUpdate}
+                    >
+                        <RefreshCw className="size-4"/>
+                        Check for Updates
+                    </Button>
+
+                    {updateInfo && !updateInfo.available && (
+                        <p className="text-sm text-muted-foreground">
+                            You're up to date ({updateInfo.currentVersion}).
+                        </p>
+                    )}
+
+                    {updateInfo?.available && (
+                        <div className="space-y-3 rounded-md border bg-muted/40 p-4">
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium">
+                                    Update available: {updateInfo.latestVersion}
+                                </p>
+                                {updateInfo.releaseNotes && (
+                                    <p className="max-h-40 overflow-y-auto whitespace-pre-line text-sm text-muted-foreground">
+                                        {updateInfo.releaseNotes}
+                                    </p>
+                                )}
+                            </div>
+                            <Button disabled={installing} onClick={installUpdate}>
+                                <Download className="size-4"/>
+                                {installing ? 'Installing…' : 'Download & Install'}
+                            </Button>
+                        </div>
+                    )}
+
+                    {installStatus && <p className="text-sm text-emerald-600">{installStatus}</p>}
+                    {updateError && <p className="text-sm text-destructive">{updateError}</p>}
                 </CardContent>
             </Card>
         </div>

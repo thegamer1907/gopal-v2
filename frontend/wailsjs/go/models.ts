@@ -164,3 +164,32 @@ export namespace reports {
 
 }
 
+export namespace updater {
+	
+	export class Info {
+	    currentVersion: string;
+	    latestVersion: string;
+	    available: boolean;
+	    downloadUrl: string;
+	    checksumHex: string;
+	    releaseNotes: string;
+	    releaseUrl: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Info(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.currentVersion = source["currentVersion"];
+	        this.latestVersion = source["latestVersion"];
+	        this.available = source["available"];
+	        this.downloadUrl = source["downloadUrl"];
+	        this.checksumHex = source["checksumHex"];
+	        this.releaseNotes = source["releaseNotes"];
+	        this.releaseUrl = source["releaseUrl"];
+	    }
+	}
+
+}
+

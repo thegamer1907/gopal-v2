@@ -3,12 +3,14 @@ module gopal-v2
 go 1.25.0
 
 require (
+	github.com/minio/selfupdate v0.6.0
 	github.com/wailsapp/wails/v2 v2.16.0
 	github.com/xuri/excelize/v2 v2.11.0
 	modernc.org/sqlite v1.51.0
 )
 
 require (
+	aead.dev/minisign v0.2.0 // indirect
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
