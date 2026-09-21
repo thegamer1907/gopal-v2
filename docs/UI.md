@@ -55,7 +55,8 @@ Screens, flows, and visual decisions, recorded as they firm up.
   there's no sidebar eating width. Each page lives in `src/pages/`. (Replaced the old
   collapsible left sidebar — see `DECISIONS.md` 2026-06-15.)
 - **Top bar** (`h-14`, `border-b`): left side is the **GopalOne wordmark** + the primary
-  `NavLink`s in one row — Dashboard · Add Purchase Bill · View/Edit Bills · Items · Companies;
+  `NavLink`s in one row — Dashboard · Add Purchase Bill · View/Edit Bills · Items · Companies ·
+  Reports;
   right side (`ml-auto`) is **Settings** (gear) and **Logout** (closes the app via `Quit()`
   after a "Close GopalOne?" confirm `AlertDialog`). Links are styled with
   `buttonVariants({variant:'ghost', size:'sm'})`; the **active route** gets a filled
@@ -162,6 +163,32 @@ Screens, flows, and visual decisions, recorded as they firm up.
   or bills reference it).
 - Companies are also pickable/creatable inline on the bill header via `CompanyCombobox` +
   `NewCompanyDialog` (see Add Purchase Bill).
+
+### Reports (`/reports`) — top-nav "Reports"
+- `src/pages/Reports.tsx`. A **card grid** (`grid gap-4 sm:grid-cols-2 lg:grid-cols-3`) — one
+  `Card` per downloadable report. Only **Purchase Summary** exists today; a future report is
+  just another card, no layout rework needed.
+- **Purchase Summary card:** icon + title/description, a **`DateRangeFilter`** (empty = "all
+  bills", same semantics as the View/Edit Bills filter — no separate "download all" toggle), a
+  live preview line ("N lines across M bills · ₹total", recomputed as the range changes), and a
+  **Download Excel** button (disabled while loading/saving or when the range matches zero
+  bills, showing "No purchase bills in this range." instead).
+- **Data flow:** loads all bills via `ListPurchaseBills`, filters by the chosen range using the
+  same inclusive/end-of-day logic as `SavedBills.tsx`, flattens every remaining bill's lines
+  into one row per line (computing GST/totals via the shared **`calcLine`**, never re-derived),
+  sorts chronologically (date asc, then bill number), and calls the generated
+  `ExportPurchaseSummary(rows, defaultFilename)` binding. That Go method opens a native **Save
+  File** dialog and writes the `.xlsx` (backed by `internal/reports` + `excelize`) — Go never
+  computes report math, only lays out finished numbers. Feedback mirrors other pages:
+  `text-emerald-600` "Saved to …" on success, `text-destructive` on error, silent no-op if the
+  save dialog is cancelled.
+- **The workbook itself:** real typed cells, not text — Date is a genuine Excel date
+  (`dd-mmm-yyyy` custom format, sortable); money columns (Tax Value, D Value, GST Amount, Tax
+  Bill Amount, Bill Value, Billing/Final Rate, Discount) are `#,##0.00`; quantity/rate-support
+  columns (Pack Size, Tax Qty, D Qty, GST %) are `0.00`; HSN is a plain integer. Header row is
+  bold, frozen, and auto-filtered; a bold **Totals** row sums Tax Qty, Tax Value, D Qty,
+  D Value, GST Amount, Tax Bill Amount, Bill Value, and Discount — mirroring the footer Totals
+  row on the Add/View Bill line-items grid.
 
 ### Settings (`/settings`) — sidebar footer "Settings"
 - `src/pages/Settings.tsx`. First (and only) section is **Database**:

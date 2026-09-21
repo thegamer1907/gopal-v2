@@ -285,3 +285,33 @@ have to re-litigate.
 - **Chosen layout:** flat/all-visible over grouped dropdowns — dropdowns would re-introduce the
   same "hidden behind a click" problem that bothered the client. Group labels (Purchases/Masters)
   dropped; only 5 destinations, so a single row is clear on the maximised window.
+
+### 2026-09-20 — Reports: card-grid page, Excel via excelize, math computed in the frontend
+- **Decision:** New `/reports` page laid out as a **card grid** — one `Card` per report type,
+  each owning its controls — so future reports are just more cards, not a redesign. First
+  report: **Purchase Summary**, a line-item register (not aggregated) over a chosen date range
+  or all bills. Added **`github.com/xuri/excelize/v2`** (pure Go, no CGO) as the project's first
+  Excel dependency. **All report math (GST amount, totals, rates) is computed in the frontend
+  via the existing `calcLine`** (`lib/purchaseBill.ts`) and handed to Go as finished rows; the
+  new `internal/reports` package + `App.ExportPurchaseSummary` only lay those rows out into a
+  workbook and save it (native Save dialog, mirroring `CreateNewDatabase`'s file-dialog
+  pattern) — Go never re-derives the formulas.
+- **Cell types/formats (explicit client ask — not left as text):** Date is a genuine Excel date
+  cell with a custom `dd-mmm-yyyy` format (matches the app's own date style, still sortable);
+  numeric cells are real numbers, "accounting-style": money columns (Tax Value, D Value, GST
+  Amount, Tax Bill Amount, Bill Value, Billing/Final Rate, Discount) get `#,##0.00`;
+  quantity/rate-support columns (Pack Size, Tax Qty, D Qty, GST %) get plain `0.00`, no
+  separator; HSN stays a plain integer (`0`). A bold Totals row sums the same columns as the
+  Add/View Bill line-items grid footer.
+- **Read-side addition:** `items.hsn` (already existed, migration 2) is now also joined into
+  `PurchaseBillItem` (`ListPurchaseBills`/`GetPurchaseBill`) since the report needs it — no
+  schema/migration change.
+- **Why:** Client wants a Reports area that will grow to hold several report types; the
+  card-grid avoids relayout later. Formulas were kept single-sourced per the existing
+  `lib/purchaseBill.ts` rule (CLAUDE.md) rather than reimplemented in Go. Real typed date/number
+  cells (not text) were an explicit client requirement so the workbook is directly
+  sortable/summable in Excel.
+- **Alternatives considered:** a bill-level-totals-only report or a two-sheet (details +
+  summary) workbook — client chose the detailed line-item register for v1; other layouts
+  (single-purpose page, list+detail panel) were considered for the Reports page and rejected in
+  favor of the card grid for extensibility.

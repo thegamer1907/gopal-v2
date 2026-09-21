@@ -43,6 +43,7 @@ export namespace db {
 	    itemName: string;
 	    itemPackSize: number;
 	    gstPercent: number;
+	    hsn: number;
 	    taxQty: number;
 	    taxValue: number;
 	    dQty: number;
@@ -60,6 +61,7 @@ export namespace db {
 	        this.itemName = source["itemName"];
 	        this.itemPackSize = source["itemPackSize"];
 	        this.gstPercent = source["gstPercent"];
+	        this.hsn = source["hsn"];
 	        this.taxQty = source["taxQty"];
 	        this.taxValue = source["taxValue"];
 	        this.dQty = source["dQty"];
@@ -107,6 +109,57 @@ export namespace db {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace reports {
+	
+	export class PurchaseSummaryRow {
+	    date: string;
+	    companyName: string;
+	    billNumber: string;
+	    itemName: string;
+	    hsn: number;
+	    packSize: number;
+	    taxQty: number;
+	    taxValue: number;
+	    dQty: number;
+	    dValue: number;
+	    gstPercent: number;
+	    gstAmount: number;
+	    taxBillAmount: number;
+	    billValue: number;
+	    billingRate: number;
+	    finalRate: number;
+	    discount: number;
+	    remarks: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PurchaseSummaryRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.companyName = source["companyName"];
+	        this.billNumber = source["billNumber"];
+	        this.itemName = source["itemName"];
+	        this.hsn = source["hsn"];
+	        this.packSize = source["packSize"];
+	        this.taxQty = source["taxQty"];
+	        this.taxValue = source["taxValue"];
+	        this.dQty = source["dQty"];
+	        this.dValue = source["dValue"];
+	        this.gstPercent = source["gstPercent"];
+	        this.gstAmount = source["gstAmount"];
+	        this.taxBillAmount = source["taxBillAmount"];
+	        this.billValue = source["billValue"];
+	        this.billingRate = source["billingRate"];
+	        this.finalRate = source["finalRate"];
+	        this.discount = source["discount"];
+	        this.remarks = source["remarks"];
+	    }
 	}
 
 }

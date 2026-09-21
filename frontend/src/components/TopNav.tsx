@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {NavLink, useLocation, useNavigate} from 'react-router-dom';
-import {LayoutDashboard, FilePlus2, FileText, Package, Building2, Settings, LogOut, X} from 'lucide-react';
+import {LayoutDashboard, FilePlus2, FileText, Package, Building2, FileSpreadsheet, Settings, LogOut, X} from 'lucide-react';
 import {Quit} from '../../wailsjs/go/main/App';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {Button, buttonVariants} from '@/components/ui/button';
@@ -28,6 +28,7 @@ const links: NavItem[] = [
     {to: '/purchase-bills', label: 'View/Edit Bills', icon: FileText},
     {to: '/items', label: 'Items', icon: Package},
     {to: '/companies', label: 'Companies', icon: Building2},
+    {to: '/reports', label: 'Reports', icon: FileSpreadsheet},
 ];
 
 export function TopNav() {

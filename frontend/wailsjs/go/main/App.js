@@ -30,6 +30,10 @@ export function DeletePurchaseBill(arg1) {
   return window['go']['main']['App']['DeletePurchaseBill'](arg1);
 }
 
+export function ExportPurchaseSummary(arg1, arg2) {
+  return window['go']['main']['App']['ExportPurchaseSummary'](arg1, arg2);
+}
+
 export function GetDatabasePath() {
   return window['go']['main']['App']['GetDatabasePath']();
 }

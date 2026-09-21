@@ -8,6 +8,7 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"gopal-v2/internal/db"
+	"gopal-v2/internal/reports"
 )
 
 // App struct
@@ -217,4 +218,29 @@ func (a *App) UpdatePurchaseBill(bill db.PurchaseBill) (db.PurchaseBill, error) 
 // DeletePurchaseBill removes a bill and its line items.
 func (a *App) DeletePurchaseBill(id int64) error {
 	return db.DeletePurchaseBill(a.db, id)
+}
+
+// --- Reports ---
+
+// ExportPurchaseSummary prompts for a save location and writes the given (fully
+// computed by the caller — see lib/purchaseBill.ts) rows to an .xlsx workbook. Returns
+// the chosen path, or "" if the user cancelled the dialog.
+func (a *App) ExportPurchaseSummary(rows []reports.PurchaseSummaryRow, defaultFilename string) (string, error) {
+	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:           "Export Purchase Summary",
+		DefaultFilename: defaultFilename,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "Excel Workbook (*.xlsx)", Pattern: "*.xlsx"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := reports.WritePurchaseSummary(path, rows); err != nil {
+		return "", err
+	}
+	return path, nil
 }

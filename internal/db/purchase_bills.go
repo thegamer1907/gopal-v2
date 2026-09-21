@@ -25,6 +25,7 @@ type PurchaseBillItem struct {
 	ItemName     string  `json:"itemName"`    // read (JOIN)
 	ItemPackSize float64 `json:"itemPackSize"` // read (JOIN)
 	GSTPercent   float64 `json:"gstPercent"`  // read (JOIN)
+	HSN          int64   `json:"hsn"`         // read (JOIN)
 	TaxQty       float64 `json:"taxQty"`
 	TaxValue     float64 `json:"taxValue"`
 	DQty         float64 `json:"dQty"`
@@ -159,7 +160,7 @@ func ListPurchaseBills(conn *sql.DB) ([]PurchaseBill, error) {
 	}
 
 	itemRows, err := conn.Query(
-		`SELECT pbi.bill_id, pbi.item_id, i.name, i.pack_size, i.gst_percent,
+		`SELECT pbi.bill_id, pbi.item_id, i.name, i.pack_size, i.gst_percent, i.hsn,
 				pbi.tax_qty, pbi.tax_value, pbi.d_qty, pbi.d_value, pbi.discount, pbi.remarks
 			FROM purchase_bill_items pbi
 			JOIN items i ON i.id = pbi.item_id
@@ -174,7 +175,7 @@ func ListPurchaseBills(conn *sql.DB) ([]PurchaseBill, error) {
 		var billID int64
 		var it PurchaseBillItem
 		if err := itemRows.Scan(
-			&billID, &it.ItemID, &it.ItemName, &it.ItemPackSize, &it.GSTPercent,
+			&billID, &it.ItemID, &it.ItemName, &it.ItemPackSize, &it.GSTPercent, &it.HSN,
 			&it.TaxQty, &it.TaxValue, &it.DQty, &it.DValue, &it.Discount, &it.Remarks,
 		); err != nil {
 			return nil, fmt.Errorf("scan bill item: %w", err)
@@ -200,7 +201,7 @@ func GetPurchaseBill(conn *sql.DB, id int64) (PurchaseBill, error) {
 	}
 
 	rows, err := conn.Query(
-		`SELECT pbi.item_id, i.name, i.pack_size, i.gst_percent,
+		`SELECT pbi.item_id, i.name, i.pack_size, i.gst_percent, i.hsn,
 				pbi.tax_qty, pbi.tax_value, pbi.d_qty, pbi.d_value, pbi.discount, pbi.remarks
 			FROM purchase_bill_items pbi
 			JOIN items i ON i.id = pbi.item_id
@@ -217,7 +218,7 @@ func GetPurchaseBill(conn *sql.DB, id int64) (PurchaseBill, error) {
 	for rows.Next() {
 		var it PurchaseBillItem
 		if err := rows.Scan(
-			&it.ItemID, &it.ItemName, &it.ItemPackSize, &it.GSTPercent,
+			&it.ItemID, &it.ItemName, &it.ItemPackSize, &it.GSTPercent, &it.HSN,
 			&it.TaxQty, &it.TaxValue, &it.DQty, &it.DValue, &it.Discount, &it.Remarks,
 		); err != nil {
 			return PurchaseBill{}, fmt.Errorf("scan bill item: %w", err)

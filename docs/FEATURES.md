@@ -7,10 +7,22 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
-_Shipped in **v0.3.0** (2026-06-15): masters edit/delete, sortable + filterable tables with a
+_Shipped in **v0.4.0** (2026-09-20): **Reports** page + Purchase Summary Excel export.
+v0.3.0 (2026-06-15): masters edit/delete, sortable + filterable tables with a
 date-range filter, Indian (en-IN) number formatting, the reworded unsaved-changes dialog, and the
 **top-nav redesign** (sidebar → flat top bar). v0.2.1 (2026-06-10): Company master,
 items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, batch-1 polish._
+
+- **Reports — Purchase Summary** — new `/reports` page (own top-nav link), a card-grid of
+  downloadable reports (extensible — more report types are just more cards). First report:
+  **Purchase Summary**, a line-item register of every purchase-bill line across a chosen date
+  range (or all, when no range is picked), exported as a real `.xlsx` workbook — typed date
+  cells (`dd-mmm-yyyy`) and typed number cells (accounting-style: money 2-decimal + thousands
+  separator, quantity/rate-support columns plain 2-decimal, HSN a plain integer), a frozen +
+  auto-filtered header, and a bold Totals row. Report math is computed in the frontend (reuses
+  `calcLine`, never re-derived) and handed to a new Go method (`ExportPurchaseSummary`, backed
+  by `internal/reports` + `excelize`) that only lays it out and saves it via the native
+  save-file dialog.
 
 - **App navigation shell** — a **flat, always-visible top navigation bar** (`src/components/TopNav.tsx`):
   wordmark + all page links in one row (Dashboard · Add Purchase Bill · View/Edit Bills · Items ·
@@ -54,6 +66,8 @@ _None._
 - **Dashboard content** — decide the real KPIs / lists.
 - **As-billed snapshots** — optionally store GST%/name on the bill line so historical bills
   don't shift when the master changes.
+- **More Reports cards** — additional report types on `/reports` (e.g. sales/stock summaries),
+  each just another card in the same grid.
 
 ## Ideas
 _Capture raw feature ideas here as they come up (from us or the client)._

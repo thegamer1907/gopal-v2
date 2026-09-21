@@ -6,6 +6,42 @@ reads the top entry first.
 
 ---
 
+## 2026-09-20 — Reports page + Purchase Summary Excel export (new feature)
+**Did:**
+- New **Reports** area: `/reports` route + top-nav link, `src/pages/Reports.tsx`. A card-grid
+  layout (one `Card` per report type) so future reports are just more cards. First (only) card:
+  **Purchase Summary**.
+- **Purchase Summary**: reuses `DateRangeFilter` (empty = all bills, same as View/Edit Bills —
+  no separate toggle), shows a live "N lines across M bills · ₹total" preview, and a Download
+  Excel button. Flattens filtered bills into one row per line, computing GST/totals via the
+  existing shared `calcLine` (never re-derived in Go), sorted chronologically.
+- **Backend:** added **`github.com/xuri/excelize/v2`** (first Excel dep, pure Go/no CGO). New
+  `internal/reports` package (`PurchaseSummaryRow` + `WritePurchaseSummary`) writes a workbook
+  with **real typed cells**: Date as a genuine Excel date (`dd-mmm-yyyy` custom format,
+  sortable); money columns `#,##0.00`; quantity/rate-support columns `0.00`; HSN plain integer.
+  Bold frozen+auto-filtered header, bold Totals row. New `App.ExportPurchaseSummary` opens a
+  native Save dialog (mirrors `CreateNewDatabase`'s pattern) and calls it. Also joined
+  `items.hsn` into `PurchaseBillItem` (`ListPurchaseBills`/`GetPurchaseBill`) since the report
+  needed it — column already existed, no migration.
+- **Caught during implementation:** an ordering bug where applying whole-column number-format
+  styles *after* the header/totals bold styles silently stripped the bold from those cells
+  (`SetColStyle` overrides existing per-cell styles). Fixed by applying column styles first,
+  then bold on top; totals row uses combined bold+numFmt styles per column instead of a blanket
+  bold, so the accounting format survives on the totals line too. Verified by generating a
+  sample workbook and inspecting the raw XML (cell types, numFmt ids, date serial values).
+- `go build/vet/test` ✅. `npm run build` (tsc + vite) ✅. Docs updated (FEATURES → In Progress,
+  UI.md new Reports screen section + nav list, DECISIONS entry).
+
+**Decisions:** see `docs/DECISIONS.md` 2026-09-20 — card-grid layout for extensibility;
+frontend-computes/Go-writes split (single-sourced formulas); explicit real typed date/number
+cells with the accounting-style formats the client asked for, chosen via AskUserQuestion.
+
+**Client verified live in `wails dev`** and approved — marked Shipped in FEATURES.md
+(**v0.4.0**), committed, pushed to `main`, and tagged `v0.4.0` to cut the Windows release.
+No DB reset needed (additive read-side change only).
+
+---
+
 ## 2026-06-15 — Navigation moved from left sidebar to a flat top bar
 **Did:** (client feedback — uncomfortable with the sidebar, keeps forgetting it's collapsible,
 prefers top nav + natural vertical scroll)
