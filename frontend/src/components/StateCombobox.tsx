@@ -4,7 +4,9 @@ import {INDIAN_STATES} from '@/lib/indianStates';
 
 // State picker for the Customer master — type to filter the fixed Indian states/UTs
 // list, same interaction as CompanyCombobox/ItemCombobox. No "add new" option since the
-// list is closed. The selected value is just the state name (a plain string).
+// list is closed, but unlike those comboboxes State isn't FK'd to anything — it's just a
+// plain string column — so free text the user types without picking a suggestion is still
+// accepted as-is (propagated on every keystroke, not only on select).
 interface Props {
     value: string;
     onSelect: (state: string) => void;
@@ -39,6 +41,7 @@ export function StateCombobox({value, onSelect, id}: Props) {
                 value={query}
                 onChange={(e) => {
                     setQuery(e.target.value);
+                    onSelect(e.target.value);
                     setOpen(true);
                 }}
                 onFocus={() => setOpen(true)}

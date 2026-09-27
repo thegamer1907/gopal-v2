@@ -80,10 +80,11 @@ var headers = [colCount]string{
 	colRemarks - 1:       "Remarks",
 }
 
-// moneyCols get a 2-decimal, thousands-separated format; qtyCols get plain 2 decimals
-// (no separator) — the "accounting-style" formatting agreed for the Reports feature.
+// moneyCols get a 2-decimal, thousands-separated format; qtyCols are whole numbers (no
+// separator, no decimals) — the "accounting-style" formatting agreed for the Reports
+// feature. GST % gets its own native Excel percentage format (see applyColumnStyles).
 var moneyCols = []int{colTaxValue, colDValue, colGSTAmount, colTaxBillAmount, colBillValue, colBillingRate, colFinalRate, colDiscount}
-var qtyCols = []int{colPackSize, colTaxQty, colDQty, colGSTPercent}
+var qtyCols = []int{colPackSize, colTaxQty, colDQty}
 
 // WritePurchaseSummary writes rows to a new "Purchase Summary" workbook at path: a bold
 // header, real typed date/number cells (not text) with the agreed formats, a frozen +
@@ -175,12 +176,28 @@ func applyColumnStyles(f *excelize.File) error {
 		return err
 	}
 
-	qtyFmt := "0.00"
+	qtyFmt := "0"
 	qtyStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &qtyFmt})
 	if err != nil {
 		return fmt.Errorf("qty style: %w", err)
 	}
 	if err := applyColStyle(f, qtyCols, qtyStyle); err != nil {
+		return err
+	}
+
+	// GST % is written as a fraction (e.g. 0.05) so this is a real Excel Percentage cell,
+	// not just a number with a literal "%" appended — whole-number slabs only (5, 12, 18…)
+	// so no decimals, matching the other non-amount columns.
+	gstFmt := "0%"
+	gstStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &gstFmt})
+	if err != nil {
+		return fmt.Errorf("gst style: %w", err)
+	}
+	gstCol, err := excelize.ColumnNumberToName(colGSTPercent)
+	if err != nil {
+		return err
+	}
+	if err := f.SetColStyle(sheetName, gstCol, gstStyle); err != nil {
 		return err
 	}
 
@@ -225,7 +242,7 @@ func writeRows(f *excelize.File, rows []PurchaseSummaryRow) (int, error) {
 		values[colTaxValue-1] = r.TaxValue
 		values[colDQty-1] = r.DQty
 		values[colDValue-1] = r.DValue
-		values[colGSTPercent-1] = r.GSTPercent
+		values[colGSTPercent-1] = r.GSTPercent / 100
 		values[colGSTAmount-1] = r.GSTAmount
 		values[colTaxBillAmount-1] = r.TaxBillAmount
 		values[colBillValue-1] = r.BillValue
@@ -319,7 +336,7 @@ func writeTotals(f *excelize.File, rows []PurchaseSummaryRow, totalsRow int) err
 		}
 	}
 
-	qtyFmt := "0.00"
+	qtyFmt := "0"
 	boldQtyStyle, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}, CustomNumFmt: &qtyFmt})
 	if err != nil {
 		return fmt.Errorf("totals qty style: %w", err)

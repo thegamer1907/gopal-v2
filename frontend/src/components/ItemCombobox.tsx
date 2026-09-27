@@ -4,11 +4,12 @@ import {Plus} from 'lucide-react';
 import {db} from '../../wailsjs/go/models';
 import {Input} from '@/components/ui/input';
 
-// Lightweight item search. Filters the in-memory item cache as the user types and
-// shows suggestions ("name · pack size"). The suggestion list is rendered in a portal
-// (fixed-positioned under the input) so it isn't clipped by — and doesn't add a vertical
-// scrollbar to — the horizontally-scrolling line-items table. If nothing matches it
-// offers "add as new item".
+// Lightweight item search. Filters the in-memory item cache as the user types and shows
+// suggestions — name + pack size on one line (never wraps; name truncates if too long),
+// plus the company on its own line below when showCompany is set. The suggestion list is
+// rendered in a portal (fixed-positioned under the input) so it isn't clipped by — and
+// doesn't add a vertical scrollbar to — the horizontally-scrolling line-items table. If
+// nothing matches it offers "add as new item".
 interface Props {
     items: db.Item[];
     value: db.Item | null;
@@ -20,13 +21,16 @@ interface Props {
     // (Add Purchase Bill's list is already scoped to one company, so it'd be redundant
     // there); Add Order turns it on since its item search spans every company.
     showCompany?: boolean;
+    // Override the input/dropdown width (default w-56). Add Order's rows are wider
+    // (name + company + pack size all shown), so it asks for more room.
+    className?: string;
 }
 
 function label(it: db.Item): string {
     return `${it.name} · ${it.packSize}`;
 }
 
-export function ItemCombobox({items, value, onSelect, onAddNew, disabled, placeholder, showCompany}: Props) {
+export function ItemCombobox({items, value, onSelect, onAddNew, disabled, placeholder, showCompany, className}: Props) {
     const [query, setQuery] = useState('');
     const [open, setOpen] = useState(false);
     const [rect, setRect] = useState<{left: number; top: number; width: number} | null>(null);
@@ -70,10 +74,12 @@ export function ItemCombobox({items, value, onSelect, onAddNew, disabled, placeh
         setOpen(false);
     }
 
+    const width = className ?? 'w-56';
+
     return (
-        <div ref={anchorRef} className="relative w-56">
+        <div ref={anchorRef} className={`relative ${width}`}>
             <Input
-                className="w-56"
+                className={width}
                 placeholder={placeholder ?? 'Search item…'}
                 autoComplete="off"
                 disabled={disabled}
@@ -102,14 +108,19 @@ export function ItemCombobox({items, value, onSelect, onAddNew, disabled, placeh
                         {filtered.map((it) => (
                             <button
                                 type="button"
-                                key={label(it)}
+                                key={it.id}
                                 onClick={() => select(it)}
-                                className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+                                className="flex w-full flex-col rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
                             >
-                                <span className="font-medium">{it.name}</span>
-                                <span className="shrink-0 text-muted-foreground tabular-nums">
-                                    {showCompany ? `${it.companyName} · ${it.packSize}` : it.packSize}
+                                <span className="flex w-full items-center justify-between gap-3">
+                                    <span className="min-w-0 truncate font-medium">{it.name}</span>
+                                    <span className="shrink-0 whitespace-nowrap text-muted-foreground tabular-nums">
+                                        {it.packSize}
+                                    </span>
                                 </span>
+                                {showCompany && (
+                                    <span className="truncate text-xs text-muted-foreground">{it.companyName}</span>
+                                )}
                             </button>
                         ))}
                         {filtered.length === 0 && (

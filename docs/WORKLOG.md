@@ -6,6 +6,44 @@ reads the top entry first.
 
 ---
 
+## 2026-09-27 — Post-v0.6.0 patch: five client-reported fixes
+**Did:** (client tested v0.6.0 live; these came out of that session)
+- **Add Order item search showed a phantom duplicate row** after the client renamed a
+  Prayagh item to match Sapna's naming, making two different items share the same
+  name+pack-size. Root cause: `ItemCombobox` keyed its dropdown rows by `label(it)`
+  (name+packSize) instead of `it.id`, so React mis-reconciled once two rows collided on
+  key. Verified via the real DB (`/Users/harshit/Downloads/inventory.db`, queried
+  directly) that the master itself had no duplicate rows — 3 genuinely distinct items —
+  confirming it was a pure frontend rendering bug, not a data problem. Fixed by keying on
+  `it.id`.
+- **Purchase Summary Excel export formatting:** quantity columns (Pack Size, Tax Qty,
+  D Qty, and their Totals-row cells) now format `0` (no decimals) instead of `0.00` —
+  matches the app's own whole-number convention for quantities. **GST % is now a real
+  Excel Percentage cell** — value written as `gstPercent/100` with format `0%`, not the
+  raw number as `0.00`. Verified by generating a workbook and inspecting `styles.xml` +
+  the sheet XML directly (confirmed the `0`/`0%` numFmts and the `0.05`-style cell value).
+- **Add Order's item search widened** (`w-56` → `w-72`, via a new `className` override on
+  `ItemCombobox`) and its dropdown row now goes two-line when showing company: name + pack
+  size on line 1 (name truncates only if it still doesn't fit), company name on line 2 —
+  first tried truncating everything onto one line, but that hid names too eagerly.
+- **Customer State field silently dropped anything typed without picking a dropdown
+  suggestion.** `StateCombobox`'s `onChange` only updated its own local text, never called
+  `onSelect` — so the parent's `state` (and therefore `AddCustomer`/`UpdateCustomer`) never
+  heard about free-typed text. Fixed by calling `onSelect` on every keystroke too; safe
+  since State is a plain string column, not an FK like Company/Item.
+- **Top-nav wrap on narrow windows (client's actual laptop) looked cramped** — the last
+  two links wrapped to a second row, but the header had a *fixed* `h-14` while its `nav`
+  wraps via `flex flex-wrap`, so the wrapped row overflowed past the header's own box with
+  no breathing room before the border. Changed to `min-h-14 flex-wrap` + `py-2` so the
+  header grows to fit however many rows wrap, evenly padded top and bottom.
+- `go build/vet/test` ✅, `npm run build` ✅. Docs updated (DECISIONS, FEATURES).
+
+**Next steps:** verify live in `wails dev` (client's own narrow-window repro for the nav
+fix in particular, since it can't be checked headlessly here — no browser-automation
+access this session). Then commit and cut a patch release (`vX.Y.Z` tag) once confirmed.
+
+---
+
 ## 2026-09-27 — View/Edit Orders (third, and last-planned, piece of the Order Book)
 **Did:**
 - New `/orders` page (`SavedOrders.tsx`, top-nav "View/Edit Orders" right after Add

@@ -566,3 +566,47 @@ have to re-litigate.
 - **Nav icon `ClipboardList`** for View/Edit Orders — deliberately distinct from Add
   Order's `ShoppingCart` and View/Edit Bills' `FileText`, so the nav bar doesn't show two
   identical icons for two different things.
+
+### 2026-09-27 — Post-ship v0.6.0 patch: five small client-reported fixes
+- **`ItemCombobox` keyed dropdown rows by `name · packSize` instead of `item.id`.** Client
+  renamed a Prayagh item to match Sapna's naming and two different items (different
+  companies) ended up with an identical name+pack-size; React's reconciliation broke on
+  the duplicate key and left a phantom duplicate row in the Add Order item search. Keying
+  by `id` (the actual unique identity) fixes it regardless of what two items are named.
+  **Lesson: never key a list by a field that isn't guaranteed unique, even if it "usually"
+  is** — this bites only when data collides, which the master's own unique constraint
+  didn't protect against here (constraint is per-company; nothing stops two *different*
+  companies from having identically-named items).
+- **Purchase Summary Excel export:** quantity columns (Pack Size, Tax Qty, D Qty,
+  including their Totals-row cells) now format as `0` (whole numbers, no decimals) instead
+  of `0.00` — matches the app's own `fmtQty` convention (quantities are always whole in
+  this business) and was purely a leftover inconsistency in the report styling, not a data
+  issue. **GST % is now a real Excel Percentage cell** — written as the fraction
+  (`gstPercent / 100`) with format `0%`, not the raw number with `0.00`; previously it
+  displayed as a plain number ("5.00") with no `%` and 2 decimals it never needed (GST
+  slabs are whole percentages in this business's real data).
+- **Add Order's `ItemCombobox` widened (`w-56` → `w-72` via a new `className` override
+  prop) and its dropdown row goes two-line when `showCompany` is set:** name + pack size
+  together on line 1 (name truncates only if it still doesn't fit), company name alone on
+  line 2. Plain truncating everything onto one line (tried first) hid the item name behind
+  an ellipsis too eagerly; two lines gives the name room while still keeping the company
+  legible instead of squeezed off to the side.
+- **`StateCombobox` didn't save manually-typed text at all** — `onChange` only updated the
+  input's own local `query` state; the parent's `state` field (and therefore
+  `AddCustomer`/`UpdateCustomer`) only ever heard about a value via `onSelect`, which fired
+  solely on clicking a dropdown suggestion. Typing a state and never picking a suggestion
+  meant nothing was ever passed up, so nothing saved. Fixed by calling `onSelect` on every
+  keystroke too — safe here specifically because State is a plain string column, not an FK
+  like Company/Item, so free text is a perfectly valid value, unlike those comboboxes.
+- **`TopNav` header used a fixed `h-14`** while its `nav` wraps (`flex flex-wrap`) once the
+  window is too narrow for all links on one line. On wrap, the two-row nav grew taller
+  than the header's fixed box, so the wrapped row spilled past the header's own
+  bottom edge with no breathing room before the border. Changed to `min-h-14 flex-wrap` +
+  `py-2` so the header grows to fit however many rows the nav wraps to, with equal padding
+  top and bottom — single-line (normal window width) layout is unchanged since `min-h-14`
+  still equals the old fixed height there.
+- All five verified: DB queried directly for the item-key bug (confirmed the DB itself had
+  no duplicate rows — 3 genuinely distinct items, purely a frontend rendering bug); the
+  Excel fixes verified by generating a real workbook and inspecting `styles.xml`/the sheet
+  XML directly (confirmed `0`/`0%` number formats and the `0.05`-style fraction value)
+  rather than eyeballing a screenshot. `go build/vet/test` ✅, `npm run build` ✅.

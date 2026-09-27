@@ -76,7 +76,7 @@ export function TopNav() {
 
     return (
         <>
-            <header className="flex h-14 items-center gap-2 border-b bg-background px-6">
+            <header className="flex min-h-14 flex-wrap items-center gap-2 border-b bg-background px-6 py-2">
                 <span className="mr-2 text-base font-semibold tracking-tight">GopalOne</span>
 
                 <nav className="flex flex-wrap items-center gap-1">

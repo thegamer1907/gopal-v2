@@ -452,6 +452,7 @@ export function AddOrder() {
                                                     disabled={!customer}
                                                     placeholder={customer ? 'Search item…' : 'Select a customer first'}
                                                     showCompany
+                                                    className="w-72"
                                                 />
                                             </td>
                                             <td className="text-right tabular-nums text-muted-foreground">

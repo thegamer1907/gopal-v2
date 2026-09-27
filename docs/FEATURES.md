@@ -7,6 +7,12 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
+_Patch after v0.6.0 (2026-09-27): five client-reported fixes — Add Order item-search
+duplicate-row bug, Excel report number formatting (whole-number quantities, real GST %
+percentage format), a wider two-line Add Order item dropdown, Customer state field not
+saving free-typed text, and the top-nav wrap-spacing glitch on narrow windows. See
+DECISIONS for detail on each._
+
 _Shipped in **v0.6.0** (2026-09-27): the **Sales / Order Book** feature — Customers
 master, Add Order (+ item stock, per-customer rate history), View/Edit Orders — plus the
 `dd-mmm-yy` date format. v0.5.0 (2026-09-20): in-app self-update (Settings → Updates).
