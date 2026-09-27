@@ -357,3 +357,31 @@ have to re-litigate.
   suspicion than a library-driven in-process replace); switching to an NSIS
   installer (rejected — bigger change to the whole release pipeline for a problem the
   portable-`.exe` self-replace pattern already solves).
+
+### 2026-09-26 — Date format: dd-mmm-yyyy → dd-mmm-yy (2-digit year), no data migration
+- **Decision:** Client feedback — dates should show a 2-digit year (`09-Jun-26`), not the
+  4-digit `09-Jun-2026` used until now. Changed `formatDate` (`frontend/src/lib/date.ts`)
+  to always write the 2-digit form going forward, and made `parseDate` **permanently**
+  tolerant of *both* a 2-digit and the legacy 4-digit year (a 2-digit year expands as
+  `2000 + yy`) rather than doing a one-time cutover. Added a new `displayDate(raw)` helper
+  that normalizes any stored string to the current display form, and used it everywhere a
+  raw stored date string was shown or passed along (`SavedBills.tsx`'s list row and detail
+  header, `AddPurchaseBill.tsx`'s edit-prefill, `Reports.tsx`'s Excel row-building).
+  `internal/reports/purchase_summary.go`'s Excel date column/format also moved to
+  `dd-mmm-yy` — safe to make that the *only* layout Go understands, since the frontend
+  now always normalizes before building a report row.
+- **Why no data migration:** the real database already has 28+ bills stored with
+  4-digit-year strings (dates are stored exactly as entered and never rewritten — see
+  `docs/DATA_MODEL.md`). A `parseDate` tightened to *require* 2 digits would have stopped
+  parsing every existing bill, silently breaking sort order (falls back to epoch),
+  date-range filtering (excludes every old bill), the Add/Edit Save button (every existing
+  bill would look "invalid" the moment it's opened), and the Excel export's date column.
+  Making the parser permanently tolerant of both forms, plus normalizing at display time,
+  fixes the client's complaint (every bill now *shows* `dd-mmm-yy`, old and new alike)
+  without touching a single stored row — lower risk than a rewrite migration, and it keeps
+  working automatically if the format is ever adjusted again.
+- **Left alone:** the calendar popup's own month/year heading (e.g. "September 2026") is
+  react-day-picker's own internal caption (`captionLayout="label"`, no custom
+  `formatCaption`) — independent of `lib/date.ts`, and a full month name + 4-digit year is
+  the normal convention for a date-picker's own header, not what the client's feedback was
+  about.

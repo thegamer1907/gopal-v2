@@ -33,7 +33,7 @@ import {
 import {SortableHeader} from '@/components/SortableHeader';
 import {DateRangeFilter} from '@/components/DateRangeFilter';
 import {useTableSort} from '@/hooks/useTableSort';
-import {parseDate} from '@/lib/date';
+import {parseDate, displayDate} from '@/lib/date';
 import {fmt, fmtQty, calcLine, LineCalc} from '@/lib/purchaseBill';
 
 // View/Edit Bills — a list of every saved bill that opens a read-only detail, from
@@ -205,7 +205,7 @@ export function SavedBills() {
                                                 className="cursor-pointer"
                                             >
                                                 <TableCell className="pl-4 font-medium">{bill.companyName}</TableCell>
-                                                <TableCell className="tabular-nums text-muted-foreground">{bill.date}</TableCell>
+                                                <TableCell className="tabular-nums text-muted-foreground">{displayDate(bill.date)}</TableCell>
                                                 <TableCell>{bill.billNumber}</TableCell>
                                                 <TableCell className="text-right tabular-nums text-muted-foreground">{fmtQty(totalQtyOf(bill))}</TableCell>
                                                 <TableCell className="pr-4 text-right tabular-nums font-medium">{fmt(billValueOf(bill))}</TableCell>
@@ -283,7 +283,7 @@ function BillDetail({
                 <CardHeader>
                     <CardTitle>Bill {bill.billNumber}</CardTitle>
                     <CardDescription>
-                        {bill.companyName} · {bill.date}
+                        {bill.companyName} · {displayDate(bill.date)}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

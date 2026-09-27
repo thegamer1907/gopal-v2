@@ -29,7 +29,7 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   downloadable reports (extensible — more report types are just more cards). First report:
   **Purchase Summary**, a line-item register of every purchase-bill line across a chosen date
   range (or all, when no range is picked), exported as a real `.xlsx` workbook — typed date
-  cells (`dd-mmm-yyyy`) and typed number cells (accounting-style: money 2-decimal + thousands
+  cells (`dd-mmm-yy`) and typed number cells (accounting-style: money 2-decimal + thousands
   separator, quantity/rate-support columns plain 2-decimal, HSN a plain integer), a frozen +
   auto-filtered header, and a bold Totals row. Report math is computed in the frontend (reuses
   `calcLine`, never re-derived) and handed to a new Go method (`ExportPurchaseSummary`, backed
@@ -47,7 +47,7 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
 - **Item master (company-scoped)** — `items` has `id` PK + **`company_id` FK**, unique
   `(company_id, name, pack_size)`. Items page has a company picker + Company column.
 - **Add Purchase Bill** — company-first data-entry screen: header (Company combobox, Bill
-  number, Date in **dd-mmm-yyyy**) + searchable line items **fetched per company**, live calc
+  number, Date in **dd-mmm-yy**) + searchable line items **fetched per company**, live calc
   columns (GST amt, totals, Final Rate), running totals, add-new-item/company dialogs,
   unsaved-changes guard, centered Save, transactional save.
 - **View/Edit Bills** — `/purchase-bills`. List → read-only detail with **Edit** (reopens the

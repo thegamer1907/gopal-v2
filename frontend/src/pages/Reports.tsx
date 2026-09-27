@@ -6,7 +6,7 @@ import {db, reports} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {DateRangeFilter} from '@/components/DateRangeFilter';
-import {parseDate, formatDate} from '@/lib/date';
+import {parseDate, formatDate, displayDate} from '@/lib/date';
 import {calcLine, fmt} from '@/lib/purchaseBill';
 
 // Reports (/reports) — a grid of downloadable reports, one Card per report. Only
@@ -41,7 +41,7 @@ function toRows(bills: db.PurchaseBill[]): reports.PurchaseSummaryRow[] {
             });
             rows.push(
                 reports.PurchaseSummaryRow.createFrom({
-                    date: bill.date,
+                    date: displayDate(bill.date),
                     companyName: bill.companyName,
                     billNumber: bill.billNumber,
                     itemName: it.itemName,

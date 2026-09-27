@@ -72,7 +72,7 @@ One row per bill (from the Add Purchase Bill form: Company, Bill number, Date).
 | `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key (FK target for line items) |
 | `company_id` | INTEGER NOT NULL | → `companies(id)` (FK). The bill references the company by id, not name. |
 | `bill_number` | TEXT NOT NULL | the supplier's bill number |
-| `date` | TEXT NOT NULL | bill date, stored as entered: `dd/mm/yyyy` |
+| `date` | TEXT NOT NULL | bill date, stored exactly as entered/unvalidated (never rewritten). Current format is `dd-mmm-yy` (e.g. `09-Jun-26`); bills saved before 2026-09 are stored as the older `dd-mmm-yyyy`. `@/lib/date`'s `parseDate` accepts both permanently, and `displayDate` normalizes any stored string to the current form for display — no migration of old rows. |
 
 Foreign key: `(company_id)` → `companies(id)`.
 

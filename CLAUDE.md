@@ -85,7 +85,7 @@ The Go/frontend boundary is the core concept here:
 - **Data-entry pages** must (a) disable submit until valid (all required fields filled; `0`
   counts as filled) and (b) wire the unsaved-changes guard (`useUnsavedChanges` →
   `setDirty(isDirty)` + clear on unmount). (DECISIONS / UI)
-- **Dates** display/enter as `dd-mmm-yyyy` via `@/lib/date`. **Bill calc formulas** live only
+- **Dates** display/enter as `dd-mmm-yy` via `@/lib/date`. **Bill calc formulas** live only
   in `@/lib/purchaseBill` (shared by the add/edit form and the bill detail). Reuse, don't
   re-derive.
 - **Masters use surrogate `id` PKs + FKs** (companies, items); items belong to a company, and

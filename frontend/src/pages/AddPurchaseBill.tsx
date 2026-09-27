@@ -39,7 +39,7 @@ import {Calendar} from '@/components/ui/calendar';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {cn} from '@/lib/utils';
 import {num, fmt, fmtQty, calcLine} from '@/lib/purchaseBill';
-import {formatDate, todayDate, parseDate} from '@/lib/date';
+import {formatDate, todayDate, parseDate, displayDate} from '@/lib/date';
 
 // Add Purchase Bill — header (Company, Bill number, Date) plus searchable line items.
 // Items are cached on load; each line is calculated live. New items can be added on the
@@ -157,7 +157,7 @@ export function AddPurchaseBill() {
                 setItemsForCompany(items);
                 setCompany({id: bill.companyId, name: bill.companyName} as db.Company);
                 setBillNumber(bill.billNumber);
-                setDate(bill.date);
+                setDate(displayDate(bill.date));
                 const prefilled: Line[] = bill.items.map((bi, i) => ({
                     id: i + 1,
                     item: itemById.get(bi.itemId) ?? null,
@@ -359,7 +359,7 @@ export function AddPurchaseBill() {
                             <div className="relative">
                                 <Input
                                     id="date"
-                                    placeholder="dd-mmm-yyyy"
+                                    placeholder="dd-mmm-yy"
                                     autoComplete="off"
                                     className="pr-9"
                                     value={date}

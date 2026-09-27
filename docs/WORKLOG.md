@@ -6,6 +6,36 @@ reads the top entry first.
 
 ---
 
+## 2026-09-26 — Date format: dd-mmm-yyyy → dd-mmm-yy (client feedback)
+**Did:** (first piece of client feedback on the live app)
+- `frontend/src/lib/date.ts`: `formatDate` now writes a 2-digit year; `parseDate` made
+  **permanently** tolerant of both the new 2-digit and legacy 4-digit year (real DB
+  already has 28+ bills stored as `dd-mmm-yyyy`, never rewritten — a strict cutover would
+  have broken sorting, date-range filtering, and the Add/Edit Save button for every
+  existing bill). Added a new `displayDate(raw)` helper that normalizes any stored string
+  to the current form for display.
+- Wired `displayDate` into every raw-date-display/pass-through site: `SavedBills.tsx`
+  (list row + detail header), `AddPurchaseBill.tsx` (edit-prefill), `Reports.tsx`
+  (Excel row-building, so Go always receives the current format).
+- `internal/reports/purchase_summary.go`: Excel date column/format → `dd-mmm-yy`; Go's
+  `time.Parse` layout simplified to the single current format (safe, since the frontend
+  now always normalizes before handing Go a row).
+- Verified the new parse/format/display logic standalone (round-trips a 2-digit year,
+  still parses+normalizes an existing 4-digit-year string, rejects malformed input) before
+  wiring it in; regenerated a sample `.xlsx` and confirmed the Excel date cell is still a
+  real, sortable date under the new `dd-mmm-yy` format. `go build/vet/test` ✅,
+  `npm run build` ✅. Docs updated (CLAUDE.md, UI.md, DATA_MODEL.md — also fixed an
+  already-stale `dd/mm/yyyy` line there —, FEATURES.md, DECISIONS.md).
+
+**Next steps:** verify live in `wails dev` against the real sample DB (28+ bills stored
+with 4-digit years) — View/Edit Bills list + detail now show `dd-mmm-yy` for every
+existing bill, sorted correctly; opening an old bill for edit has Save enabled
+immediately; a newly typed/calendar-picked date writes `dd-mmm-yy`; Reports date-range
+filter + Excel export still work correctly across old and new bills. Then ask before
+committing/tagging a release.
+
+---
+
 ## 2026-09-20 — In-app self-update ("Check for Updates" button)
 **Did:**
 - New **Updates** section on Settings: shows the running version, a **Check for Updates**

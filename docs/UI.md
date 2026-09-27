@@ -19,7 +19,7 @@ Screens, flows, and visual decisions, recorded as they firm up.
   single decimal point only (`inputMode="decimal"`). It takes `value: string` /
   `onChange: (v) => void`.
 - Icons: **lucide-react**.
-- **Dates** display/enter as **dd-mmm-yyyy** (month in words) via the shared **`@/lib/date`**
+- **Dates** display/enter as **dd-mmm-yy** (month in words, 2-digit year) via the shared **`@/lib/date`**
   (`formatDate` / `todayDate` / `parseDate`) — use it everywhere a date is shown or typed.
 - **Numbers** render Indian-style (lakh/crore grouping) via **`@/lib/purchaseBill`**: **`fmt`**
   for monetary amounts (always 2 decimals, e.g. `1,20,300.00`) and **`fmtQty`** for quantities
@@ -85,11 +85,16 @@ Screens, flows, and visual decisions, recorded as they firm up.
   '…' as new company"** opens `NewCompanyDialog` → `AddCompany` → pushed into the cache and
   selected. The selected value is the full company (id + name); the bill is saved with its
   `company_id`. Save stays disabled until a company is chosen. Date is a text field in
-  **dd-mmm-yyyy** (month in words, e.g. `09-Jun-2026`; defaults to today) and is stored as
-  entered. It has **both** a free-typed text box and a **calendar popover** (shadcn `calendar`
-  + `popover`, react-day-picker) behind a calendar icon; both drive one `date` string — picking
-  a day writes `dd-mmm-yyyy`, and the calendar opens on the currently-typed date when it parses.
-  Format/parse via the shared **`@/lib/date`** (`formatDate` / `todayDate` / `parseDate`).
+  **dd-mmm-yy** (month in words, 2-digit year, e.g. `09-Jun-26`; defaults to today) and is
+  stored as entered. It has **both** a free-typed text box and a **calendar popover** (shadcn
+  `calendar` + `popover`, react-day-picker) behind a calendar icon; both drive one `date`
+  string — picking a day writes `dd-mmm-yy`, and the calendar opens on the currently-typed
+  date when it parses (the calendar popup's own month/year heading is react-day-picker's own,
+  independent of this format — full month name + 4-digit year, unchanged). Format/parse via
+  the shared **`@/lib/date`** (`formatDate` / `todayDate` / `parseDate` / `displayDate`) —
+  `parseDate` also still accepts the legacy 4-digit-year form so bills saved before the
+  2026-09 switch keep working; `displayDate` normalizes any stored string to the current
+  form for display, so old bills show `dd-mmm-yy` on screen too without any data migration.
 - **Line items** — a wide, horizontally-scrollable grid. Each line:
   - **Item search** (`ItemCombobox`): all items are cached once on load (`ListItems`); typing
     filters and shows suggestions as “name · pack size”. Selecting one fills the line and
@@ -113,7 +118,7 @@ Screens, flows, and visual decisions, recorded as they firm up.
   and selected for the line.
 - **Save** persists the whole bill via `AddPurchaseBill` (header + lines, one transaction);
   shows a confirmation and resets the form. The button is **disabled until the form is
-  valid**: header (Company, Bill number, a real dd-mmm-yyyy date) filled, **at least one
+  valid**: header (Company, Bill number, a real dd-mmm-yy date) filled, **at least one
   complete line**, and **no partially-filled line** left over. The **Save button is centered**
   at the bottom of the page. Mandatory line fields are the
   item + the four numeric inputs (Tax Qty, Tax Value, D Qty, D Value); **Discount and Remarks
@@ -183,7 +188,7 @@ Screens, flows, and visual decisions, recorded as they firm up.
   `text-emerald-600` "Saved to …" on success, `text-destructive` on error, silent no-op if the
   save dialog is cancelled.
 - **The workbook itself:** real typed cells, not text — Date is a genuine Excel date
-  (`dd-mmm-yyyy` custom format, sortable); money columns (Tax Value, D Value, GST Amount, Tax
+  (`dd-mmm-yy` custom format, sortable); money columns (Tax Value, D Value, GST Amount, Tax
   Bill Amount, Bill Value, Billing/Final Rate, Discount) are `#,##0.00`; quantity/rate-support
   columns (Pack Size, Tax Qty, D Qty, GST %) are `0.00`; HSN is a plain integer. Header row is
   bold, frozen, and auto-filtered; a bold **Totals** row sums Tax Qty, Tax Value, D Qty,

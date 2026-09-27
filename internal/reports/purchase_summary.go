@@ -14,7 +14,7 @@ import (
 // calcLine in frontend/src/lib/purchaseBill.ts — the single source of truth for these
 // formulas).
 type PurchaseSummaryRow struct {
-	Date          string  `json:"date"` // dd-mmm-yyyy, as stored/displayed
+	Date          string  `json:"date"` // dd-mmm-yy, as stored/displayed
 	CompanyName   string  `json:"companyName"`
 	BillNumber    string  `json:"billNumber"`
 	ItemName      string  `json:"itemName"`
@@ -153,7 +153,7 @@ func writeHeader(f *excelize.File) error {
 }
 
 func applyColumnStyles(f *excelize.File) error {
-	dateFmt := "dd-mmm-yyyy"
+	dateFmt := "dd-mmm-yy"
 	dateStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &dateFmt})
 	if err != nil {
 		return fmt.Errorf("date style: %w", err)
@@ -247,11 +247,13 @@ func writeRows(f *excelize.File, rows []PurchaseSummaryRow) (int, error) {
 	return len(rows) + 2, nil
 }
 
-// dateValue parses a dd-mmm-yyyy string into a time.Time for a real Excel date cell.
-// An unparseable date (shouldn't happen for saved bills) falls back to the zero value
-// rather than failing the whole export.
+// dateValue parses a dd-mmm-yy string into a time.Time for a real Excel date cell. The
+// caller (Reports.tsx) always normalizes to the current format before building a row, so
+// this never needs to understand the legacy dd-mmm-yyyy form. An unparseable date
+// (shouldn't happen for saved bills) falls back to the zero value rather than failing the
+// whole export.
 func dateValue(s string) time.Time {
-	t, err := time.Parse("02-Jan-2006", s)
+	t, err := time.Parse("02-Jan-06", s)
 	if err != nil {
 		return time.Time{}
 	}
