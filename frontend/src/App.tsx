@@ -4,6 +4,8 @@ import {UnsavedChangesProvider} from '@/components/UnsavedChanges';
 import {Dashboard} from '@/pages/Dashboard';
 import {AddPurchaseBill} from '@/pages/AddPurchaseBill';
 import {SavedBills} from '@/pages/SavedBills';
+import {AddOrder} from '@/pages/AddOrder';
+import {SavedOrders} from '@/pages/SavedOrders';
 import {Items} from '@/pages/Items';
 import {Companies} from '@/pages/Companies';
 import {Customers} from '@/pages/Customers';
@@ -28,6 +30,9 @@ function App() {
                             <Route path="/purchase-bills/new" element={<AddPurchaseBill/>}/>
                             <Route path="/purchase-bills/:id/edit" element={<AddPurchaseBill/>}/>
                             <Route path="/purchase-bills" element={<SavedBills/>}/>
+                            <Route path="/orders/new" element={<AddOrder/>}/>
+                            <Route path="/orders/:id/edit" element={<AddOrder/>}/>
+                            <Route path="/orders" element={<SavedOrders/>}/>
                             <Route path="/items" element={<Items/>}/>
                             <Route path="/companies" element={<Companies/>}/>
                             <Route path="/customers" element={<Customers/>}/>

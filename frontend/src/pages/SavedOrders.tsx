@@ -1,0 +1,332 @@
+import {useEffect, useMemo, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
+import {ArrowLeft, ClipboardList, Pencil, Search, Trash2} from 'lucide-react';
+import type {DateRange} from 'react-day-picker';
+import {ListSalesOrders, DeleteSalesOrder} from '../../wailsjs/go/main/App';
+import {db} from '../../wailsjs/go/models';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {SortableHeader} from '@/components/SortableHeader';
+import {DateRangeFilter} from '@/components/DateRangeFilter';
+import {useTableSort} from '@/hooks/useTableSort';
+import {parseDate, displayDate} from '@/lib/date';
+import {fmt, fmtQty} from '@/lib/purchaseBill';
+import {calcOrderLine, OrderLineCalc} from '@/lib/salesOrder';
+
+// View/Edit Orders — a list of every saved order that opens a read-only detail, from
+// which the order can be edited (full overwrite) or deleted. Mirrors View/Edit Bills
+// (SavedBills.tsx). No order-number column — that field doesn't exist for orders.
+
+function lineCalc(it: db.SalesOrderItem): OrderLineCalc {
+    return calcOrderLine({rate: it.rate, qty: it.qty, packSize: it.itemPackSize});
+}
+
+// Per-order summaries used by the list columns/sort.
+const finalAmountOf = (order: db.SalesOrder): number =>
+    order.items.reduce((sum, it) => sum + lineCalc(it).finalAmount, 0);
+const totalQtyOf = (order: db.SalesOrder): number =>
+    order.items.reduce((sum, it) => sum + it.qty, 0);
+
+// Sort accessors for the orders list. Unparseable dates fall back to the epoch so they
+// sort to the bottom under the default newest-first order.
+const orderSortAccessors = {
+    customer: (o: db.SalesOrder) => o.customerName,
+    date: (o: db.SalesOrder) => parseDate(o.date) ?? new Date(0),
+    qty: totalQtyOf,
+    amount: finalAmountOf,
+};
+
+export function SavedOrders() {
+    const navigate = useNavigate();
+    const [orders, setOrders] = useState<db.SalesOrder[]>([]);
+    const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [search, setSearch] = useState('');
+    const [range, setRange] = useState<DateRange | undefined>(undefined);
+
+    function refresh() {
+        return ListSalesOrders()
+            .then(setOrders)
+            .catch((e) => setError(String(e)))
+            .finally(() => setLoading(false));
+    }
+
+    useEffect(() => {
+        refresh();
+    }, []);
+
+    const selected = useMemo(
+        () => orders.find((o) => o.id === selectedId) ?? null,
+        [orders, selectedId],
+    );
+
+    // Filter by search (customer name) and by date range (inclusive, either bound
+    // optional), then sort. The date range's `to` is taken as end-of-day.
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const from = range?.from;
+        const to = range?.to;
+        return orders.filter((o) => {
+            if (q && !o.customerName.toLowerCase().includes(q)) {
+                return false;
+            }
+            if (from || to) {
+                const d = parseDate(o.date);
+                if (!d) return false;
+                if (from && d < from) return false;
+                if (to && d > new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999)) return false;
+            }
+            return true;
+        });
+    }, [orders, search, range]);
+
+    const {sorted, sortKey, sortDir, toggle} = useTableSort(filtered, orderSortAccessors, {
+        key: 'date',
+        dir: 'desc',
+    });
+
+    async function deleteOrder(id: number) {
+        try {
+            await DeleteSalesOrder(id);
+            setSelectedId(null);
+            await refresh();
+        } catch (e: any) {
+            setError(String(e));
+        }
+    }
+
+    if (loading) {
+        return <p className="text-sm text-muted-foreground">Loading orders…</p>;
+    }
+    if (error) {
+        return <p className="text-sm text-destructive">{error}</p>;
+    }
+
+    if (selected) {
+        return (
+            <OrderDetail
+                order={selected}
+                onBack={() => setSelectedId(null)}
+                onEdit={() => navigate(`/orders/${selected.id}/edit`)}
+                onDelete={() => deleteOrder(selected.id)}
+            />
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-semibold tracking-tight">View / Edit Orders</h1>
+                <p className="text-sm text-muted-foreground">
+                    {orders.length} saved order{orders.length === 1 ? '' : 's'}. Click one to view, edit, or delete it.
+                </p>
+            </div>
+
+            {orders.length === 0 ? (
+                <Card>
+                    <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                        <ClipboardList className="size-8 text-muted-foreground"/>
+                        <p className="text-sm text-muted-foreground">No orders saved yet.</p>
+                    </CardContent>
+                </Card>
+            ) : (
+                <>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="relative w-64">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
+                            <Input
+                                className="pl-8"
+                                placeholder="Search customer…"
+                                autoComplete="off"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <DateRangeFilter value={range} onChange={setRange}/>
+                    </div>
+
+                    <Card>
+                        <CardContent className="p-0">
+                            {sorted.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+                                    <Search className="size-8 opacity-40"/>
+                                    <p className="text-sm">No orders match the current filters.</p>
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <SortableHeader label="Customer" sortKey="customer" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
+                                            <SortableHeader label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
+                                            <SortableHeader label="Qty" sortKey="qty" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
+                                            <SortableHeader label="Final Amount" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right" className="pr-4"/>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {sorted.map((order) => (
+                                            <TableRow
+                                                key={order.id}
+                                                onClick={() => setSelectedId(order.id)}
+                                                className="cursor-pointer"
+                                            >
+                                                <TableCell className="pl-4 font-medium">{order.customerName}</TableCell>
+                                                <TableCell className="tabular-nums text-muted-foreground">{displayDate(order.date)}</TableCell>
+                                                <TableCell className="text-right tabular-nums text-muted-foreground">{fmtQty(totalQtyOf(order))}</TableCell>
+                                                <TableCell className="pr-4 text-right tabular-nums font-medium">{fmt(finalAmountOf(order))}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                </>
+            )}
+        </div>
+    );
+}
+
+// Read-only detail for a single order: header summary + the full line-items grid,
+// display-only. Offers Edit (opens the order form) and Delete (with confirm). No Stock
+// column here — Stock is a live figure for placing a new order, not a fact about a
+// historical one.
+function OrderDetail({
+    order,
+    onBack,
+    onEdit,
+    onDelete,
+}: {
+    order: db.SalesOrder;
+    onBack: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+}) {
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const rows = order.items.map((it) => ({it, c: lineCalc(it)}));
+    const totals = rows.reduce(
+        (acc, {it, c}) => {
+            acc.qty += it.qty;
+            acc.finalAmount += c.finalAmount;
+            return acc;
+        },
+        {qty: 0, finalAmount: 0},
+    );
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between gap-3">
+                <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
+                    <ArrowLeft className="size-4"/>
+                    Back to all orders
+                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={onEdit}>
+                        <Pencil className="size-4"/>
+                        Edit order
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setConfirmDelete(true)}
+                    >
+                        <Trash2 className="size-4"/>
+                        Delete
+                    </Button>
+                </div>
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Order #{order.id}</CardTitle>
+                    <CardDescription>
+                        {order.customerName} · {displayDate(order.date)}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-separate border-spacing-0 text-sm">
+                            <thead>
+                                <tr className="text-center align-bottom text-muted-foreground [&>th]:px-1.5 [&>th]:pb-2 [&>th]:font-medium [&>th]:leading-tight">
+                                    <th className="text-left">Item</th>
+                                    <th className="w-12">Pack Size</th>
+                                    <th className="w-10">GST %</th>
+                                    <th className="w-14">HSN</th>
+                                    <th className="w-20">Rate</th>
+                                    <th className="w-14">Qty</th>
+                                    <th className="w-24 bg-muted/50">Final Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1.5 [&>tr>td]:align-middle">
+                                {rows.map(({it, c}, i) => (
+                                    <tr key={i} className="border-t">
+                                        <td className="font-medium">{it.itemName}</td>
+                                        <td className="text-right tabular-nums text-muted-foreground">{it.itemPackSize}</td>
+                                        <td className="text-right tabular-nums text-muted-foreground">{it.gstPercent}</td>
+                                        <td className="text-right tabular-nums text-muted-foreground">{it.hsn}</td>
+                                        <td className="text-right tabular-nums">{fmt(it.rate)}</td>
+                                        <td className="text-right tabular-nums">{fmtQty(it.qty)}</td>
+                                        <td className="text-right tabular-nums bg-muted/50 font-medium">{fmt(c.finalAmount)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                            <tfoot>
+                                <tr className="border-t-2 font-medium [&>td]:px-2 [&>td]:py-2 [&>td]:tabular-nums">
+                                    <td colSpan={5} className="text-right text-muted-foreground">Totals</td>
+                                    <td className="text-right">{fmtQty(totals.qty)}</td>
+                                    <td className="text-right bg-muted/50">{fmt(totals.finalAmount)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this order?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Order <span className="font-medium text-foreground">#{order.id}</span> and all its
+                            line items will be permanently deleted. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={onDelete}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+    );
+}

@@ -12,10 +12,12 @@ type migration struct {
 	sql string
 }
 
-// migrations is the ordered list of schema changes. NOTE: we're in early, fast schema
-// iteration — we are NOT maintaining incremental migrations yet. Edit the schema below
-// directly; the local dev DB is reset when it changes (see docs/DATA_MODEL.md). Real
-// migrations come later, before there's data worth preserving.
+// migrations is the ordered, append-only list of schema changes, each applied at most
+// once (tracked in schema_migrations) — including against the client's real database. An
+// additive change (new table, new DEFAULTed column) is always safe to append here; a
+// genuinely breaking change (rename/retype/drop an existing column) needs a real,
+// hand-written migration instead of a plain CREATE/ALTER. See docs/DATA_MODEL.md for the
+// full policy — this is not a from-scratch-only schema anymore.
 var migrations = []migration{
 	// Company master. Surrogate id PK so items/bills can FK to it without breaking when a
 	// company is renamed; name is unique. Created first so it's a valid FK target.
@@ -88,6 +90,33 @@ var migrations = []migration{
 			pincode    TEXT NOT NULL DEFAULT '',
 			gstin      TEXT NOT NULL DEFAULT '',
 			mobile     TEXT NOT NULL DEFAULT ''
+		);`,
+	},
+	// Sales order header (first piece of the Order Book / Sales feature, after
+	// Customers). Surrogate id PK; references a customer. No order number for v1 — just
+	// the internal id.
+	{
+		id: 6,
+		sql: `CREATE TABLE IF NOT EXISTS sales_orders (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			customer_id INTEGER NOT NULL,
+			date        TEXT NOT NULL,
+			FOREIGN KEY (customer_id) REFERENCES customers(id)
+		);`,
+	},
+	// Sales order line items. References the parent order and an item in the master.
+	// Rate/Qty are entered by the user; Final Amount (rate × qty × pack size) is derived
+	// on the frontend and not stored, same as purchase_bill_items' calculated columns.
+	{
+		id: 7,
+		sql: `CREATE TABLE IF NOT EXISTS sales_order_items (
+			id       INTEGER PRIMARY KEY AUTOINCREMENT,
+			order_id INTEGER NOT NULL,
+			item_id  INTEGER NOT NULL,
+			rate     REAL NOT NULL DEFAULT 0,
+			qty      REAL NOT NULL DEFAULT 0,
+			FOREIGN KEY (order_id) REFERENCES sales_orders(id) ON DELETE CASCADE,
+			FOREIGN KEY (item_id) REFERENCES items(id)
 		);`,
 	},
 }

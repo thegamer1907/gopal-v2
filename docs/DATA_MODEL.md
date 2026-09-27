@@ -61,9 +61,19 @@ UNIQUE: `(company_id, name, pack_size)`. Foreign key: `(company_id)` → `compan
 Created **after** `companies` (FK target).
 
 > Go: `db.Item` (`id`, `companyId`, read-only `companyName` via JOIN, name, packSize,
-> gstPercent, hsn) + `AddItem(companyID, …)` / `ListItems` (all, JOIN company name) /
-> `ListItemsByCompany(companyID)` in `internal/db/items.go`. UI: Items master page has a
-> company picker + Company column; the bill fetches items **for the selected company**.
+> gstPercent, hsn, read-only `stock`) + `AddItem(companyID, …)` / `ListItems` (all, JOIN
+> company name) / `ListItemsByCompany(companyID)` in `internal/db/items.go`. UI: Items
+> master page has a company picker + Company column; the bill fetches items **for the
+> selected company**.
+>
+> **`stock` is derived, not a column** — `itemSelect`'s query computes it per row via
+> correlated subqueries: total purchased (`tax_qty + d_qty` summed across
+> `purchase_bill_items`) minus total sold (`qty` summed across `sales_order_items`) for
+> that item. Every caller of `ListItems`/`ListItemsByCompany` gets it for free (no
+> separate lookup) — shown on the Items master table and on Add Order once a line's item
+> is picked. `AddItem`/`UpdateItem`'s returned struct leaves it at the zero value (same as
+> `companyName` already is there) — a brand-new item has no history yet regardless, and an
+> edited item's real figure is picked up the next time the list is re-fetched.
 
 ### `companies` — company master
 The list of companies bills can be raised against. **Surrogate `id` PK** (so bills FK to it
@@ -116,8 +126,8 @@ Foreign keys: `(bill_id)` → `purchase_bills(id)` ON DELETE CASCADE; `(item_id)
 > the item's *current* name/pack/GST from the JOIN. Discount is stored but currently unused by
 > any formula.
 
-### `customers` — customer master (first piece of the Sales feature)
-The list of customers Sales bills will eventually be raised against (migration id 5).
+### `customers` — customer master (first piece of the Order Book / Sales feature)
+The list of customers `sales_orders` are raised against (migration id 5).
 Surrogate `id` PK; `name` is **not** unique (unlike `companies` — two customers may share a
 display name). Only `name` and `city` are required by the app; every other column
 defaults to `''` so a partially-filled customer saves cleanly.
@@ -134,12 +144,54 @@ defaults to `''` so a partially-filled customer saves cleanly.
 | `gstin` | TEXT NOT NULL DEFAULT '' | no format validation |
 | `mobile` | TEXT NOT NULL DEFAULT '' | stored as text |
 
-No foreign keys yet (nothing references `customers`) — `DeleteCustomer` is currently
-**unguarded**, unlike `DeleteCompany`/`DeleteItem`. Add a reference-count guard here once
-Sales bills exist and can reference a customer.
+`sales_orders.customer_id` now references `customers(id)` — `DeleteCustomer` is guarded
+the same way as `DeleteCompany`/`DeleteItem` (refuses with a friendly count when any sales
+order still uses the customer).
 
 > Go: `db.Customer` (all 10 fields) + `AddCustomer`/`UpdateCustomer`/`DeleteCustomer`/
 > `ListCustomers` (ordered by name) in `internal/db/customers.go`, passed as a whole struct
 > (not flat params, since there are 9 editable fields) — exposed via `app.go`. UI: a
-> Companies/Items-style master page (`/customers`) with a State `Select`
-> (`components/ui/select.tsx`) populated from `INDIAN_STATES`.
+> Companies/Items-style master page (`/customers`) with a **`StateCombobox`**
+> (type-to-filter, mirrors `CompanyCombobox`) populated from `INDIAN_STATES` — not a plain
+> dropdown (an earlier shadcn `Select` was replaced with this per client feedback).
+
+### `sales_orders` — sales order header (first piece of the Order Book / Sales feature)
+One row per order (from the Add Order form: Customer, Date). No order number for v1 — the
+internal `id` is the only identifier so far. Migration id 6.
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key (FK target for line items) |
+| `customer_id` | INTEGER NOT NULL | → `customers(id)` (FK) — the order references the customer by id, not name |
+| `date` | TEXT NOT NULL | order date, same `dd-mmm-yy` convention/handling as `purchase_bills.date` |
+
+Foreign key: `(customer_id)` → `customers(id)`.
+
+### `sales_order_items` — sales order line items
+One row per item line on an order. Links to its parent order and to an item in the master.
+Migration id 7.
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key |
+| `order_id` | INTEGER NOT NULL | → `sales_orders(id)`, `ON DELETE CASCADE` |
+| `item_id` | INTEGER NOT NULL | → `items(id)` (FK). Item name/pack size/GST %/HSN are read back via a JOIN, not stored |
+| `rate` | REAL NOT NULL DEFAULT 0 | **Rate**, entered by the user |
+| `qty` | REAL NOT NULL DEFAULT 0 | **Qty**, entered by the user |
+
+Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)` →
+`items(id)`.
+
+> Go: `db.SalesOrder`/`db.SalesOrderItem` + `AddSalesOrder` / `ListSalesOrders` /
+> `GetSalesOrder` / `UpdateSalesOrder` / `DeleteSalesOrder` in `internal/db/sales_orders.go`
+> (each a direct structural mirror of `purchase_bills.go`'s equivalent — same
+> transactional delete-and-reinsert shape for Update, same two-query header-then-lines
+> shape for List/Get); exposed via `app.go`. **Final Amount** (rate × qty × pack size) is
+> derived on the frontend and not stored (shared helper `frontend/src/lib/salesOrder.ts`),
+> same pattern as Purchase Bill's calculated columns.
+>
+> **Rate history is derived, not a separate table**: `db.RateHistoryEntry` +
+> `RateHistory(customerID, itemID)` (same file) answers "what did this customer last pay
+> for this item" straight from `sales_order_items` JOINed to `sales_orders` — every past
+> order already *is* the history, so nothing is duplicated/kept in sync separately. Since
+> `date` is free text, the query only orders by `id` as a cheap tie-break; the frontend
+> sorts by parsed date (`AddOrder.tsx`, `RateHistoryDialog.tsx`) — same reasoning as every
+> other date sort in this app.

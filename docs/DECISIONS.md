@@ -386,7 +386,7 @@ have to re-litigate.
   the normal convention for a date-picker's own header, not what the client's feedback was
   about.
 
-### 2026-09-26 — Customers master: required fields, merged Address column, no guard yet
+### 2026-09-26 — Customers master: required fields, merged Address column
 - **Decision:** First piece of a new **Sales** feature — a Customers master
   (`id, name, nick_name, address1, address2, city, state, pincode, gstin, mobile`),
   built as a new page mirroring the Companies/Items master pattern exactly (add-form
@@ -400,10 +400,9 @@ have to re-litigate.
 - **List table shows every field**, but **Address 1 and Address 2 are merged into a
   single "Address" column** (comma-joined, skipping the join when Address 2 is blank)
   rather than two separate columns — both were explicit client choices when asked.
-- **`DeleteCustomer` is unguarded**, unlike `DeleteCompany`/`DeleteItem` (which refuse
-  deletion with a friendly `COUNT(1)` check when items/bills still reference them) —
-  nothing references `customers` yet, since Sales bills don't exist. Add the same guard
-  pattern once they do; tracked under Planned in `docs/FEATURES.md`.
+- **`DeleteCustomer` was unguarded at first** (nothing referenced `customers` yet); now
+  guarded the same way as `DeleteCompany`/`DeleteItem` (`COUNT(1)` against `sales_orders`)
+  — see the 2026-09-26 Add Order entry below, which introduced that FK.
 - **No format validation** on GSTIN/pincode (plain required-vs-optional checks only) —
   consistent with how Items/Companies treat their fields; both are plain text `Input`s,
   not `NumberInput`, since they're identifiers rather than quantities (same reasoning as
@@ -454,3 +453,116 @@ have to re-litigate.
   suggesting a wipe as a shortcut for what should be an automatic, zero-risk update.
 - **Not a code change** — `internal/db/migrate.go`'s actual behavior is unchanged; this
   is a documentation/process correction to match what the runner already safely does.
+
+### 2026-09-26 — Add Order: global item search, reuse over new components, derived rate history
+- **Decision:** First functional piece of the Order Book — a `/orders/new` page mirroring
+  Add Purchase Bill, with three deliberate departures the client confirmed:
+  1. **Item columns show Pack Size, GST %, *and* HSN** (full item-master visibility),
+     even though only Pack Size feeds this order's math (`Rate × Qty × Pack Size`) — GST%/
+     HSN are shown for reference, not yet used in any formula.
+  2. **No order number for v1** — the internal `sales_orders.id` is the only identifier;
+     add a real number later if the client needs one to reference orders with customers.
+  3. **Quick-add customer reuses `EditCustomerDialog`** (extended with a create mode)
+     rather than a separate lightweight dialog, so a quick-added customer gets the exact
+     same full 9-field form as the Customers page, not a stripped-down version.
+- **Item search is global (`ListItems()`), not company-scoped** like Add Purchase Bill's
+  `ListItemsByCompany` — there's no company on this page's header to scope by, so every
+  item in the catalog is eligible for an order line. `ItemCombobox` was extended (not
+  replaced) with an opt-in `showCompany` prop so the same component now disambiguates
+  same-named items across companies here, while Add Purchase Bill's already-shipped look
+  is untouched (prop defaults off).
+- **New `CustomerCombobox`** (mirrors `CompanyCombobox`) filters by name, nickname, *or*
+  city and shows a composite "Name (Nickname) · City" label — a plain name-only filter
+  (like `CompanyCombobox`) wouldn't be enough to tell similarly-named customers apart.
+- **Rate history is derived, not a separate table.** The client asked for the Rate field
+  to prefill from the latest rate a customer previously paid for an item, plus an info
+  button showing the full history. Rather than a table that has to be kept in sync, this
+  queries `sales_order_items` JOINed to `sales_orders` for that `(customer_id, item_id)`
+  pair — every past order already *is* the history. `RateHistory`/`GetRateHistory` return
+  rows ordered by `id` only (a cheap tie-break); the **frontend sorts by parsed date**
+  (`AddOrder.tsx`, `RateHistoryDialog.tsx`) since the stored date is free text, not a
+  SQL-sortable value — same reasoning as every other date sort in this app. Prefill fires
+  once, when an item is picked, using whichever customer is selected at that moment; it
+  does not retroactively refresh an already-filled line if the customer changes afterward
+  — the described workflow is customer-first, then items, so this covers the real case
+  without tracking "was this rate manually edited."
+- **`DeleteCustomer` gained a reference guard** (see the Customers-master entry above) —
+  `sales_orders.customer_id` is the first real FK into `customers`, so the previously
+  "nothing references it yet" unguarded delete would otherwise hit a raw SQLite
+  foreign-key-constraint error the moment a customer with orders was deleted.
+- **Backend scope is Add-only**, matching "build the Add Order page first": only
+  `AddSalesOrder` exists. `sales_orders`/`sales_order_items` are still designed in full now
+  so the schema doesn't need reshaping when View/Edit Orders (List/Get/Update/Delete)
+  arrives later.
+- **Shared calc in a new `lib/salesOrder.ts`** (`calcOrderLine`), mirroring
+  `lib/purchaseBill.ts`'s "one formula, reused not re-derived" rule, so View/Edit Orders
+  doesn't re-derive Final Amount later.
+
+### 2026-09-26 — Add Order client feedback: lock items to a chosen customer; switch-customer prompt
+- **Decision:** Two rounds of manual-testing feedback, applied the same day Add Order
+  shipped:
+  1. The item picker is now **disabled until a customer is chosen** (placeholder: "Select
+     a customer first") — rate-history prefill needs a customer to look up against, so
+     picking an item first was never actually useful.
+  2. **Changing the header customer after lines already have items** no longer just
+     applies silently. It now prompts (`AlertDialog`, same shape as Add Purchase Bill's
+     company-switch confirm): **Keep current rates** (apply the new customer, leave every
+     line's Rate untouched), **Recalculate rates** (apply the new customer, then re-run
+     the rate-history lookup for every filled line and re-prefill Rate from it), or
+     **Cancel** (revert the picker to the original customer via the same
+     force-remount-via-`key` trick `AddPurchaseBill.tsx` already uses for its company
+     combobox). Quick-adding a brand-new customer goes through the same prompt.
+- **Why:** client feedback after trying the page — locking item entry avoids a state
+  where rate prefill silently can't happen; the switch-customer prompt avoids silently
+  leaving stale, wrong-customer rates in place (or silently discarding rates the user may
+  have already hand-adjusted) when the customer changes mid-order.
+
+### 2026-09-26 — Item stock: derived from purchases minus sales, not a new table
+- **Decision:** Show current on-hand stock per item — total purchased
+  (`tax_qty + d_qty` across `purchase_bill_items`) minus total sold (`qty` across
+  `sales_order_items`) — on Add Order's line-items table and as a new column on the Items
+  master. Computed as a **correlated-subquery addition to the existing `itemSelect`**
+  query (`internal/db/items.go`), not a new table or a separate lookup call — every
+  existing caller of `ListItems`/`ListItemsByCompany` gets `Item.Stock` for free, so
+  Add Order's already-cached item list needs no extra round trip when a line's item is
+  picked. Same "derive it, don't store/duplicate it" reasoning as rate history and every
+  calculated bill column in this app.
+- **No over-sell validation** — Qty greater than Stock is allowed and not flagged; the
+  client asked to *see* stock, not to be blocked by it.
+- **Add Order re-fetches its cached item list after a successful save**, so Stock stays
+  current if the same item is used again later in the same session (e.g. a second order
+  right after).
+- **`AddItem`/`UpdateItem` leave `Stock` at its zero value** in their returned struct —
+  the same existing pattern already used for `CompanyName` there ("callers re-list to
+  refresh"); a brand-new item has no history yet regardless.
+
+### 2026-09-27 — View/Edit Orders: mirror View/Edit Bills exactly, extend AddOrder in place
+- **Decision:** The last deferred piece of the Order Book — client asked for "similar
+  conventions as View/Edit Bills." Built `SavedOrders.tsx` as a near-verbatim structural
+  copy of `SavedBills.tsx` (list/search/date-range-filter/sort → read-only detail →
+  Edit/Delete), and gave `AddOrder.tsx` an edit mode the same way `AddPurchaseBill.tsx`
+  already serves both add and edit from one component — not a new/separate editor file.
+  Backend gained `ListSalesOrders`/`GetSalesOrder`/`UpdateSalesOrder`/`DeleteSalesOrder`,
+  each a direct structural mirror of `purchase_bills.go`'s equivalent.
+- **Customer prefill in edit mode uses a freshly-fetched full customer list, not a
+  partial reconstruction** — `AddPurchaseBill.tsx` gets away with
+  `{id, name} as db.Company` for its Company prefill because `Company` genuinely only has
+  those two fields; `Customer` has nine, and `CustomerCombobox` dereferences `.nickName`/
+  `.city` directly in its filter/label logic, so a partial cast there would throw the
+  first time the combobox rendered. Caught this before it shipped by tracing exactly what
+  `CustomerCombobox` touches, not just following the Purchase Bill pattern blindly.
+- **Rate history is fetched but rates are not re-prefilled when loading for edit** — the
+  info button should work immediately on an existing order, but editing an order should
+  show what was actually charged, not silently overwrite it with today's latest rate the
+  way a *new* line's selection does.
+- **No Stock column on the order detail view** — Stock is a live figure meant to help
+  decide how much to order *now*; it's not a fact about an order already placed, so it
+  doesn't belong on a historical record the way Pack Size/GST %/HSN/Rate/Qty do.
+- **No order-number column on the list** (matches the earlier "no order number for v1"
+  decision) — Customer/Date/Qty/Final Amount only.
+- **Nothing extra needed for Stock/rate-history correctness after an edit or delete** —
+  both are computed live from `sales_order_items` at read time, so changing or removing an
+  order is automatically reflected everywhere else that reads them.
+- **Nav icon `ClipboardList`** for View/Edit Orders — deliberately distinct from Add
+  Order's `ShoppingCart` and View/Edit Bills' `FileText`, so the nav bar doesn't show two
+  identical icons for two different things.

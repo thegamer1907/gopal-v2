@@ -18,6 +18,10 @@ export function AddPurchaseBill(arg1) {
   return window['go']['main']['App']['AddPurchaseBill'](arg1);
 }
 
+export function AddSalesOrder(arg1) {
+  return window['go']['main']['App']['AddSalesOrder'](arg1);
+}
+
 export function CheckForUpdate() {
   return window['go']['main']['App']['CheckForUpdate']();
 }
@@ -42,6 +46,10 @@ export function DeletePurchaseBill(arg1) {
   return window['go']['main']['App']['DeletePurchaseBill'](arg1);
 }
 
+export function DeleteSalesOrder(arg1) {
+  return window['go']['main']['App']['DeleteSalesOrder'](arg1);
+}
+
 export function DownloadAndInstallUpdate(arg1, arg2) {
   return window['go']['main']['App']['DownloadAndInstallUpdate'](arg1, arg2);
 }
@@ -62,6 +70,14 @@ export function GetPurchaseBill(arg1) {
   return window['go']['main']['App']['GetPurchaseBill'](arg1);
 }
 
+export function GetRateHistory(arg1, arg2) {
+  return window['go']['main']['App']['GetRateHistory'](arg1, arg2);
+}
+
+export function GetSalesOrder(arg1) {
+  return window['go']['main']['App']['GetSalesOrder'](arg1);
+}
+
 export function ListCompanies() {
   return window['go']['main']['App']['ListCompanies']();
 }
@@ -80,6 +96,10 @@ export function ListItemsByCompany(arg1) {
 
 export function ListPurchaseBills() {
   return window['go']['main']['App']['ListPurchaseBills']();
+}
+
+export function ListSalesOrders() {
+  return window['go']['main']['App']['ListSalesOrders']();
 }
 
 export function OpenExistingDatabase() {
@@ -104,6 +124,10 @@ export function UpdateItem(arg1, arg2, arg3, arg4, arg5, arg6) {
 
 export function UpdatePurchaseBill(arg1) {
   return window['go']['main']['App']['UpdatePurchaseBill'](arg1);
+}
+
+export function UpdateSalesOrder(arg1) {
+  return window['go']['main']['App']['UpdateSalesOrder'](arg1);
 }
 
 export function WipeDatabase() {

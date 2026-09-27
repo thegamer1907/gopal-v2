@@ -11,6 +11,7 @@ import {EditItemDialog} from '@/components/EditItemDialog';
 import {SortableHeader} from '@/components/SortableHeader';
 import {useTableSort} from '@/hooks/useTableSort';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
+import {fmtQty} from '@/lib/purchaseBill';
 import {
     Card,
     CardContent,
@@ -101,6 +102,7 @@ export function Items() {
             packSize: (it) => it.packSize,
             gstPercent: (it) => it.gstPercent,
             hsn: (it) => it.hsn,
+            stock: (it) => it.stock,
         },
         {key: 'company', dir: 'asc'},
     );
@@ -242,6 +244,7 @@ export function Items() {
                                     <SortableHeader label="Pack Size" sortKey="packSize" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                     <SortableHeader label="GST %" sortKey="gstPercent" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <SortableHeader label="HSN" sortKey="hsn" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
+                                    <SortableHeader label="Stock" sortKey="stock" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <TableHead className="w-24 text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -253,6 +256,7 @@ export function Items() {
                                         <TableCell>{it.packSize}</TableCell>
                                         <TableCell className="text-right tabular-nums">{it.gstPercent}</TableCell>
                                         <TableCell>{it.hsn}</TableCell>
+                                        <TableCell className="text-right tabular-nums">{fmtQty(it.stock)}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
                                                 <Button

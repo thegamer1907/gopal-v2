@@ -55,8 +55,8 @@ Screens, flows, and visual decisions, recorded as they firm up.
   there's no sidebar eating width. Each page lives in `src/pages/`. (Replaced the old
   collapsible left sidebar — see `DECISIONS.md` 2026-06-15.)
 - **Top bar** (`h-14`, `border-b`): left side is the **GopalOne wordmark** + the primary
-  `NavLink`s in one row — Dashboard · Add Purchase Bill · View/Edit Bills · Items · Companies ·
-  Customers · Reports;
+  `NavLink`s in one row — Dashboard · Add Purchase Bill · View/Edit Bills · Add Order ·
+  View/Edit Orders · Items · Companies · Customers · Reports;
   right side (`ml-auto`) is **Settings** (gear) and **Logout** (closes the app via `Quit()`
   after a "Close GopalOne?" confirm `AlertDialog`). Links are styled with
   `buttonVariants({variant:'ghost', size:'sm'})`; the **active route** gets a filled
@@ -79,7 +79,7 @@ Screens, flows, and visual decisions, recorded as they firm up.
 - Landing page. Currently a single centered "Hare Krishna". Real content (KPIs / recent
   activity) to be defined.
 
-### Add Purchase Bill (`/purchase-bills/new`) — sidebar "Add Purchase Bill"
+### Add Purchase Bill (`/purchase-bills/new`) — top-nav "Add Purchase Bill"
 - **Header card** — Company name, Bill number, Date. **Company** is a `CompanyCombobox`
   (mirrors the item search): type to filter the cached company master; pick one, or **"Add
   '…' as new company"** opens `NewCompanyDialog` → `AddCompany` → pushed into the cache and
@@ -96,11 +96,16 @@ Screens, flows, and visual decisions, recorded as they firm up.
   2026-09 switch keep working; `displayDate` normalizes any stored string to the current
   form for display, so old bills show `dd-mmm-yy` on screen too without any data migration.
 - **Line items** — a wide, horizontally-scrollable grid. Each line:
-  - **Item search** (`ItemCombobox`): all items are cached once on load (`ListItems`); typing
-    filters and shows suggestions as “name · pack size”. Selecting one fills the line and
-    pulls its Pack Size / GST % (shown read-only, used in formulas). The suggestion list is
-    **rendered in a portal** (fixed-positioned under the input) so the horizontally-scrolling
-    grid doesn't clip it or gain a stray vertical scrollbar.
+  - **Item search** (`ItemCombobox`): items are **company-scoped** — fetched via
+    `ListItemsByCompany(company.id)` whenever the header company changes, not a global
+    cache (corrected 2026-09-26; this previously said "all items cached via `ListItems`",
+    which was never accurate for this page). Typing filters and shows suggestions as
+    "name · pack size". Selecting one fills the line and pulls its Pack Size / GST % (shown
+    read-only, used in formulas). The suggestion list is **rendered in a portal**
+    (fixed-positioned under the input) so the horizontally-scrolling grid doesn't clip it
+    or gain a stray vertical scrollbar. A `showCompany` prop (off by default, so this
+    page's look is unchanged) additionally shows the item's company in the dropdown row —
+    added for Add Order, whose item search *is* global across every company.
   - **Column order** (left→right): Item · Pack Size · GST % · **Tax Qty · Tax Value · D Qty ·
     D Value** (inputs) · **GST Amount · Tax Bill Amount · Bill Value · Billing Rate · Final
     Rate** (calculated, shaded band) · **Discount · Remarks** (inputs) · delete.
@@ -130,7 +135,7 @@ Screens, flows, and visual decisions, recorded as they firm up.
   `GetPurchaseBill`, shows an "Edit purchase bill" heading + an **Update bill** button, and on
   save does a **complete overwrite** via `UpdatePurchaseBill` then returns to View/Edit Bills.
 
-### View/Edit Bills (`/purchase-bills`) — sidebar "View/Edit Bills"
+### View/Edit Bills (`/purchase-bills`) — top-nav "View/Edit Bills"
 - **List → detail**, single page (`src/pages/SavedBills.tsx`). Loads all bills via
   `ListPurchaseBills` on mount (`refresh()` is reused after a delete).
 - **List:** a card with a table of bills — columns **Company · Date · Bill number · Qty · Amount**,
@@ -151,10 +156,92 @@ Screens, flows, and visual decisions, recorded as they firm up.
   **`src/lib/purchaseBill.ts`**. Item **name/pack/GST** come from the backend's JOIN on the
   line's `item_id` (current master value), so no separate lookup is needed.
 
+### Add Order (`/orders/new`) — top-nav "Add Order" (first piece of the Order Book / Sales feature)
+- `src/pages/AddOrder.tsx`. Closely mirrors Add Purchase Bill, adapted for a Customer
+  header instead of a Company: **Order details** card (Customer, Date) + **Line items**
+  card, Save centered below both, same unsaved-changes guard. No order number (just the
+  internal id) — that field doesn't exist for orders.
+- **Also serves as the order editor**, exactly like `AddPurchaseBill.tsx` doubles as the
+  bill editor: the same component handles `/orders/:id/edit` (route param via
+  `useParams`). Edit mode prefills header + lines from `GetSalesOrder`, shows an "Edit
+  order" heading + "Update order" button, and saves via a **complete overwrite**
+  (`UpdateSalesOrder`) before returning to View/Edit Orders. The customer is resolved from
+  a freshly-fetched full customer list (not a partial reconstruction the way Add Purchase
+  Bill does for Company) since `CustomerCombobox` dereferences fields — nickname, city —
+  that a partial object wouldn't have. Each existing line's rate history is fetched (info
+  button works immediately) but its **Rate is left exactly as saved**, not re-prefilled
+  with today's latest.
+- **Customer** (`CustomerCombobox`): types filter the cached customer list by **name,
+  nickname, or city**; the dropdown/seeded-input label reads "Name (Nickname) · City" so
+  similarly-named customers are easy to tell apart. **"Add … as new customer"** opens
+  `EditCustomerDialog` in its create mode (see Customers, below) — only Name and City are
+  required, the rest can be filled in later. **Date** is the same free-typed +
+  calendar-popover `dd-mmm-yy` field as Add Purchase Bill.
+- **Line items** — unlike Add Purchase Bill, item search is **global** (`ListItems()`),
+  not scoped to anything (a sales order has no "company" the way a purchase bill does),
+  but the item picker is **disabled until a customer is chosen** (placeholder reads
+  "Select a customer first") — rate history (below) needs a customer to look up against.
+  `ItemCombobox` is reused as-is with a new `showCompany` flag turned on, so its dropdown
+  shows the item's company alongside pack size (needed now that the same item name can
+  exist under different companies). **Column order**: Item · Pack Size · GST % · HSN ·
+  **Stock** (all read-only, from the selected item) · **Rate · Qty** (inputs) ·
+  **Final Amount** (calculated, shaded band) · info button · delete.
+- **Stock**: current on-hand quantity for the selected item — total purchased minus total
+  sold, **derived** (not stored; see `docs/DATA_MODEL.md`'s `items.stock` note), already
+  present on every cached item so it needs no extra fetch. The cached item list is
+  re-fetched after a successful save so Stock stays current for the rest of the session
+  (e.g. adding the same item to a second order right after). No validation blocks
+  entering a Qty larger than Stock — it's shown for reference only.
+- **Rate prefill + history**: selecting an item looks up the chosen customer's past rate
+  for it (`GetRateHistory`) and prefills **Rate** with the latest one (blank if there's no
+  prior order for that pair). The **info** button opens `RateHistoryDialog`, listing every
+  past rate for that customer+item, newest first (or an empty state). This lookup is
+  **derived from past orders**, not a separate table — see `docs/DATA_MODEL.md`. Prefill
+  fires once, at the moment the item is picked.
+- **Changing the customer after lines already have items** prompts (controlled
+  `AlertDialog`): **Cancel** (reverts the picker to the original customer), **Keep
+  current rates** (applies the new customer, leaves every line's Rate untouched), or
+  **Recalculate rates** (applies the new customer, then re-runs the rate-history lookup
+  for every filled line and re-prefills Rate from it). Quick-adding a brand-new customer
+  goes through the same prompt.
+- **Final Amount** = Rate × Qty × Pack Size (`calcOrderLine`, `src/lib/salesOrder.ts` —
+  mirrors `calcLine`'s "one shared formula" convention). **Totals row** sums only Qty and
+  Final Amount, per the client's ask.
+- **Add new item on the fly** (`NewItemDialog`, reused as-is): since there's no header
+  company to default to, `defaultCompany` is `null` — the user must pick one for a
+  brand-new item, same dialog Add Purchase Bill uses.
+
+### View/Edit Orders (`/orders`) — top-nav "View/Edit Orders" (third piece of the Order Book)
+- `src/pages/SavedOrders.tsx`. A near-verbatim structural copy of `SavedBills.tsx`:
+  **list → detail**, single page. Loads all orders via `ListSalesOrders` on mount
+  (`refresh()` reused after a delete).
+- **List**: a card with a table of orders — columns **Customer · Date · Qty · Final
+  Amount** (no "order number" column — that field doesn't exist). **Default sort: Date,
+  newest first**; every column header is a `SortableHeader`. Above the table: a **search
+  box** (customer name only) and a **`DateRangeFilter`** (same inclusive/end-of-day
+  behavior as View/Edit Bills).
+- **Detail**: clicking a row swaps in a read-only view — "Back to all orders" plus **Edit
+  order** and **Delete** actions, a header card ("Order #{id}" / "{customerName} ·
+  {date}"), and a display-only line-items grid (Item · Pack Size · GST % · HSN · Rate ·
+  Qty · Final Amount, footer Totals row for Qty and Final Amount). **No Stock column
+  here** — Stock is a live decision-support figure for placing a *new* order, not a fact
+  about a saved one.
+  - **Edit order** → navigates to `/orders/:id/edit` (the same `AddOrder.tsx` form in
+    edit mode).
+  - **Delete** → a controlled `AlertDialog` confirm → `DeleteSalesOrder` → back to the
+    list (refreshed). Line items are removed by the DB cascade. Because Stock and rate
+    history are both derived live from `sales_order_items`, deleting (or later editing)
+    an order is automatically reflected everywhere else that reads them — nothing to
+    invalidate or resync.
+
 ### Items (`/items`) — item master
 - A live item count, a company-scoped "Add item" card (**Company, Item, Pack Size, GST %, HSN** +
-  Add), and a card with the items table (Company / Item / Pack Size / GST % / HSN + **Actions**).
-  Pack Size / GST % / HSN use `NumberInput` (no spinner); same in the on-the-fly `NewItemDialog`.
+  Add), and a card with the items table (Company / Item / Pack Size / GST % / HSN /
+  **Stock** + **Actions**). Pack Size / GST % / HSN use `NumberInput` (no spinner); same
+  in the on-the-fly `NewItemDialog`.
+- **Stock** is current on-hand quantity — total purchased minus total sold, **derived**
+  on every read (not a stored column; see `docs/DATA_MODEL.md`), sortable like every
+  other column.
 - **Search box** (item or company name) + **sortable headers** (`useTableSort`, default by
   company). Each row has **Edit** (`EditItemDialog` — prefilled, can move the item to another
   company) and **Delete** (controlled `AlertDialog`; backend refuses if bill lines reference it).
@@ -169,7 +256,7 @@ Screens, flows, and visual decisions, recorded as they firm up.
 - Companies are also pickable/creatable inline on the bill header via `CompanyCombobox` +
   `NewCompanyDialog` (see Add Purchase Bill).
 
-### Customers (`/customers`) — customer master (first piece of Sales)
+### Customers (`/customers`) — customer master (first piece of the Order Book / Sales feature)
 - `src/pages/Customers.tsx`. Same Companies/Items master pattern: a live customer count,
   an "Add customer" card, and a card with the customers table + search + sort.
 - **Add customer** — a responsive grid (`grid gap-3 sm:grid-cols-2 lg:grid-cols-3`) of all
@@ -189,9 +276,11 @@ Screens, flows, and visual decisions, recorded as they firm up.
   column except Address is sortable (`useTableSort`/`SortableHeader`, same as
   Items/Companies).
 - Each row has **Edit** (`EditCustomerDialog` — same 9-field grid + State picker) and
-  **Delete** (controlled `AlertDialog`). Unlike Companies/Items, **delete is currently
-  unguarded** — nothing references customers yet (no Sales bills exist); a reference guard
-  will be added once they do.
+  **Delete** (controlled `AlertDialog`; backend refuses if any sales order still uses it).
+- **`EditCustomerDialog` doubles as the quick-add dialog** on Add Order's
+  `CustomerCombobox`: passing `customer={null}` switches it to create mode (title/button
+  read "Add customer", Name seeded from whatever was typed in the combobox, `AddCustomer`
+  instead of `UpdateCustomer`) — same 9-field form and Name+City requirement either way.
 
 ### Reports (`/reports`) — top-nav "Reports"
 - `src/pages/Reports.tsx`. A **card grid** (`grid gap-4 sm:grid-cols-2 lg:grid-cols-3`) — one
@@ -219,7 +308,7 @@ Screens, flows, and visual decisions, recorded as they firm up.
   D Value, GST Amount, Tax Bill Amount, Bill Value, and Discount — mirroring the footer Totals
   row on the Add/View Bill line-items grid.
 
-### Settings (`/settings`) — sidebar footer "Settings"
+### Settings (`/settings`) — top-nav "Settings" (right-aligned group)
 - `src/pages/Settings.tsx`. First (and only) section is **Database**:
   - **Current location** — `GetDatabasePath()` shown in a monospace box (dir muted, filename
     emphasized).

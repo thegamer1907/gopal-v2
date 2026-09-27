@@ -90,11 +90,17 @@ The Go/frontend boundary is the core concept here:
 - **Data-entry pages** must (a) disable submit until valid (all required fields filled; `0`
   counts as filled) and (b) wire the unsaved-changes guard (`useUnsavedChanges` →
   `setDirty(isDirty)` + clear on unmount). (DECISIONS / UI)
-- **Dates** display/enter as `dd-mmm-yy` via `@/lib/date`. **Bill calc formulas** live only
-  in `@/lib/purchaseBill` (shared by the add/edit form and the bill detail). Reuse, don't
-  re-derive.
-- **Masters use surrogate `id` PKs + FKs** (companies, items); items belong to a company, and
-  bills reference companies/items by id (names/GST read back via JOIN).
+- **Dates** display/enter as `dd-mmm-yy` via `@/lib/date` (`parseDate` also still accepts
+  the legacy `dd-mmm-yyyy` form so pre-2026-09 rows keep working — see docs/DECISIONS.md).
+  **Calc formulas live only in one shared file per document type** — Purchase Bill's in
+  `@/lib/purchaseBill` (`calcLine`), Sales Order's in `@/lib/salesOrder` (`calcOrderLine`)
+  — reused by both the add/edit form and the read-only detail view. Reuse, don't re-derive.
+- **Masters use surrogate `id` PKs + FKs** (companies, items, customers); items belong to
+  a company, purchase bills reference companies/items by id, and sales orders reference
+  customers/items by id (names/GST/pack-size etc. always read back via JOIN, never
+  duplicated). Anything derivable from existing rows (calculated bill columns, item stock,
+  a customer's rate history for an item) is computed on read, never stored — see
+  docs/DATA_MODEL.md and docs/DECISIONS.md for the specific examples.
 
 ### Data layer
 - **SQLite, single file**, opened via the `internal/db` package. Default path is

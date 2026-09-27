@@ -16,13 +16,17 @@ interface Props {
     onAddNew: (query: string) => void;
     disabled?: boolean;
     placeholder?: string;
+    // Show the item's company in the dropdown row, alongside pack size. Off by default
+    // (Add Purchase Bill's list is already scoped to one company, so it'd be redundant
+    // there); Add Order turns it on since its item search spans every company.
+    showCompany?: boolean;
 }
 
 function label(it: db.Item): string {
     return `${it.name} · ${it.packSize}`;
 }
 
-export function ItemCombobox({items, value, onSelect, onAddNew, disabled, placeholder}: Props) {
+export function ItemCombobox({items, value, onSelect, onAddNew, disabled, placeholder, showCompany}: Props) {
     const [query, setQuery] = useState('');
     const [open, setOpen] = useState(false);
     const [rect, setRect] = useState<{left: number; top: number; width: number} | null>(null);
@@ -55,7 +59,7 @@ export function ItemCombobox({items, value, onSelect, onAddNew, disabled, placeh
 
     const q = query.trim().toLowerCase();
     const filtered = (q
-        ? items.filter((it) => `${it.name} ${it.packSize}`.toLowerCase().includes(q))
+        ? items.filter((it) => `${it.name} ${it.companyName} ${it.packSize}`.toLowerCase().includes(q))
         : items
     ).slice(0, 8);
     const exact = items.some((it) => label(it).toLowerCase() === q);
@@ -103,7 +107,9 @@ export function ItemCombobox({items, value, onSelect, onAddNew, disabled, placeh
                                 className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
                             >
                                 <span className="font-medium">{it.name}</span>
-                                <span className="shrink-0 text-muted-foreground tabular-nums">{it.packSize}</span>
+                                <span className="shrink-0 text-muted-foreground tabular-nums">
+                                    {showCompany ? `${it.companyName} · ${it.packSize}` : it.packSize}
+                                </span>
                             </button>
                         ))}
                         {filtered.length === 0 && (

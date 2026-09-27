@@ -52,10 +52,17 @@ func UpdateCustomer(conn *sql.DB, c Customer) (Customer, error) {
 	return c, nil
 }
 
-// DeleteCustomer removes a customer. Unlike Company/Item, this is currently unguarded —
-// nothing references customers yet (no Sales bills exist). Add a reference guard here
-// once sales bills do.
+// DeleteCustomer removes a customer. It refuses (with a friendly error) when a sales
+// order still references the customer, since FK enforcement would otherwise fail with an
+// opaque message — same guard shape as DeleteCompany/DeleteItem.
 func DeleteCustomer(conn *sql.DB, id int64) error {
+	var orders int
+	if err := conn.QueryRow(`SELECT COUNT(1) FROM sales_orders WHERE customer_id = ?`, id).Scan(&orders); err != nil {
+		return fmt.Errorf("count orders: %w", err)
+	}
+	if orders > 0 {
+		return fmt.Errorf("can't delete: %d order(s) still use this customer", orders)
+	}
 	if _, err := conn.Exec(`DELETE FROM customers WHERE id = ?`, id); err != nil {
 		return fmt.Errorf("delete customer: %w", err)
 	}

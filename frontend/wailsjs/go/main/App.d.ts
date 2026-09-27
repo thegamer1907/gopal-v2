@@ -12,6 +12,8 @@ export function AddItem(arg1:number,arg2:string,arg3:number,arg4:number,arg5:num
 
 export function AddPurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
 
+export function AddSalesOrder(arg1:db.SalesOrder):Promise<db.SalesOrder>;
+
 export function CheckForUpdate():Promise<updater.Info>;
 
 export function CreateNewDatabase():Promise<string>;
@@ -24,6 +26,8 @@ export function DeleteItem(arg1:number):Promise<void>;
 
 export function DeletePurchaseBill(arg1:number):Promise<void>;
 
+export function DeleteSalesOrder(arg1:number):Promise<void>;
+
 export function DownloadAndInstallUpdate(arg1:string,arg2:string):Promise<void>;
 
 export function ExportPurchaseSummary(arg1:Array<reports.PurchaseSummaryRow>,arg2:string):Promise<string>;
@@ -34,6 +38,10 @@ export function GetDatabasePath():Promise<string>;
 
 export function GetPurchaseBill(arg1:number):Promise<db.PurchaseBill>;
 
+export function GetRateHistory(arg1:number,arg2:number):Promise<Array<db.RateHistoryEntry>>;
+
+export function GetSalesOrder(arg1:number):Promise<db.SalesOrder>;
+
 export function ListCompanies():Promise<Array<db.Company>>;
 
 export function ListCustomers():Promise<Array<db.Customer>>;
@@ -43,6 +51,8 @@ export function ListItems():Promise<Array<db.Item>>;
 export function ListItemsByCompany(arg1:number):Promise<Array<db.Item>>;
 
 export function ListPurchaseBills():Promise<Array<db.PurchaseBill>>;
+
+export function ListSalesOrders():Promise<Array<db.SalesOrder>>;
 
 export function OpenExistingDatabase():Promise<string>;
 
@@ -55,5 +65,7 @@ export function UpdateCustomer(arg1:db.Customer):Promise<db.Customer>;
 export function UpdateItem(arg1:number,arg2:number,arg3:string,arg4:number,arg5:number,arg6:number):Promise<db.Item>;
 
 export function UpdatePurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
+
+export function UpdateSalesOrder(arg1:db.SalesOrder):Promise<db.SalesOrder>;
 
 export function WipeDatabase():Promise<void>;

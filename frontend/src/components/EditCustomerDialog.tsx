@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {UpdateCustomer} from '../../wailsjs/go/main/App';
+import {AddCustomer, UpdateCustomer} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -15,17 +15,19 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-// Dialog to edit an existing customer. Controlled (open + customer passed in by the
-// parent); on save it persists via UpdateCustomer and hands the updated record back.
-// Mirrors EditItemDialog/EditCompanyDialog.
+// Dialog to edit an existing customer, or (when `customer` is null) quick-add a new one
+// — e.g. from Add Order's CustomerCombobox, without leaving that page. Controlled (open +
+// customer passed in by the parent); on save it persists via UpdateCustomer/AddCustomer
+// and hands the saved record back. Mirrors EditItemDialog/EditCompanyDialog.
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    customer: db.Customer | null;
-    onUpdated: (customer: db.Customer) => void;
+    customer: db.Customer | null; // null = creating a new customer
+    initialName?: string; // seeds Name when creating (e.g. from a combobox's typed query)
+    onSaved: (customer: db.Customer) => void;
 }
 
-export function EditCustomerDialog({open, onOpenChange, customer, onUpdated}: Props) {
+export function EditCustomerDialog({open, onOpenChange, customer, initialName, onSaved}: Props) {
     const [name, setName] = useState('');
     const [nickName, setNickName] = useState('');
     const [mobile, setMobile] = useState('');
@@ -38,9 +40,11 @@ export function EditCustomerDialog({open, onOpenChange, customer, onUpdated}: Pr
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
-    // Seed the form from the customer being edited each time it opens.
+    // Seed the form each time it opens: from the customer being edited, or blank (Name
+    // pre-filled from the search query) when creating.
     useEffect(() => {
-        if (open && customer) {
+        if (!open) return;
+        if (customer) {
             setName(customer.name);
             setNickName(customer.nickName);
             setMobile(customer.mobile);
@@ -50,9 +54,19 @@ export function EditCustomerDialog({open, onOpenChange, customer, onUpdated}: Pr
             setState(customer.state);
             setPincode(customer.pincode);
             setGstin(customer.gstin);
-            setError('');
+        } else {
+            setName(initialName ?? '');
+            setNickName('');
+            setMobile('');
+            setAddress1('');
+            setAddress2('');
+            setCity('');
+            setState('');
+            setPincode('');
+            setGstin('');
         }
-    }, [open, customer]);
+        setError('');
+    }, [open, customer, initialName]);
 
     // Mobile is optional, but if any digits are entered they must form a full 10-digit
     // number (MobileInput already blocks non-digit characters and anything past 10).
@@ -62,11 +76,10 @@ export function EditCustomerDialog({open, onOpenChange, customer, onUpdated}: Pr
     const isValid = name.trim() !== '' && city.trim() !== '' && mobileValid;
 
     async function save() {
-        if (!isValid || !customer) return;
+        if (!isValid) return;
         setSaving(true);
         try {
-            const updated = await UpdateCustomer({
-                id: customer.id,
+            const fields = {
                 name: name.trim(),
                 nickName: nickName.trim(),
                 address1: address1.trim(),
@@ -76,8 +89,11 @@ export function EditCustomerDialog({open, onOpenChange, customer, onUpdated}: Pr
                 pincode: pincode.trim(),
                 gstin: gstin.trim(),
                 mobile: mobile.trim(),
-            } as db.Customer);
-            onUpdated(updated);
+            };
+            const saved = customer
+                ? await UpdateCustomer({id: customer.id, ...fields} as db.Customer)
+                : await AddCustomer({id: 0, ...fields} as db.Customer);
+            onSaved(saved);
             onOpenChange(false);
         } catch (e: any) {
             setError(String(e));
@@ -90,8 +106,12 @@ export function EditCustomerDialog({open, onOpenChange, customer, onUpdated}: Pr
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Edit customer</DialogTitle>
-                    <DialogDescription>Update this customer's details.</DialogDescription>
+                    <DialogTitle>{customer ? 'Edit customer' : 'Add customer'}</DialogTitle>
+                    <DialogDescription>
+                        {customer
+                            ? "Update this customer's details."
+                            : 'Only Name and City are required — the rest can be filled in later.'}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <form
@@ -148,7 +168,7 @@ export function EditCustomerDialog({open, onOpenChange, customer, onUpdated}: Pr
                         Cancel
                     </Button>
                     <Button type="button" onClick={save} disabled={!isValid || saving}>
-                        Save changes
+                        {customer ? 'Save changes' : 'Add customer'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

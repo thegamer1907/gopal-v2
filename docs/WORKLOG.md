@@ -6,6 +6,117 @@ reads the top entry first.
 
 ---
 
+## 2026-09-27 — View/Edit Orders (third, and last-planned, piece of the Order Book)
+**Did:**
+- New `/orders` page (`SavedOrders.tsx`, top-nav "View/Edit Orders" right after Add
+  Order): a near-verbatim structural copy of `SavedBills.tsx` — list (Customer · Date ·
+  Qty · Final Amount, sortable, search by customer, date-range filter) → read-only detail
+  → Edit/Delete. No order-number column (doesn't exist); detail view has no Stock column
+  (that's for planning a new order, not a fact about a saved one).
+- **`AddOrder.tsx` gained edit mode** (`/orders/:id/edit`), the same dual-purpose pattern
+  `AddPurchaseBill.tsx` already uses: `GetSalesOrder` prefills header + lines, Save becomes
+  "Update order" (`UpdateSalesOrder`, full overwrite), returns to `/orders` on success.
+  Caught a real footgun before it shipped: `AddPurchaseBill`'s partial-object trick for
+  prefilling Company (`{id, name} as db.Company`) would **not** be safe for Customer, since
+  `CustomerCombobox` dereferences `.nickName`/`.city` directly — a partial cast would throw
+  at runtime the first time the combobox rendered. Fixed by resolving the customer from a
+  freshly-fetched full `ListCustomers()` instead. Each line's rate history is fetched on
+  load (info button works immediately) but its Rate is left exactly as saved, not
+  re-prefilled with today's latest.
+- **Backend:** `ListSalesOrders`/`GetSalesOrder`/`UpdateSalesOrder`/`DeleteSalesOrder`
+  added to `internal/db/sales_orders.go` + `app.go`, each a direct structural mirror of
+  the matching `purchase_bills.go` function (same transactional delete-and-reinsert for
+  Update, same two-query header-then-lines shape for List/Get). No schema change.
+- Confirmed Stock and rate history need **zero extra code** to stay correct after an edit
+  or delete — both are derived live from `sales_order_items`, so any change is picked up
+  automatically everywhere else that reads them.
+- `go build/vet/test` ✅, `npm run build` ✅. Docs updated (DATA_MODEL, UI, FEATURES,
+  DECISIONS).
+
+Client reviewed live in `wails dev` and confirmed it all looks good. Marked Shipped in
+FEATURES.md (**v0.6.0**, bundling the whole Sales/Order-Book epic — Customers, Add Order,
+item stock, View/Edit Orders — plus the already-committed `dd-mmm-yy` date-format fix and
+migration-policy doc clarification). Committed, pushed to `main`, tagged **v0.6.0**.
+
+---
+
+## 2026-09-26 — Add Order refinements: customer-first entry, switch prompt, item stock
+**Did:** (client feedback from manually testing Add Order, two rounds, same day it shipped)
+- **Item entry now locked until a customer is chosen** ("Select a customer first"
+  placeholder) — rate-history prefill needs a customer to look up against.
+- **Changing the header customer after lines already have items** now prompts instead of
+  applying silently: Cancel / **Keep current rates** / **Recalculate rates** (re-runs the
+  rate-history lookup for every filled line and re-prefills Rate). Same for quick-adding a
+  brand-new customer mid-order. Cancel reverts the picker via the same combobox-remount
+  trick `AddPurchaseBill.tsx` already uses for its company switch.
+- **New Stock column** — current on-hand quantity (total purchased minus total sold),
+  shown on both Add Order's line-items table and the Items master table. **Derived**, not
+  stored: one correlated-subquery addition to the existing `itemSelect` query
+  (`internal/db/items.go`), so every existing `ListItems`/`ListItemsByCompany` caller gets
+  `Item.Stock` for free — no new table, no new Go method, no extra round trip when a line's
+  item is picked on Add Order. Verified the SQL directly against the real sample DB before
+  wiring it up. No over-sell validation — Qty > Stock is allowed, shown for reference only.
+  Add Order re-fetches its item cache after a successful save so Stock stays current for
+  the rest of the session.
+- `go build/vet/test` ✅, `npm run build` ✅. No schema/migration change (stock is a query
+  expression, not a column). Docs updated (DATA_MODEL, UI, FEATURES, DECISIONS).
+
+**Next steps:** verify live in `wails dev` — item picker disabled until a customer is
+picked; switching customer with items already added shows the prompt and each option
+behaves as described; Stock displays correctly on both pages and updates after saving an
+order for the same item. Then ask before committing (nothing from this Add Order /
+Customers-master work is pushed yet).
+
+---
+
+## 2026-09-26 — Add Order page (second piece of the Sales / Order Book feature)
+**Did:**
+- New `/orders/new` page (top-nav "Add Order", after View/Edit Bills): Customer header
+  (`CustomerCombobox` — filters by name/nickname/city) + Date, then line items with a
+  **global** item search (not scoped to anything, unlike Add Purchase Bill's
+  per-company one) showing Pack Size/GST %/HSN read-only, user-entered Rate/Qty, and a
+  calculated Final Amount (`Rate × Qty × Pack Size`). Totals row sums Qty and Final
+  Amount. Create-only for now — no order number, no edit mode; View/Edit Orders is later
+  work, same incremental path Purchase Bills took.
+- **Rate history**: selecting an item prefills Rate from the customer's latest past rate
+  for it (blank if none), plus an info button showing the full date-descending history.
+  Deliberately **derived from past orders** (`sales_order_items` JOINed to
+  `sales_orders`), not a separate table — nothing to keep in sync. Frontend sorts by
+  parsed date since the stored date is free text.
+- **Backend:** new `sales_orders`/`sales_order_items` tables (migrations 6, 7) and
+  `internal/db/sales_orders.go` (`AddSalesOrder`, `RateHistory`) — Add-only scope for now,
+  full schema already in place for when View/Edit Orders needs List/Get/Update/Delete.
+- **Reused and extended two existing components** rather than building parallel new ones,
+  per client instruction: `ItemCombobox` gained an opt-in `showCompany` flag (Add Purchase
+  Bill's look is unchanged, flag defaults off) so the same component disambiguates
+  same-named items across companies now that search is global; `EditCustomerDialog`
+  gained a create mode (`customer={null}`) so Add Order's quick-add-customer flow uses the
+  exact same full 9-field form as the Customers page, not a stripped-down dialog
+  (`onUpdated` renamed `onSaved` since it now covers both add and update).
+- **Caught and fixed a real bug while updating docs**: `sales_orders.customer_id` is the
+  first FK into `customers`, so the already-shipped `DeleteCustomer` (previously
+  unguarded, since nothing referenced customers yet) would have hit a raw SQLite
+  foreign-key error the first time someone deleted a customer with orders. Added the same
+  `COUNT(1)` reference guard `DeleteCompany`/`DeleteItem` already have, before this shipped.
+- Also fixed a **pre-existing, unrelated doc inaccuracy** noticed while writing this
+  session's UI.md entry: Add Purchase Bill's item search was documented as "cached via
+  `ListItems`" but has actually always been company-scoped (`ListItemsByCompany`) —
+  corrected in `docs/UI.md`.
+- `go build/vet/test` ✅, `npm run build` ✅. New tables are additive — no DB reset needed.
+  Docs updated (DATA_MODEL, FEATURES, UI, DECISIONS).
+
+**Next steps:** verify live in `wails dev` — customer search by name/nickname/city, date
+defaults to today and is editable, item search is global and shows company for
+disambiguation, Rate/Qty/Final Amount and the Totals row compute correctly, Save
+disabled-until-valid and resets the form on success, quick-add for both customer (full
+form, Name+City required) and item works and selects the new record into the line/header.
+Then specifically exercise **rate history**: an item with no prior orders leaves Rate
+blank; after saving one order, starting a second order for the same customer+item
+prefills Rate from it and the info button shows that entry; a third order at a different
+rate shows both, newest first. Then ask before committing.
+
+---
+
 ## 2026-09-26 — Docs: clarified migration policy (additive vs. breaking)
 **Did:** Client asked how the new `customers` table would reach their existing database
 without losing data — answered (auto-applied on next launch, zero-touch to existing

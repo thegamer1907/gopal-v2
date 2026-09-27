@@ -7,12 +7,60 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
-_Shipped in **v0.5.0** (2026-09-20): in-app self-update (Settings → Updates). v0.4.0
-(2026-09-20): **Reports** page + Purchase Summary Excel export.
+_Shipped in **v0.6.0** (2026-09-27): the **Sales / Order Book** feature — Customers
+master, Add Order (+ item stock, per-customer rate history), View/Edit Orders — plus the
+`dd-mmm-yy` date format. v0.5.0 (2026-09-20): in-app self-update (Settings → Updates).
+v0.4.0 (2026-09-20): **Reports** page + Purchase Summary Excel export.
 v0.3.0 (2026-06-15): masters edit/delete, sortable + filterable tables with a
 date-range filter, Indian (en-IN) number formatting, the reworded unsaved-changes dialog, and the
 **top-nav redesign** (sidebar → flat top bar). v0.2.1 (2026-06-10): Company master,
 items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, batch-1 polish._
+
+- **Customers master** (first piece of the **Sales / Order Book** feature) — new
+  `/customers` page: add/edit/delete customers (Name, Nick Name, Address 1/2, City, State,
+  Pincode, GSTIN, Mobile). Only **Name and City are required**; everything else can be
+  filled in later. **State** is a type-to-filter combobox (`StateCombobox`, mirrors
+  `CompanyCombobox`) over the 28 Indian states + 8 union territories, not free text and
+  not a plain dropdown. List table shows every field, with Address 1/2 merged into one
+  Address column. **Delete is reference-guarded** — refuses with a friendly count once a
+  sales order uses the customer. Backend: `internal/db/customers.go`
+  (`AddCustomer`/`UpdateCustomer`/`DeleteCustomer`/`ListCustomers`, passed as a whole
+  `db.Customer` struct).
+- **Add Order** (second piece of Sales / Order Book) — new `/orders/new` page, closely
+  mirroring Add Purchase Bill: a Customer header (`CustomerCombobox`, filters by
+  name/nickname/city; quick-add reuses `EditCustomerDialog`'s new create mode) + Date,
+  then line items with a **global** item search (`ItemCombobox`, now cross-company via a
+  new `showCompany` display flag) — **disabled until a customer is chosen** — showing
+  Pack Size/GST %/HSN/**Stock** read-only, user-entered Rate and Qty, and a calculated
+  **Final Amount** (`Rate × Qty × Pack Size`, `lib/salesOrder.ts`). **Rate auto-prefills
+  from the customer's own rate history for that item** (latest past order, blank if none)
+  via a derived lookup — no separate history table, just a query over past
+  `sales_order_items`/`sales_orders` — plus an info button showing the full
+  date-descending history. **Changing the customer after lines have items** prompts to
+  recalculate rates for the new customer, keep them as-is, or cancel the switch. Totals
+  row sums Qty and Final Amount. No order number (just the internal id). **Also serves as
+  the order editor** (`/orders/:id/edit`, see View/Edit Orders below) — same dual-purpose
+  component as `AddPurchaseBill.tsx`. Backend: `sales_orders`/`sales_order_items` tables,
+  `internal/db/sales_orders.go` (`AddSalesOrder`, `RateHistory`, plus the CRUD listed
+  below).
+- **Item stock** — a **Stock** column on both Add Order's line items and the Items
+  master table: total purchased minus total sold, **derived** on every read (a query
+  addition to the existing `itemSelect`, not a new table/column) so it's always current
+  and never needs syncing. No over-sell validation — shown for reference only.
+- **View/Edit Orders** (third piece of Sales / Order Book) — new `/orders` page, a
+  near-verbatim structural copy of View/Edit Bills: list (Customer · Date · Qty · Final
+  Amount, sortable, search by customer, date-range filter) → read-only detail (Edit →
+  reopens `AddOrder.tsx` in edit mode; Delete → confirm → cascade) → back to the refreshed
+  list. No Stock column on the detail view (Stock is for planning a *new* order, not a
+  fact about a saved one). Because Stock and rate history are both derived live, editing
+  or deleting an order needs no extra sync code — every other screen picks the change up
+  automatically. Backend: `ListSalesOrders`/`GetSalesOrder`/`UpdateSalesOrder`/
+  `DeleteSalesOrder` in `internal/db/sales_orders.go`, each mirroring the matching
+  Purchase Bill function.
+- **Date format `dd-mmm-yy`** (2-digit year) — replaced `dd-mmm-yyyy` everywhere a date is
+  shown or typed. `parseDate` stays permanently tolerant of the legacy 4-digit form (real
+  bills already existed in that format) and `displayDate` normalizes any stored string to
+  the current form for display — no data migration.
 
 - **In-app self-update** — new **Updates** section on Settings: shows the running version,
   a **Check for Updates** button (polls the GitHub Releases API), and — when a newer release
@@ -37,10 +85,12 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   save-file dialog.
 
 - **App navigation shell** — a **flat, always-visible top navigation bar** (`src/components/TopNav.tsx`):
-  wordmark + all page links in one row (Dashboard · Add Purchase Bill · View/Edit Bills · Items ·
-  Companies) with Settings + Logout on the right; active route highlighted. Launches **maximised**;
-  **Logout** quits (confirm). Routing via `react-router-dom` (`HashRouter`). (Replaced the original
-  collapsible left sidebar per client feedback.)
+  wordmark + all page links in one row (currently Dashboard · Add Purchase Bill ·
+  View/Edit Bills · Add Order · View/Edit Orders · Items · Companies · Customers ·
+  Reports — grows as pages are added) with Settings + Logout on the right; active route
+  highlighted. Launches **maximised**; **Logout** quits (confirm). Routing via
+  `react-router-dom` (`HashRouter`). (Replaced the original collapsible left sidebar per
+  client feedback.)
 - **Dashboard (placeholder)** — landing page; centered "Hare Krishna". Real content TBD.
 - **Company master** — `companies` (surrogate `id` PK + unique `name`). Companies page under
   *Masters*; picked/created inline on the bill via `CompanyCombobox` + `NewCompanyDialog`.
@@ -72,15 +122,7 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   (`1,20,300.00`) via `fmt`; quantities whole via `fmtQty`.
 
 ## In Progress
-- **Customers master** (first piece of a new **Sales** feature) — new `/customers` page:
-  add/edit/delete customers (Name, Nick Name, Address 1/2, City, State, Pincode, GSTIN,
-  Mobile). Only **Name and City are required**; everything else can be filled in later.
-  **State** is a preselected picker (shadcn `Select`, new this feature) from the 28 Indian
-  states + 8 union territories, not free text. List table shows every field, with
-  Address 1/2 merged into one Address column. Delete is currently **unguarded** (nothing
-  references customers yet — no schema/FK for Sales bills exists). Backend:
-  `internal/db/customers.go` (`AddCustomer`/`UpdateCustomer`/`DeleteCustomer`/
-  `ListCustomers`, passed as a whole `db.Customer` struct).
+_None._
 
 ## Planned
 - **Dashboard content** — decide the real KPIs / lists.
@@ -90,9 +132,8 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   each just another card in the same grid.
 - **Auto-check for updates on launch** — a silent background check (today's Check for
   Updates button is manual-only, deliberately, per the client's ask).
-- **Sales bills** — the actual Sales-bill feature the Customers master exists for
-  (mirroring Purchase Bills but against a customer). Once it exists, `DeleteCustomer`
-  needs the same reference-count guard `DeleteCompany`/`DeleteItem` already have.
+- **Order number** — whether/how to add one to Sales orders is still open; not needed
+  for v1.
 
 ## Ideas
 _Capture raw feature ideas here as they come up (from us or the client)._

@@ -358,7 +358,7 @@ export function Customers() {
                 open={editing !== null}
                 onOpenChange={(o) => !o && setEditing(null)}
                 customer={editing}
-                onUpdated={() => {
+                onSaved={() => {
                     setEditing(null);
                     refresh();
                 }}
@@ -370,7 +370,7 @@ export function Customers() {
                         <AlertDialogTitle>Delete this customer?</AlertDialogTitle>
                         <AlertDialogDescription>
                             <span className="font-medium text-foreground">{deleting?.name}</span> will be
-                            permanently deleted.
+                            permanently deleted. This is blocked if any orders still use it.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

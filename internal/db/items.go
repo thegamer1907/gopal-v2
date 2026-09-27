@@ -16,6 +16,7 @@ type Item struct {
 	PackSize    float64 `json:"packSize"`    // numeric pack size, e.g. 100
 	GSTPercent  float64 `json:"gstPercent"`  // GST rate %, e.g. 18
 	HSN         int64   `json:"hsn"`         // HSN code (numeric)
+	Stock       float64 `json:"stock"`       // derived on read; see itemSelect. Not written.
 }
 
 // AddItem inserts a new item for a company and returns it with its assigned id.
@@ -63,14 +64,22 @@ func DeleteItem(conn *sql.DB, id int64) error {
 	return nil
 }
 
-const itemSelect = `SELECT i.id, i.company_id, c.name, i.name, i.pack_size, i.gst_percent, i.hsn
+// stock is derived, not stored: total purchased (tax_qty + d_qty across every purchase
+// bill line) minus total sold (qty across every saved sales order line). Recomputed on
+// every read via correlated subqueries — fine at single-user/local scale, and avoids
+// keeping a separate figure in sync as bills/orders are added, edited, or deleted.
+const itemSelect = `SELECT i.id, i.company_id, c.name, i.name, i.pack_size, i.gst_percent, i.hsn,
+		COALESCE((SELECT SUM(pbi.tax_qty + pbi.d_qty) FROM purchase_bill_items pbi WHERE pbi.item_id = i.id), 0)
+		- COALESCE((SELECT SUM(soi.qty) FROM sales_order_items soi WHERE soi.item_id = i.id), 0) AS stock
 	FROM items i JOIN companies c ON c.id = i.company_id`
 
 func scanItems(rows *sql.Rows) ([]Item, error) {
 	items := []Item{}
 	for rows.Next() {
 		var it Item
-		if err := rows.Scan(&it.ID, &it.CompanyID, &it.CompanyName, &it.Name, &it.PackSize, &it.GSTPercent, &it.HSN); err != nil {
+		if err := rows.Scan(
+			&it.ID, &it.CompanyID, &it.CompanyName, &it.Name, &it.PackSize, &it.GSTPercent, &it.HSN, &it.Stock,
+		); err != nil {
 			return nil, fmt.Errorf("scan item: %w", err)
 		}
 		items = append(items, it)

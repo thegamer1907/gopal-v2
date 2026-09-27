@@ -139,6 +139,40 @@ func (a *App) ListCustomers() ([]db.Customer, error) {
 	return db.ListCustomers(a.db)
 }
 
+// --- Sales orders (Order Book) ---
+
+// AddSalesOrder saves a sales order (header + line items) and returns it with its
+// assigned id.
+func (a *App) AddSalesOrder(order db.SalesOrder) (db.SalesOrder, error) {
+	return db.AddSalesOrder(a.db, order)
+}
+
+// ListSalesOrders returns all saved sales orders (header + line items), newest first.
+func (a *App) ListSalesOrders() ([]db.SalesOrder, error) {
+	return db.ListSalesOrders(a.db)
+}
+
+// GetSalesOrder returns a single sales order (header + line items) by id.
+func (a *App) GetSalesOrder(id int64) (db.SalesOrder, error) {
+	return db.GetSalesOrder(a.db, id)
+}
+
+// UpdateSalesOrder overwrites a sales order completely (header + all line items).
+func (a *App) UpdateSalesOrder(order db.SalesOrder) (db.SalesOrder, error) {
+	return db.UpdateSalesOrder(a.db, order)
+}
+
+// DeleteSalesOrder removes a sales order and its line items.
+func (a *App) DeleteSalesOrder(id int64) error {
+	return db.DeleteSalesOrder(a.db, id)
+}
+
+// GetRateHistory returns every past rate a customer has been charged for an item,
+// newest-insert-first (the caller sorts by parsed date — see db.RateHistory).
+func (a *App) GetRateHistory(customerID, itemID int64) ([]db.RateHistoryEntry, error) {
+	return db.RateHistory(a.db, customerID, itemID)
+}
+
 // --- Database management (Settings → Database) ---
 
 // GetDatabasePath returns the absolute path of the currently-open database file.
