@@ -426,3 +426,31 @@ have to re-litigate.
 - **Why:** client-specified fields and picker requirement; required-fields and
   list-column choices were explicit client decisions (not required-by-default the way
   Company's `name` is, since a customer record is realistically built up over time).
+
+### 2026-09-26 — Migration policy clarified: additive is auto-safe, breaking needs care
+- **Decision:** Explicitly split the schema-change policy in two, and wrote it down
+  (`docs/DATA_MODEL.md`, `CLAUDE.md`) after the client asked how the `customers` table
+  (this session) would reach their existing database without losing anything:
+  1. **Additive changes** (new table, new column with a `DEFAULT`) are appended to the
+     `migrations` slice in `internal/db/migrate.go` as always, and need **no manual step
+     for the client at all** — `migrate()` (tracked via `schema_migrations`) applies only
+     what's new the next time the app opens the database, production data included, and
+     never touches an existing table/row. This was already how the migration runner
+     worked; what changed is making the guarantee explicit rather than implicit.
+  2. **"Reset/wipe the database"** — previously the blanket instruction for "the schema
+     changed" — is now documented as a **local-development-only** convenience, for
+     iterating on a migration's shape before it ships, on a machine/table with nothing
+     worth keeping. It must never be suggested for the client's database again.
+  3. **Breaking changes** (rename/retype/drop an existing column) are called out as
+     needing a real, hand-written migration that transforms existing rows (or an explicit
+     client conversation about what would be lost) — `CREATE TABLE IF NOT EXISTS` cannot
+     rescue data out of a column that's disappearing, so this category cannot be handled
+     the same way as #1.
+- **Why:** the client now has real, irreplaceable business data (companies, items,
+  purchase bills, and going forward customers) — the original "delete the dev DB to reset
+  it" guidance in `docs/DATA_MODEL.md`/`CLAUDE.md` was written before any of that existed
+  and, read literally today, could be misapplied to the client's production file. Writing
+  the distinction down prevents a future session (or a rushed moment in this one) from
+  suggesting a wipe as a shortcut for what should be an automatic, zero-risk update.
+- **Not a code change** — `internal/db/migrate.go`'s actual behavior is unchanged; this
+  is a documentation/process correction to match what the runner already safely does.

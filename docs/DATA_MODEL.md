@@ -3,16 +3,29 @@
 The evolving SQLite schema. Update this whenever a table/field/relationship changes, and
 keep it in sync with the Go DB layer.
 
-> **Status:** Item master in active design. Broader domain (stock levels, suppliers,
-> purchase bills, transactions, etc.) still to be defined and captured here.
-
-> **Iteration policy (current phase):** we are **not** maintaining incremental migrations
-> yet — the schema is changing too fast. Edit the schema in `internal/db/migrate.go`
-> directly. Because the existing migration is marked applied, a schema change won't reapply
-> to an existing dev DB: **delete the dev DB file to reset it** (macOS:
-> `~/Library/Application Support/gopal-v2/inventory.db`; Windows:
-> `%APPDATA%\gopal-v2\inventory.db`). Real, additive migrations come later, before there's
-> data worth preserving.
+> **Migration policy — the client has real, irreplaceable data now (since ~2026-06).**
+> This distinction matters and has bitten adjacent projects before, so read it before
+> touching `internal/db/migrate.go`:
+>
+> - **Additive changes are always safe and need no manual step.** A new table, or a new
+>   column with a `DEFAULT`, just gets appended to the `migrations` slice. The runner
+>   (`internal/db/migrate.go`, tracked via `schema_migrations`) applies only what's new,
+>   automatically, the next time *any* copy of the app opens the database — the client's
+>   real production DB included. It never touches existing tables or rows. This is exactly
+>   how the `customers` table was added (2026-09-26): the client updated, got an empty
+>   `customers` table, and every existing company/item/bill was untouched. **Never tell the
+>   client to delete or wipe their database for a change of this kind — there is nothing
+>   for them to do.**
+> - **"Wipe the dev DB"/"delete `inventory.db`" is a local-development convenience only**
+>   — for quickly iterating on a migration's shape on *your own machine* before it ships,
+>   while a table has no data worth keeping yet. It is never something to suggest for the
+>   client's database now that it holds real bills/companies/items/customers.
+> - **A genuinely breaking change — renaming, retyping, or dropping an existing column —
+>   is a different situation entirely.** `CREATE TABLE IF NOT EXISTS` can't rescue data out
+>   of a column that's disappearing. That needs a real, hand-written migration that copies/
+>   transforms the existing rows in place (or an explicit, upfront conversation with the
+>   client about what would be lost) — not a slice append, and never a wipe. Flag this
+>   loudly and get sign-off before writing anything shaped like that.
 
 ---
 

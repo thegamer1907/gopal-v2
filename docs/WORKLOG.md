@@ -6,6 +6,21 @@ reads the top entry first.
 
 ---
 
+## 2026-09-26 — Docs: clarified migration policy (additive vs. breaking)
+**Did:** Client asked how the new `customers` table would reach their existing database
+without losing data — answered (auto-applied on next launch, zero-touch to existing
+tables), then wrote the distinction down since the old "delete the dev DB to reset it"
+guidance predates any real client data existing:
+- `docs/DATA_MODEL.md` and `CLAUDE.md`: additive changes (new table/defaulted column) are
+  auto-safe against *any* database including the client's production one — no manual step,
+  no data loss. "Wipe the DB" is now explicitly scoped as local-dev-only. A breaking change
+  (rename/retype/drop a column) needs a real hand-written migration, not a slice append.
+- `docs/DECISIONS.md`: dated entry recording the same, with why.
+- No code changes — `internal/db/migrate.go`'s behavior was already correct; this closes a
+  documentation gap before it could cause a future session to suggest wiping real data.
+
+---
+
 ## 2026-09-26 — Customers master (first piece of the Sales feature)
 **Did:**
 - New `/customers` page (own top-nav link, after Companies): add/edit/delete customers

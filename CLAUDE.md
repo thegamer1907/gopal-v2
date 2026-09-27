@@ -52,8 +52,13 @@ npm run build    # TypeScript compile + Vite bundle (outputs to frontend/dist/)
 ```
 
 **Release:** push a `vX.Y.Z` tag on `main` → the `build-windows.yml` CI builds the Windows
-`.exe` and publishes a public GitHub Release (`github.com/thegamer1907/gopal-v2`). After a
-schema reshape, tell the user to reset their DB (delete `inventory.db` or Settings → Wipe).
+`.exe` and publishes a public GitHub Release (`github.com/thegamer1907/gopal-v2`). **Additive
+schema changes need no manual step** — the migration runner applies them automatically
+against the client's real database the next time they open the new build, with zero data
+loss (see `docs/DATA_MODEL.md`). Only tell the user to reset/wipe their DB for a purely
+local, no-real-data-yet dev scenario — **never** as the answer to shipping a schema change
+to the client; a genuinely breaking change (rename/drop/retype a column) needs a real
+migration instead, since the client's data must not be lost.
 
 ## Architecture
 
@@ -98,10 +103,15 @@ The Go/frontend boundary is the core concept here:
   `db.ActivePath`). Never hardcode the path; always go through `internal/db`.
 - **Pure-Go driver** `modernc.org/sqlite` (no CGO) — keeps Mac dev and the eventual Windows
   build simple. Do not switch to a CGO driver without recording it in `docs/DECISIONS.md`.
-- **Migrations (current phase):** we are **not** maintaining incremental migrations yet — edit
-  the schema in `internal/db/migrate.go` directly, then **reset the dev DB** to pick it up
-  (delete `inventory.db`, or use Settings → Database → Wipe). Keep `docs/DATA_MODEL.md` in
-  sync. Real additive migrations come later, before there's data worth preserving.
+- **Migrations:** see `docs/DATA_MODEL.md` for the full policy. Short version — **additive**
+  changes (new table, new defaulted column) just get appended to the `migrations` slice in
+  `internal/db/migrate.go`; the runner applies them automatically and safely to *any*
+  database, including the client's real one, with zero data loss. "Reset/wipe the dev DB"
+  is a **local-dev-only** convenience for iterating before a migration ships — never
+  something to do to, or suggest for, the client's database. A **breaking** change
+  (rename/retype/drop an existing column) needs a real, hand-written migration that
+  transforms existing rows, not a slice append. Keep `docs/DATA_MODEL.md` in sync with every
+  migration.
 
 ## Key Files
 
