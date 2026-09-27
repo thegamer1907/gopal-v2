@@ -71,6 +71,25 @@ var migrations = []migration{
 			FOREIGN KEY (item_id) REFERENCES items(id)
 		);`,
 	},
+	// Customer master (first piece of the Sales feature). Surrogate id PK; name is NOT
+	// unique (two customers may share a display name). Only name/city are required by
+	// the app; every other column defaults to '' so partially-filled customers save
+	// cleanly. state is plain text (a small, effectively static list), not a lookup table.
+	{
+		id: 5,
+		sql: `CREATE TABLE IF NOT EXISTS customers (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			name       TEXT NOT NULL,
+			nick_name  TEXT NOT NULL DEFAULT '',
+			address1   TEXT NOT NULL DEFAULT '',
+			address2   TEXT NOT NULL DEFAULT '',
+			city       TEXT NOT NULL DEFAULT '',
+			state      TEXT NOT NULL DEFAULT '',
+			pincode    TEXT NOT NULL DEFAULT '',
+			gstin      TEXT NOT NULL DEFAULT '',
+			mobile     TEXT NOT NULL DEFAULT ''
+		);`,
+	},
 }
 
 // migrate applies any migrations not yet recorded in schema_migrations.

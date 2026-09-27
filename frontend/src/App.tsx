@@ -6,6 +6,7 @@ import {AddPurchaseBill} from '@/pages/AddPurchaseBill';
 import {SavedBills} from '@/pages/SavedBills';
 import {Items} from '@/pages/Items';
 import {Companies} from '@/pages/Companies';
+import {Customers} from '@/pages/Customers';
 import {Reports} from '@/pages/Reports';
 import {Settings} from '@/pages/Settings';
 
@@ -29,6 +30,7 @@ function App() {
                             <Route path="/purchase-bills" element={<SavedBills/>}/>
                             <Route path="/items" element={<Items/>}/>
                             <Route path="/companies" element={<Companies/>}/>
+                            <Route path="/customers" element={<Customers/>}/>
                             <Route path="/reports" element={<Reports/>}/>
                             <Route path="/settings" element={<Settings/>}/>
                         </Routes>

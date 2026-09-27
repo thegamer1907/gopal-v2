@@ -102,3 +102,31 @@ Foreign keys: `(bill_id)` → `purchase_bills(id)` ON DELETE CASCADE; `(item_id)
 > on the frontend and not stored** (shared helper `frontend/src/lib/purchaseBill.ts`), using
 > the item's *current* name/pack/GST from the JOIN. Discount is stored but currently unused by
 > any formula.
+
+### `customers` — customer master (first piece of the Sales feature)
+The list of customers Sales bills will eventually be raised against (migration id 5).
+Surrogate `id` PK; `name` is **not** unique (unlike `companies` — two customers may share a
+display name). Only `name` and `city` are required by the app; every other column
+defaults to `''` so a partially-filled customer saves cleanly.
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key |
+| `name` | TEXT NOT NULL | customer name (label: **Name**) — required |
+| `nick_name` | TEXT NOT NULL DEFAULT '' | (label: **Nick Name**) |
+| `address1` | TEXT NOT NULL DEFAULT '' | (label: **Address 1**) |
+| `address2` | TEXT NOT NULL DEFAULT '' | (label: **Address 2**) |
+| `city` | TEXT NOT NULL DEFAULT '' | (label: **City**) — required |
+| `state` | TEXT NOT NULL DEFAULT '' | one of the 28 Indian states / 8 union territories (`frontend/src/lib/indianStates.ts`); plain text, not a lookup table — the list is small and effectively static |
+| `pincode` | TEXT NOT NULL DEFAULT '' | stored as text (an identifier, not a quantity) |
+| `gstin` | TEXT NOT NULL DEFAULT '' | no format validation |
+| `mobile` | TEXT NOT NULL DEFAULT '' | stored as text |
+
+No foreign keys yet (nothing references `customers`) — `DeleteCustomer` is currently
+**unguarded**, unlike `DeleteCompany`/`DeleteItem`. Add a reference-count guard here once
+Sales bills exist and can reference a customer.
+
+> Go: `db.Customer` (all 10 fields) + `AddCustomer`/`UpdateCustomer`/`DeleteCustomer`/
+> `ListCustomers` (ordered by name) in `internal/db/customers.go`, passed as a whole struct
+> (not flat params, since there are 9 editable fields) — exposed via `app.go`. UI: a
+> Companies/Items-style master page (`/customers`) with a State `Select`
+> (`components/ui/select.tsx`) populated from `INDIAN_STATES`.

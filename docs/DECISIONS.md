@@ -385,3 +385,44 @@ have to re-litigate.
   `formatCaption`) — independent of `lib/date.ts`, and a full month name + 4-digit year is
   the normal convention for a date-picker's own header, not what the client's feedback was
   about.
+
+### 2026-09-26 — Customers master: required fields, merged Address column, no guard yet
+- **Decision:** First piece of a new **Sales** feature — a Customers master
+  (`id, name, nick_name, address1, address2, city, state, pincode, gstin, mobile`),
+  built as a new page mirroring the Companies/Items master pattern exactly (add-form
+  card, sortable/searchable table, controlled Edit dialog, controlled Delete confirm).
+  **Required fields: Name and City only** — every other field (including GSTIN and
+  mobile) can be blank and filled in later via Edit; real customer records are often
+  captured incrementally. **State is a picker** populated from a fixed `INDIAN_STATES`
+  array (`frontend/src/lib/indianStates.ts`, the current 28 states + 8 union
+  territories) rather than free text or a normalized lookup table — the list is small
+  and effectively static, so a DB table for it would be overkill.
+- **List table shows every field**, but **Address 1 and Address 2 are merged into a
+  single "Address" column** (comma-joined, skipping the join when Address 2 is blank)
+  rather than two separate columns — both were explicit client choices when asked.
+- **`DeleteCustomer` is unguarded**, unlike `DeleteCompany`/`DeleteItem` (which refuse
+  deletion with a friendly `COUNT(1)` check when items/bills still reference them) —
+  nothing references `customers` yet, since Sales bills don't exist. Add the same guard
+  pattern once they do; tracked under Planned in `docs/FEATURES.md`.
+- **No format validation** on GSTIN/pincode (plain required-vs-optional checks only) —
+  consistent with how Items/Companies treat their fields; both are plain text `Input`s,
+  not `NumberInput`, since they're identifiers rather than quantities (same reasoning as
+  `bill_number`). **Mobile is the one exception** (see client-feedback revision below).
+- **Revised after client manual-testing feedback (same day):**
+  - The State picker shipped first as a shadcn `Select` dropdown (`npx shadcn@latest add
+    select`); the client asked for the same type-to-filter combobox interaction already
+    used for Company/Item on Add Purchase Bill instead. Replaced with a new
+    `StateCombobox` (`frontend/src/components/StateCombobox.tsx`, same shape as
+    `CompanyCombobox` but for a plain string list, no "add new" option since the list is
+    closed) and **removed `components/ui/select.tsx` entirely** — nothing uses it now.
+  - Mobile got dedicated validation: **must be exactly 10 digits if provided at all**
+    (still optional — empty is fine). `MobileInput` (mirrors `NumberInput`'s
+    digit-filtering approach) blocks non-digit characters and caps length at 10; Add/Save
+    is disabled and an inline error shows for a partial (1-9 digit) number.
+- **Backend shape diverges slightly from Company/Item:** `AddCustomer`/`UpdateCustomer`
+  take/return a whole `db.Customer` struct rather than flat parameters — with 9 editable
+  fields, a flat signature would be unwieldy; this matches how `PurchaseBill`/
+  `PurchaseBillItem` are already passed as structs elsewhere in this codebase.
+- **Why:** client-specified fields and picker requirement; required-fields and
+  list-column choices were explicit client decisions (not required-by-default the way
+  Company's `name` is, since a customer record is realistically built up over time).

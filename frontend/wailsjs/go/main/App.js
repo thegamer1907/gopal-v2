@@ -6,6 +6,10 @@ export function AddCompany(arg1) {
   return window['go']['main']['App']['AddCompany'](arg1);
 }
 
+export function AddCustomer(arg1) {
+  return window['go']['main']['App']['AddCustomer'](arg1);
+}
+
 export function AddItem(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['AddItem'](arg1, arg2, arg3, arg4, arg5);
 }
@@ -24,6 +28,10 @@ export function CreateNewDatabase() {
 
 export function DeleteCompany(arg1) {
   return window['go']['main']['App']['DeleteCompany'](arg1);
+}
+
+export function DeleteCustomer(arg1) {
+  return window['go']['main']['App']['DeleteCustomer'](arg1);
 }
 
 export function DeleteItem(arg1) {
@@ -58,6 +66,10 @@ export function ListCompanies() {
   return window['go']['main']['App']['ListCompanies']();
 }
 
+export function ListCustomers() {
+  return window['go']['main']['App']['ListCustomers']();
+}
+
 export function ListItems() {
   return window['go']['main']['App']['ListItems']();
 }
@@ -80,6 +92,10 @@ export function Quit() {
 
 export function UpdateCompany(arg1, arg2) {
   return window['go']['main']['App']['UpdateCompany'](arg1, arg2);
+}
+
+export function UpdateCustomer(arg1) {
+  return window['go']['main']['App']['UpdateCustomer'](arg1);
 }
 
 export function UpdateItem(arg1, arg2, arg3, arg4, arg5, arg6) {

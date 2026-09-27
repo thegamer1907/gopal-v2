@@ -6,6 +6,46 @@ reads the top entry first.
 
 ---
 
+## 2026-09-26 — Customers master (first piece of the Sales feature)
+**Did:**
+- New `/customers` page (own top-nav link, after Companies): add/edit/delete customers
+  with 9 fields — Name, Nick Name, Address 1, Address 2, City, State, Pincode, GSTIN,
+  Mobile. Only **Name and City are required**.
+- List table shows every field with **Address 1/2 merged into one Address column**;
+  search matches name/nickname/city/mobile/GSTIN; every column except Address is
+  sortable — same Companies/Items pattern throughout (`EditCustomerDialog`, controlled
+  Delete confirm, unsaved-changes guard on the add form).
+- **Backend:** new `customers` table (migration id 5, `internal/db/migrate.go`) and
+  `internal/db/customers.go` (`AddCustomer`/`UpdateCustomer`/`DeleteCustomer`/
+  `ListCustomers`) — passed as a whole `db.Customer` struct rather than flat params
+  (9 fields). `DeleteCustomer` is **unguarded** for now — nothing references customers
+  yet (no Sales bills exist); noted under Planned to add the same reference-count guard
+  Company/Item have once they do.
+- **Client feedback from manual testing, fixed before committing:**
+  - **Mobile** now validated as an exact 10-digit number: `MobileInput`
+    (`frontend/src/components/MobileInput.tsx`, mirrors `NumberInput`'s approach) blocks
+    non-digit characters and caps length at 10; Add/Save stays disabled and an inline
+    "Mobile number must be 10 digits." error shows if a partial number is entered
+    (empty is still fine — mobile stays optional).
+  - **State** switched from a dropdown to a type-to-filter combobox
+    (`frontend/src/components/StateCombobox.tsx`), matching the
+    Company/Item-combobox interaction already used on Add Purchase Bill, rather than a
+    plain `Select`. This replaced the originally-added shadcn `Select` primitive
+    entirely — removed `components/ui/select.tsx` since nothing uses it anymore.
+  - Along the way, caught and fixed a rough edge from the shadcn CLI: `npx shadcn add
+    select` had generated `select.tsx` importing `cn` from a generic `cn` npm package it
+    auto-installed, instead of this project's own `@/lib/utils` (every other
+    `components/ui/*` file uses the latter) — fixed before it was ever committed, and
+    `npm uninstall`ed the stray dependency (moot now that the file itself is gone too).
+- `go build/vet/test` ✅, `npm run build` ✅. New table is additive — no DB reset needed
+  (existing data untouched, `customers` starts empty). Docs updated (DATA_MODEL, UI,
+  FEATURES → In Progress, DECISIONS).
+
+Client reviewed live in `wails dev` (including the mobile/state fixes) and said to
+commit. Sales bills themselves are a separate, future piece of work — not started.
+
+---
+
 ## 2026-09-26 — Date format: dd-mmm-yyyy → dd-mmm-yy (client feedback)
 **Did:** (first piece of client feedback on the live app)
 - `frontend/src/lib/date.ts`: `formatDate` now writes a 2-digit year; `parseDate` made

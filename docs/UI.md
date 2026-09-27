@@ -56,7 +56,7 @@ Screens, flows, and visual decisions, recorded as they firm up.
   collapsible left sidebar — see `DECISIONS.md` 2026-06-15.)
 - **Top bar** (`h-14`, `border-b`): left side is the **GopalOne wordmark** + the primary
   `NavLink`s in one row — Dashboard · Add Purchase Bill · View/Edit Bills · Items · Companies ·
-  Reports;
+  Customers · Reports;
   right side (`ml-auto`) is **Settings** (gear) and **Logout** (closes the app via `Quit()`
   after a "Close GopalOne?" confirm `AlertDialog`). Links are styled with
   `buttonVariants({variant:'ghost', size:'sm'})`; the **active route** gets a filled
@@ -168,6 +168,30 @@ Screens, flows, and visual decisions, recorded as they firm up.
   or bills reference it).
 - Companies are also pickable/creatable inline on the bill header via `CompanyCombobox` +
   `NewCompanyDialog` (see Add Purchase Bill).
+
+### Customers (`/customers`) — customer master (first piece of Sales)
+- `src/pages/Customers.tsx`. Same Companies/Items master pattern: a live customer count,
+  an "Add customer" card, and a card with the customers table + search + sort.
+- **Add customer** — a responsive grid (`grid gap-3 sm:grid-cols-2 lg:grid-cols-3`) of all
+  9 fields (Name, Nick Name, Mobile, Address 1, Address 2, City, State, Pincode, GSTIN).
+  **Only Name and City are required** — Add stays disabled until both are filled; every
+  other field can be left blank and filled in later via Edit. **State** is a
+  type-to-filter combobox (`StateCombobox`, mirrors `CompanyCombobox`'s interaction —
+  same as the Company/Item pickers on Add Purchase Bill) populated from the fixed
+  `INDIAN_STATES` list (`@/lib/indianStates`) — not free text, and not a plain dropdown.
+  **Mobile** uses `MobileInput` (digits only, capped at 10 characters); if a partial
+  number is entered, Add/Save is disabled and an inline "Mobile number must be 10
+  digits." error shows (empty stays valid — mobile is optional).
+- **Customers table** columns: **Name · Nick Name · Address · City · State · Pincode ·
+  GSTIN · Mobile · Actions** — every field is shown; **Address1 and Address2 are merged
+  into one Address column** (comma-joined, skipping the join if Address 2 is blank) rather
+  than two separate columns. Search matches name, nick name, city, mobile, or GSTIN. Every
+  column except Address is sortable (`useTableSort`/`SortableHeader`, same as
+  Items/Companies).
+- Each row has **Edit** (`EditCustomerDialog` — same 9-field grid + State picker) and
+  **Delete** (controlled `AlertDialog`). Unlike Companies/Items, **delete is currently
+  unguarded** — nothing references customers yet (no Sales bills exist); a reference guard
+  will be added once they do.
 
 ### Reports (`/reports`) — top-nav "Reports"
 - `src/pages/Reports.tsx`. A **card grid** (`grid gap-4 sm:grid-cols-2 lg:grid-cols-3`) — one

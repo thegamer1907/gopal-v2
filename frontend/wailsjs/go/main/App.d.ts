@@ -6,6 +6,8 @@ import {reports} from '../models';
 
 export function AddCompany(arg1:string):Promise<db.Company>;
 
+export function AddCustomer(arg1:db.Customer):Promise<db.Customer>;
+
 export function AddItem(arg1:number,arg2:string,arg3:number,arg4:number,arg5:number):Promise<db.Item>;
 
 export function AddPurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
@@ -15,6 +17,8 @@ export function CheckForUpdate():Promise<updater.Info>;
 export function CreateNewDatabase():Promise<string>;
 
 export function DeleteCompany(arg1:number):Promise<void>;
+
+export function DeleteCustomer(arg1:number):Promise<void>;
 
 export function DeleteItem(arg1:number):Promise<void>;
 
@@ -32,6 +36,8 @@ export function GetPurchaseBill(arg1:number):Promise<db.PurchaseBill>;
 
 export function ListCompanies():Promise<Array<db.Company>>;
 
+export function ListCustomers():Promise<Array<db.Customer>>;
+
 export function ListItems():Promise<Array<db.Item>>;
 
 export function ListItemsByCompany(arg1:number):Promise<Array<db.Item>>;
@@ -43,6 +49,8 @@ export function OpenExistingDatabase():Promise<string>;
 export function Quit():Promise<void>;
 
 export function UpdateCompany(arg1:number,arg2:string):Promise<db.Company>;
+
+export function UpdateCustomer(arg1:db.Customer):Promise<db.Customer>;
 
 export function UpdateItem(arg1:number,arg2:number,arg3:string,arg4:number,arg5:number,arg6:number):Promise<db.Item>;
 

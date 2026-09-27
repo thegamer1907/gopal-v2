@@ -72,7 +72,15 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   (`1,20,300.00`) via `fmt`; quantities whole via `fmtQty`.
 
 ## In Progress
-_None._
+- **Customers master** (first piece of a new **Sales** feature) — new `/customers` page:
+  add/edit/delete customers (Name, Nick Name, Address 1/2, City, State, Pincode, GSTIN,
+  Mobile). Only **Name and City are required**; everything else can be filled in later.
+  **State** is a preselected picker (shadcn `Select`, new this feature) from the 28 Indian
+  states + 8 union territories, not free text. List table shows every field, with
+  Address 1/2 merged into one Address column. Delete is currently **unguarded** (nothing
+  references customers yet — no schema/FK for Sales bills exists). Backend:
+  `internal/db/customers.go` (`AddCustomer`/`UpdateCustomer`/`DeleteCustomer`/
+  `ListCustomers`, passed as a whole `db.Customer` struct).
 
 ## Planned
 - **Dashboard content** — decide the real KPIs / lists.
@@ -82,6 +90,9 @@ _None._
   each just another card in the same grid.
 - **Auto-check for updates on launch** — a silent background check (today's Check for
   Updates button is manual-only, deliberately, per the client's ask).
+- **Sales bills** — the actual Sales-bill feature the Customers master exists for
+  (mirroring Purchase Bills but against a customer). Once it exists, `DeleteCustomer`
+  needs the same reference-count guard `DeleteCompany`/`DeleteItem` already have.
 
 ## Ideas
 _Capture raw feature ideas here as they come up (from us or the client)._

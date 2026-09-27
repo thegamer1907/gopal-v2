@@ -14,6 +14,36 @@ export namespace db {
 	        this.name = source["name"];
 	    }
 	}
+	export class Customer {
+	    id: number;
+	    name: string;
+	    nickName: string;
+	    address1: string;
+	    address2: string;
+	    city: string;
+	    state: string;
+	    pincode: string;
+	    gstin: string;
+	    mobile: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Customer(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.nickName = source["nickName"];
+	        this.address1 = source["address1"];
+	        this.address2 = source["address2"];
+	        this.city = source["city"];
+	        this.state = source["state"];
+	        this.pincode = source["pincode"];
+	        this.gstin = source["gstin"];
+	        this.mobile = source["mobile"];
+	    }
+	}
 	export class Item {
 	    id: number;
 	    companyId: number;

@@ -117,6 +117,28 @@ func (a *App) ListCompanies() ([]db.Company, error) {
 	return db.ListCompanies(a.db)
 }
 
+// --- Customers (first piece of the Sales feature) ---
+
+// AddCustomer creates a customer master record and returns the stored record.
+func (a *App) AddCustomer(c db.Customer) (db.Customer, error) {
+	return db.AddCustomer(a.db, c)
+}
+
+// UpdateCustomer overwrites a customer's fields and returns the updated record.
+func (a *App) UpdateCustomer(c db.Customer) (db.Customer, error) {
+	return db.UpdateCustomer(a.db, c)
+}
+
+// DeleteCustomer removes a customer.
+func (a *App) DeleteCustomer(id int64) error {
+	return db.DeleteCustomer(a.db, id)
+}
+
+// ListCustomers returns all customers in the master, ordered by name.
+func (a *App) ListCustomers() ([]db.Customer, error) {
+	return db.ListCustomers(a.db)
+}
+
 // --- Database management (Settings → Database) ---
 
 // GetDatabasePath returns the absolute path of the currently-open database file.
