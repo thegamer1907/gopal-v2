@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
-import {Plus, Trash2, Save, Info, Calendar as CalendarIcon} from 'lucide-react';
+import {Plus, Trash2, Save, Info, Calendar as CalendarIcon, CheckCircle2, RotateCcw} from 'lucide-react';
 import {
     ListCustomers,
     ListItems,
@@ -9,6 +9,7 @@ import {
     GetSalesOrder,
     UpdateSalesOrder,
     GetRateHistory,
+    SetSalesOrderDelivered,
 } from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button, buttonVariants} from '@/components/ui/button';
@@ -91,6 +92,7 @@ export function AddOrder() {
     const [customer, setCustomer] = useState<db.Customer | null>(null);
     const [date, setDate] = useState(todayDate());
     const [dateOpen, setDateOpen] = useState(false);
+    const [delivered, setDelivered] = useState(false);
     const [lines, setLines] = useState<Line[]>([blankLine(1)]);
     const [nextId, setNextId] = useState(2);
 
@@ -127,6 +129,25 @@ export function AddOrder() {
         ListCompanies().then(setCompanies).catch((e) => setError(String(e)));
     }, []);
 
+    // /orders/new and /orders/:id/edit share this component, so React Router doesn't
+    // remount it when navigating between them (same element at the same route position) —
+    // only `editId` changes. Without this, leaving an edit (e.g. via "Add Order" in the
+    // nav, discarding unsaved changes) would land on a blank-looking route that's actually
+    // still holding the previous order's data. Reset to a clean form whenever we're not
+    // (or no longer) editing; the edit-mode effect below repopulates it when editId is set.
+    useEffect(() => {
+        if (editId != null) return;
+        setCustomer(null);
+        setDate(todayDate());
+        setDelivered(false);
+        setLines([blankLine(1)]);
+        setNextId(2);
+        setHistoryLineId(null);
+        setPendingCustomer(null);
+        setError('');
+        setSaved('');
+    }, [editId]);
+
     // Edit mode: load the order once and prefill the whole form (header + lines). Fetches
     // its own customers/items rather than relying on the cache effect above (avoids a
     // load-order race) — Customer must be resolved from a *real* db.Customer here, not a
@@ -158,6 +179,7 @@ export function AddOrder() {
                         } as db.Customer),
                 );
                 setDate(displayDate(order.date));
+                setDelivered(order.delivered);
                 const prefilled: Line[] = order.items.map((oi, i) => ({
                     id: i + 1,
                     item: itemById.get(oi.itemId) ?? null,
@@ -348,10 +370,39 @@ export function AddOrder() {
 
     const historyLine = lines.find((l) => l.id === historyLineId) ?? null;
 
+    // Marking delivered/not-delivered is a direct, immediate write independent of the
+    // form's Save flow — it doesn't touch customer/date/lines state, doesn't interact
+    // with the unsaved-changes guard, and doesn't navigate away.
+    async function toggleDelivered() {
+        if (editId == null) return;
+        try {
+            const updated = await SetSalesOrderDelivered(editId, !delivered);
+            setDelivered(updated.delivered);
+            setSaved(`Order marked ${updated.delivered ? 'delivered' : 'not delivered'}.`);
+        } catch (e: any) {
+            setError(String(e));
+        }
+    }
+
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             {editId != null && (
-                <h1 className="text-2xl font-semibold tracking-tight">Edit order</h1>
+                <div className="flex items-center justify-between gap-3">
+                    <h1 className="text-2xl font-semibold tracking-tight">Edit order</h1>
+                    <Button type="button" variant="outline" size="sm" onClick={toggleDelivered}>
+                        {delivered ? (
+                            <>
+                                <RotateCcw className="size-4"/>
+                                Mark not delivered
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle2 className="size-4"/>
+                                Mark delivered
+                            </>
+                        )}
+                    </Button>
+                </div>
             )}
             <Card>
                 <CardHeader>

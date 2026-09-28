@@ -12,6 +12,7 @@ type SalesOrder struct {
 	CustomerID   int64            `json:"customerId"`   // → customers(id)
 	CustomerName string           `json:"customerName"` // populated on read (JOIN); ignored on write
 	Date         string           `json:"date"`
+	Delivered    bool             `json:"delivered"` // set only via SetSalesOrderDelivered, never UpdateSalesOrder
 	Items        []SalesOrderItem `json:"items"`
 }
 
@@ -68,7 +69,10 @@ func AddSalesOrder(conn *sql.DB, order SalesOrder) (SalesOrder, error) {
 }
 
 // UpdateSalesOrder overwrites an order completely: it updates the header and replaces
-// all line items (delete + re-insert) in one transaction.
+// all line items (delete + re-insert) in one transaction. Deliberately does not touch
+// `delivered` — the caller's order-content edit form never round-trips that field, so
+// including it here would silently reset delivery status on every content-only save.
+// Use SetSalesOrderDelivered to change it.
 func UpdateSalesOrder(conn *sql.DB, order SalesOrder) (SalesOrder, error) {
 	tx, err := conn.Begin()
 	if err != nil {
@@ -113,10 +117,24 @@ func DeleteSalesOrder(conn *sql.DB, id int64) error {
 	return nil
 }
 
+// SetSalesOrderDelivered flips an order's delivered flag without touching anything else
+// — a targeted single-column update, unlike UpdateSalesOrder's full overwrite — and
+// returns the updated order.
+func SetSalesOrderDelivered(conn *sql.DB, id int64, delivered bool) (SalesOrder, error) {
+	res, err := conn.Exec(`UPDATE sales_orders SET delivered = ? WHERE id = ?`, delivered, id)
+	if err != nil {
+		return SalesOrder{}, fmt.Errorf("set delivered for order %d: %w", id, err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return SalesOrder{}, fmt.Errorf("sales order %d not found", id)
+	}
+	return GetSalesOrder(conn, id)
+}
+
 // ListSalesOrders returns all saved orders (header + line items), newest first.
 func ListSalesOrders(conn *sql.DB) ([]SalesOrder, error) {
 	rows, err := conn.Query(
-		`SELECT so.id, so.customer_id, c.name, so.date
+		`SELECT so.id, so.customer_id, c.name, so.date, so.delivered
 			FROM sales_orders so
 			JOIN customers c ON c.id = so.customer_id
 			ORDER BY so.id DESC`,
@@ -130,7 +148,7 @@ func ListSalesOrders(conn *sql.DB) ([]SalesOrder, error) {
 	byID := map[int64]int{} // order id -> index in orders, for attaching line items
 	for rows.Next() {
 		var o SalesOrder
-		if err := rows.Scan(&o.ID, &o.CustomerID, &o.CustomerName, &o.Date); err != nil {
+		if err := rows.Scan(&o.ID, &o.CustomerID, &o.CustomerName, &o.Date, &o.Delivered); err != nil {
 			return nil, fmt.Errorf("scan order: %w", err)
 		}
 		o.Items = []SalesOrderItem{}
@@ -174,12 +192,12 @@ func ListSalesOrders(conn *sql.DB) ([]SalesOrder, error) {
 func GetSalesOrder(conn *sql.DB, id int64) (SalesOrder, error) {
 	var o SalesOrder
 	if err := conn.QueryRow(
-		`SELECT so.id, so.customer_id, c.name, so.date
+		`SELECT so.id, so.customer_id, c.name, so.date, so.delivered
 			FROM sales_orders so
 			JOIN customers c ON c.id = so.customer_id
 			WHERE so.id = ?`,
 		id,
-	).Scan(&o.ID, &o.CustomerID, &o.CustomerName, &o.Date); err != nil {
+	).Scan(&o.ID, &o.CustomerID, &o.CustomerName, &o.Date, &o.Delivered); err != nil {
 		return SalesOrder{}, fmt.Errorf("get order %d: %w", id, err)
 	}
 

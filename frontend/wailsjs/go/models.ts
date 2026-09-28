@@ -186,6 +186,7 @@ export namespace db {
 	    customerId: number;
 	    customerName: string;
 	    date: string;
+	    delivered: boolean;
 	    items: SalesOrderItem[];
 	
 	    static createFrom(source: any = {}) {
@@ -198,6 +199,7 @@ export namespace db {
 	        this.customerId = source["customerId"];
 	        this.customerName = source["customerName"];
 	        this.date = source["date"];
+	        this.delivered = source["delivered"];
 	        this.items = this.convertValues(source["items"], SalesOrderItem);
 	    }
 	

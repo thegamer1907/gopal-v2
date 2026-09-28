@@ -119,6 +119,13 @@ var migrations = []migration{
 			FOREIGN KEY (item_id) REFERENCES items(id)
 		);`,
 	},
+	// Delivered status for sales orders. Every existing and new order defaults to
+	// not-delivered (0); flipped only via SetSalesOrderDelivered's targeted update, never
+	// via UpdateSalesOrder's whole-row overwrite (see sales_orders.go).
+	{
+		id:  8,
+		sql: `ALTER TABLE sales_orders ADD COLUMN delivered INTEGER NOT NULL DEFAULT 0;`,
+	},
 }
 
 // migrate applies any migrations not yet recorded in schema_migrations.

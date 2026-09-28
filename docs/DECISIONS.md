@@ -610,3 +610,55 @@ have to re-litigate.
   Excel fixes verified by generating a real workbook and inspecting `styles.xml`/the sheet
   XML directly (confirmed `0`/`0%` number formats and the `0.05`-style fraction value)
   rather than eyeballing a screenshot. `go build/vet/test` ✅, `npm run build` ✅.
+
+### 2026-09-27 — Order delivered status: reversible toggle, excluded from `UpdateSalesOrder`
+- **Decision:** New `sales_orders.delivered` column (migration id 8, `INTEGER NOT NULL
+  DEFAULT 0`), written only through a new targeted `SetSalesOrderDelivered(id, delivered)`
+  (single-column `UPDATE`, returns the refreshed row) — never through `UpdateSalesOrder`,
+  whose SET clause deliberately stays `customer_id = ?, date = ?` only. Delivery status is
+  a **reversible toggle** (client confirmed), not a one-way mark: the same button flips
+  either direction, both in the `/orders` list row and on the order's edit page.
+- **Why:** `AddOrder.tsx`'s Save flow builds its order payload as a plain object cast
+  `as db.SalesOrder` that never sets `delivered` — if `UpdateSalesOrder` included that
+  column in its SET clause, any content-only edit-and-save (e.g. just changing the Date)
+  would silently reset delivered back to `false`, since the frontend has no reason to
+  round-trip a field it isn't editing. Excluding the column from that statement entirely
+  makes the reset structurally impossible rather than relying on frontend discipline. A
+  reversible single control (vs. two conditional one-way actions) was simpler to reason
+  about and matches how a status flip is conceptually one thing, not two.
+- **Alternatives:** Route the delivered flag through `UpdateSalesOrder` and have the
+  frontend always include the current value in its save payload — rejected: an extra
+  footgun for every future edit-flow change, for no benefit over a dedicated endpoint that
+  already existed as a clean pattern (`SetSalesOrderDelivered` mirrors how status-only
+  writes are kept separate from whole-row overwrites elsewhere in this codebase). One-way
+  "mark delivered" only (no undo) — rejected per client's explicit ask for reversibility.
+- This is the first boolean column in the schema (`modernc.org/sqlite` maps Go `bool` ↔
+  `INTEGER` transparently, no manual conversion needed) and the first use of shadcn
+  `Switch`/`Badge` components in this codebase — both added via
+  `npx shadcn@latest add switch badge`, then had their generated `cn` import corrected
+  from the CLI's newer `"cn"` package convention to this project's existing
+  `@/lib/utils` import (kept the extra `cn` npm dependency out of `package.json`, matching
+  every other `ui/` component here).
+
+### 2026-09-27 — Bug: leaving an edit form via nav left stale data on the "new" form
+- **Found while testing** the delivered-status feature above: edit an order, click "Add
+  Order" in the top nav, confirm "Discard changes" — the resulting `/orders/new` page
+  showed the *edited order's* data (customer, date, lines) instead of a blank form.
+- **Root cause:** `/orders/new` and `/orders/:id/edit` render the same `<AddOrder/>`
+  element at the same position in the route tree, so React Router reuses the existing
+  component instance across that navigation rather than remounting it — only the `id`
+  URL param (and therefore `editId`) changes. The edit-mode prefill effect only ever
+  writes to form state `if (editId != null)`; there was no corresponding branch to clear
+  it back to blank when `editId` becomes `null` again, so whatever the edit form last held
+  just stayed in state, and the now-unmatched edit-mode effect had nothing to overwrite it
+  with. Same shape of bug confirmed in `AddPurchaseBill.tsx` (`/purchase-bills/new` +
+  `/purchase-bills/:id/edit` sharing one component the same way) and fixed there too.
+- **Fix:** added a second effect, `if (editId != null) return;` else reset every
+  form-owned field (header + lines + counters) to its blank-form initial value, keyed on
+  `[editId]` — mirrors the existing edit-mode effect's shape but for the opposite branch.
+  Runs harmlessly on the normal "new" mount too (state's already blank there).
+- **Alternatives:** key the `<Route>` element on `id ?? 'new'` to force a full remount
+  instead — rejected: correct, but throws away the cheap in-place reset for a full
+  unmount/remount that re-runs the customers/items/companies cache-fetch effect
+  unnecessarily on every add↔edit transition, for no behavioral benefit over an explicit
+  reset.

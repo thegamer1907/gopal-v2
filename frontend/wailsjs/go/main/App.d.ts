@@ -58,6 +58,8 @@ export function OpenExistingDatabase():Promise<string>;
 
 export function Quit():Promise<void>;
 
+export function SetSalesOrderDelivered(arg1:number,arg2:boolean):Promise<db.SalesOrder>;
+
 export function UpdateCompany(arg1:number,arg2:string):Promise<db.Company>;
 
 export function UpdateCustomer(arg1:db.Customer):Promise<db.Customer>;

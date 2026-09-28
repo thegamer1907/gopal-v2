@@ -167,6 +167,12 @@ func (a *App) DeleteSalesOrder(id int64) error {
 	return db.DeleteSalesOrder(a.db, id)
 }
 
+// SetSalesOrderDelivered marks a sales order delivered/not-delivered and returns the
+// updated order.
+func (a *App) SetSalesOrderDelivered(id int64, delivered bool) (db.SalesOrder, error) {
+	return db.SetSalesOrderDelivered(a.db, id, delivered)
+}
+
 // GetRateHistory returns every past rate a customer has been charged for an item,
 // newest-insert-first (the caller sorts by parsed date — see db.RateHistory).
 func (a *App) GetRateHistory(customerID, itemID int64) ([]db.RateHistoryEntry, error) {

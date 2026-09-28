@@ -6,6 +6,37 @@ reads the top entry first.
 
 ---
 
+## 2026-09-27 — Order delivered status + a stale-form nav bug fix
+**Did:**
+- **Order delivered status**: new `sales_orders.delivered` column (migration id 8,
+  defaults not-delivered). Reversible toggle from two places — an inline row button on
+  `/orders` (`SavedOrders.tsx`) and a "Mark delivered"/"Mark not delivered" button on the
+  order edit page (`AddOrder.tsx`) — both call a new `SetSalesOrderDelivered` directly,
+  bypassing the edit form's Save/dirty-tracking flow. `/orders` defaults to undelivered
+  orders only, with a "Show delivered" `Switch` to include the rest; visible rows (and the
+  detail view) get a Delivered/Pending `Badge`. `UpdateSalesOrder` deliberately excludes
+  `delivered` from its SET clause so a content-only edit/save can never reset it. Added
+  shadcn `Switch`/`Badge` (first use of either in this codebase; also first boolean
+  column) — had to fix the CLI-generated `cn` import (`"cn"` package) back to this
+  project's `@/lib/utils` convention, and dropped the resulting unneeded `cn` npm dep.
+- **Bug found while testing the above, fixed in both `AddOrder.tsx` and
+  `AddPurchaseBill.tsx`**: leaving an edit form via top-nav (e.g. clicking "Add Order"
+  mid-edit, confirming "Discard changes") landed on the "new" form still showing the
+  edited record's data. Root cause: `/x/new` and `/x/:id/edit` render the same component
+  instance (React Router doesn't remount across same-position route matches), and the
+  edit-prefill effect only ever wrote form state `if (editId != null)` — nothing reset it
+  back to blank on the reverse transition. Fixed with a second effect that clears the form
+  whenever `editId` is null. See DECISIONS for the full writeup and the rejected
+  alternative (keying the `<Route>` to force a remount).
+- Verified live in `wails dev` (client walked through both the delivered-status flow and
+  the nav bug repro). `go build/vet/test` ✅, `npm run build` ✅. Docs updated (DATA_MODEL,
+  FEATURES — moved to Shipped, DECISIONS — two entries).
+
+**Next steps:** commit, then decide whether this ships alone as a patch/minor version or
+waits to bundle with more work — no release cut yet this session.
+
+---
+
 ## 2026-09-27 — Post-v0.6.0 patch: five client-reported fixes
 **Did:** (client tested v0.6.0 live; these came out of that session)
 - **Add Order item search showed a phantom duplicate row** after the client renamed a

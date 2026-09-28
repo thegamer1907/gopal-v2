@@ -110,6 +110,10 @@ export function Quit() {
   return window['go']['main']['App']['Quit']();
 }
 
+export function SetSalesOrderDelivered(arg1, arg2) {
+  return window['go']['main']['App']['SetSalesOrderDelivered'](arg1, arg2);
+}
+
 export function UpdateCompany(arg1, arg2) {
   return window['go']['main']['App']['UpdateCompany'](arg1, arg2);
 }

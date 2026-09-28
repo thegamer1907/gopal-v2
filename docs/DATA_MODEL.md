@@ -157,12 +157,14 @@ order still uses the customer).
 
 ### `sales_orders` — sales order header (first piece of the Order Book / Sales feature)
 One row per order (from the Add Order form: Customer, Date). No order number for v1 — the
-internal `id` is the only identifier so far. Migration id 6.
+internal `id` is the only identifier so far. Migration id 6; `delivered` added in
+migration id 8.
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key (FK target for line items) |
 | `customer_id` | INTEGER NOT NULL | → `customers(id)` (FK) — the order references the customer by id, not name |
 | `date` | TEXT NOT NULL | order date, same `dd-mmm-yy` convention/handling as `purchase_bills.date` |
+| `delivered` | INTEGER NOT NULL DEFAULT 0 | delivery status; `0` = not yet delivered (every existing/new order defaults here). Written only by `SetSalesOrderDelivered` — `UpdateSalesOrder` deliberately excludes it from its SET clause so a content-only edit/save can never reset it |
 
 Foreign key: `(customer_id)` → `customers(id)`.
 
@@ -187,6 +189,14 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > shape for List/Get); exposed via `app.go`. **Final Amount** (rate × qty × pack size) is
 > derived on the frontend and not stored (shared helper `frontend/src/lib/salesOrder.ts`),
 > same pattern as Purchase Bill's calculated columns.
+>
+> **Delivered status** is a targeted, single-column write path, kept separate from the
+> whole-row `UpdateSalesOrder` overwrite: `SetSalesOrderDelivered(id, delivered)` (same
+> file) does `UPDATE sales_orders SET delivered = ? WHERE id = ?` and returns the updated
+> row. Reversible by design — the same call flips it either direction — from a button in
+> the `/orders` list row and a button on the order's edit page (`AddOrder.tsx`), both
+> firing this call directly rather than going through the edit form's Save/dirty-tracking
+> flow.
 >
 > **Rate history is derived, not a separate table**: `db.RateHistoryEntry` +
 > `RateHistory(customerID, itemID)` (same file) answers "what did this customer last pay

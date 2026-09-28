@@ -1,11 +1,14 @@
 import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {ArrowLeft, ClipboardList, Pencil, Search, Trash2} from 'lucide-react';
+import {ArrowLeft, CheckCircle2, ClipboardList, Pencil, RotateCcw, Search, Trash2} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
-import {ListSalesOrders, DeleteSalesOrder} from '../../wailsjs/go/main/App';
+import {ListSalesOrders, DeleteSalesOrder, SetSalesOrderDelivered} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {Switch} from '@/components/ui/switch';
+import {Label} from '@/components/ui/label';
+import {Badge} from '@/components/ui/badge';
 import {
     Card,
     CardContent,
@@ -17,6 +20,7 @@ import {
     Table,
     TableBody,
     TableCell,
+    TableHead,
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
@@ -60,6 +64,14 @@ const orderSortAccessors = {
     amount: finalAmountOf,
 };
 
+function DeliveredBadge({delivered}: {delivered: boolean}) {
+    return delivered ? (
+        <Badge variant="default">Delivered</Badge>
+    ) : (
+        <Badge variant="secondary">Pending</Badge>
+    );
+}
+
 export function SavedOrders() {
     const navigate = useNavigate();
     const [orders, setOrders] = useState<db.SalesOrder[]>([]);
@@ -68,6 +80,7 @@ export function SavedOrders() {
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [range, setRange] = useState<DateRange | undefined>(undefined);
+    const [showDelivered, setShowDelivered] = useState(false);
 
     function refresh() {
         return ListSalesOrders()
@@ -85,13 +98,17 @@ export function SavedOrders() {
         [orders, selectedId],
     );
 
-    // Filter by search (customer name) and by date range (inclusive, either bound
-    // optional), then sort. The date range's `to` is taken as end-of-day.
+    // Filter by search (customer name), by date range (inclusive, either bound
+    // optional), and by delivered status (undelivered-only unless the toggle is on),
+    // then sort. The date range's `to` is taken as end-of-day.
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         const from = range?.from;
         const to = range?.to;
         return orders.filter((o) => {
+            if (!showDelivered && o.delivered) {
+                return false;
+            }
             if (q && !o.customerName.toLowerCase().includes(q)) {
                 return false;
             }
@@ -103,7 +120,7 @@ export function SavedOrders() {
             }
             return true;
         });
-    }, [orders, search, range]);
+    }, [orders, search, range, showDelivered]);
 
     const {sorted, sortKey, sortDir, toggle} = useTableSort(filtered, orderSortAccessors, {
         key: 'date',
@@ -115,6 +132,15 @@ export function SavedOrders() {
             await DeleteSalesOrder(id);
             setSelectedId(null);
             await refresh();
+        } catch (e: any) {
+            setError(String(e));
+        }
+    }
+
+    async function toggleDelivered(order: db.SalesOrder) {
+        try {
+            const updated = await SetSalesOrderDelivered(order.id, !order.delivered);
+            setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
         } catch (e: any) {
             setError(String(e));
         }
@@ -157,15 +183,27 @@ export function SavedOrders() {
             ) : (
                 <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="relative w-64">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
-                            <Input
-                                className="pl-8"
-                                placeholder="Search customer…"
-                                autoComplete="off"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="relative w-64">
+                                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
+                                <Input
+                                    className="pl-8"
+                                    placeholder="Search customer…"
+                                    autoComplete="off"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Switch
+                                    id="show-delivered"
+                                    checked={showDelivered}
+                                    onCheckedChange={setShowDelivered}
+                                />
+                                <Label htmlFor="show-delivered" className="font-normal text-muted-foreground">
+                                    Show delivered
+                                </Label>
+                            </div>
                         </div>
                         <DateRangeFilter value={range} onChange={setRange}/>
                     </div>
@@ -184,7 +222,9 @@ export function SavedOrders() {
                                             <SortableHeader label="Customer" sortKey="customer" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
                                             <SortableHeader label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                             <SortableHeader label="Qty" sortKey="qty" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
-                                            <SortableHeader label="Final Amount" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right" className="pr-4"/>
+                                            <SortableHeader label="Final Amount" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="w-10 pr-4"/>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -197,7 +237,29 @@ export function SavedOrders() {
                                                 <TableCell className="pl-4 font-medium">{order.customerName}</TableCell>
                                                 <TableCell className="tabular-nums text-muted-foreground">{displayDate(order.date)}</TableCell>
                                                 <TableCell className="text-right tabular-nums text-muted-foreground">{fmtQty(totalQtyOf(order))}</TableCell>
-                                                <TableCell className="pr-4 text-right tabular-nums font-medium">{fmt(finalAmountOf(order))}</TableCell>
+                                                <TableCell className="text-right tabular-nums font-medium">{fmt(finalAmountOf(order))}</TableCell>
+                                                <TableCell>
+                                                    <DeliveredBadge delivered={order.delivered}/>
+                                                </TableCell>
+                                                <TableCell className="pr-4 text-right">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="size-8"
+                                                        aria-label={order.delivered ? 'Mark not delivered' : 'Mark delivered'}
+                                                        title={order.delivered ? 'Mark not delivered' : 'Mark delivered'}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleDelivered(order);
+                                                        }}
+                                                    >
+                                                        {order.delivered ? (
+                                                            <RotateCcw className="size-4"/>
+                                                        ) : (
+                                                            <CheckCircle2 className="size-4"/>
+                                                        )}
+                                                    </Button>
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -263,7 +325,10 @@ function OrderDetail({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Order #{order.id}</CardTitle>
+                    <div className="flex items-center gap-2">
+                        <CardTitle>Order #{order.id}</CardTitle>
+                        <DeliveredBadge delivered={order.delivered}/>
+                    </div>
                     <CardDescription>
                         {order.customerName} · {displayDate(order.date)}
                     </CardDescription>

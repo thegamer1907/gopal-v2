@@ -22,6 +22,18 @@ date-range filter, Indian (en-IN) number formatting, the reworded unsaved-change
 **top-nav redesign** (sidebar → flat top bar). v0.2.1 (2026-06-10): Company master,
 items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, batch-1 polish._
 
+- **Order delivered status** — new `delivered` column on `sales_orders` (migration id 8,
+  defaults `false`/not-delivered for every existing and new order). Reversible toggle,
+  markable from two places: an inline icon button per row in the `/orders` list table
+  (`SavedOrders.tsx`) and a "Mark delivered" / "Mark not delivered" button on the order's
+  edit page (`AddOrder.tsx`, next to the "Edit order" heading) — both call the new
+  `SetSalesOrderDelivered` method directly, independent of the edit page's own Save flow.
+  The `/orders` list shows **only undelivered orders by default**, with a "Show delivered"
+  `Switch` in the toolbar to include them; when shown, each row (and the read-only detail
+  view) carries a Delivered/Pending `Badge`. `UpdateSalesOrder` deliberately never touches
+  `delivered`, so saving unrelated order edits can't reset it. Backend:
+  `SetSalesOrderDelivered` in `internal/db/sales_orders.go` + `app.go`. First use of a
+  boolean column, and first `switch`/`badge` shadcn components, in this codebase.
 - **Customers master** (first piece of the **Sales / Order Book** feature) — new
   `/customers` page: add/edit/delete customers (Name, Nick Name, Address 1/2, City, State,
   Pincode, GSTIN, Mobile). Only **Name and City are required**; everything else can be

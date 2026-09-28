@@ -144,6 +144,25 @@ export function AddPurchaseBill() {
             .catch((e) => setError(String(e)));
     }, [company]);
 
+    // /purchase-bills/new and /purchase-bills/:id/edit share this component, so React
+    // Router doesn't remount it when navigating between them (same element at the same
+    // route position) — only `editId` changes. Without this, leaving an edit (e.g. via
+    // "Add Purchase Bill" in the nav, discarding unsaved changes) would land on a
+    // blank-looking route that's actually still holding the previous bill's data. Reset
+    // to a clean form whenever we're not (or no longer) editing; the edit-mode effect
+    // below repopulates it when editId is set.
+    useEffect(() => {
+        if (editId != null) return;
+        setCompany(null);
+        setBillNumber('');
+        setDate(todayDate());
+        setLines([blankLine(1)]);
+        setNextId(2);
+        setPendingCompany(null);
+        setError('');
+        setSaved('');
+    }, [editId]);
+
     // Edit mode: load the bill once and prefill the whole form (header + lines).
     useEffect(() => {
         if (editId == null) return;
