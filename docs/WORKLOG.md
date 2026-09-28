@@ -38,9 +38,10 @@ reads the top entry first.
   header grows to fit however many rows wrap, evenly padded top and bottom.
 - `go build/vet/test` ✅, `npm run build` ✅. Docs updated (DECISIONS, FEATURES).
 
-**Next steps:** verify live in `wails dev` (client's own narrow-window repro for the nav
-fix in particular, since it can't be checked headlessly here — no browser-automation
-access this session). Then commit and cut a patch release (`vX.Y.Z` tag) once confirmed.
+Committed (`9279c16`) and tagged **v0.6.1**; CI publishes the Windows `.exe` release.
+
+**Next steps:** none outstanding for this patch. Pick up the next item from FEATURES.md
+Planned (Dashboard content, more Reports cards, auto-check-for-updates, or Order number).
 
 ---
 
