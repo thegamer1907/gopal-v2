@@ -13,7 +13,7 @@ import {calcOrderLine} from '@/lib/salesOrder';
 // predictable regardless of theme.
 const HEADER_BG = '#FFD966';
 const BORDER = '1px solid #000';
-const cell: React.CSSProperties = {border: BORDER, padding: '6px 10px'};
+const cell: React.CSSProperties = {border: BORDER, padding: '2px 6px', lineHeight: 1.3};
 
 export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOrder}>(
     function ShareableOrderImage({order}, ref) {
@@ -31,7 +31,7 @@ export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOr
 
         return (
             <div ref={ref} style={{display: 'inline-block', background: '#fff', fontFamily: 'Arial, sans-serif'}}>
-                <table style={{borderCollapse: 'collapse', fontSize: 14, color: '#000'}}>
+                <table style={{borderCollapse: 'collapse', fontSize: 11, color: '#000'}}>
                     <tbody>
                         <tr>
                             <td colSpan={3} style={{...cell, background: HEADER_BG, fontWeight: 700}}>

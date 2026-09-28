@@ -6,6 +6,17 @@ reads the top entry first.
 
 ---
 
+## 2026-09-28 — Copy Order Image: more compact sizing
+**Did:** client asked for smaller image / more line items fitting on screen. Shrank
+`ShareableOrderImage.tsx`: font 14px → 11px, cell padding `6px 10px` → `2px 6px` (plus a
+`lineHeight: 1.3` to keep it readable at the smaller size). `go build/vet`, `npm run
+build` ✅. Docs updated (FEATURES).
+
+**Next steps:** none for this tweak — same outstanding items as below (seeded test data
+cleanup, Windows clipboard verification).
+
+---
+
 ## 2026-09-28 — Copy Order Image (WhatsApp sharing)
 **Did:**
 - Explored options for sharing an order to WhatsApp before building anything: WhatsApp

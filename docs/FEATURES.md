@@ -27,7 +27,9 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   customer-facing layout (`ShareableOrderImage.tsx`: yellow header/footer bars,
   black-bordered grid, header line `{customer nickname or name} - {city}` + date,
   columns Qty/Item/Unit(pack size)/Rate/Amount, bold total row — no GST%/HSN, and no
-  packaging-type column since that's not tracked data) and copies it straight to the
+  packaging-type column since that's not tracked data; compact sizing — 11px font,
+  tight `2px 6px` cell padding — so more line items fit in a smaller image) and copies it
+  straight to the
   clipboard for pasting into a WhatsApp chat. The app never opens WhatsApp or builds a
   message itself — WhatsApp has no way to auto-attach a file via a link, so a manual
   paste is the whole interaction. Falls back to a native Save Image dialog only if the
