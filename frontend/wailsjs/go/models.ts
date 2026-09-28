@@ -185,6 +185,8 @@ export namespace db {
 	    id: number;
 	    customerId: number;
 	    customerName: string;
+	    customerNickName: string;
+	    customerCity: string;
 	    date: string;
 	    delivered: boolean;
 	    items: SalesOrderItem[];
@@ -198,6 +200,8 @@ export namespace db {
 	        this.id = source["id"];
 	        this.customerId = source["customerId"];
 	        this.customerName = source["customerName"];
+	        this.customerNickName = source["customerNickName"];
+	        this.customerCity = source["customerCity"];
 	        this.date = source["date"];
 	        this.delivered = source["delivered"];
 	        this.items = this.convertValues(source["items"], SalesOrderItem);

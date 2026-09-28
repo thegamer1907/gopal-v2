@@ -110,6 +110,10 @@ export function Quit() {
   return window['go']['main']['App']['Quit']();
 }
 
+export function SaveOrderShareImage(arg1, arg2) {
+  return window['go']['main']['App']['SaveOrderShareImage'](arg1, arg2);
+}
+
 export function SetSalesOrderDelivered(arg1, arg2) {
   return window['go']['main']['App']['SetSalesOrderDelivered'](arg1, arg2);
 }

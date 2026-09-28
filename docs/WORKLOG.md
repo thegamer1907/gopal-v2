@@ -6,6 +6,50 @@ reads the top entry first.
 
 ---
 
+## 2026-09-28 — Copy Order Image (WhatsApp sharing)
+**Did:**
+- Explored options for sharing an order to WhatsApp before building anything: WhatsApp
+  can't auto-attach a file via any link (wa.me or otherwise), and the Business Cloud API
+  that *can* send files needs Meta verification, a live server, and per-message cost —
+  wrong fit for this local/no-server app. Client settled on the simplest workable shape:
+  one button, renders the order as an image, copies it to the clipboard, user pastes into
+  WhatsApp themselves. No wa.me link, no message text, no auto-opening WhatsApp.
+- New "Copy Order Image" button on the order detail view (`/orders`). New component
+  `ShareableOrderImage.tsx` renders a purpose-built customer-facing layout (yellow
+  header/footer, black-bordered grid, `{nickname or name} - {city}` + date header,
+  Qty/Item/Unit/Rate/Amount columns, bold total row) matching a reference image the
+  client provided — no GST%/HSN, and no packaging-type ("Pack": PB/Jar/Cont/Box) column
+  since that's not data the Item master tracks.
+- Backend: `CustomerNickName`/`CustomerCity` added to `db.SalesOrder` (JOIN-populated,
+  same shape as the existing `CustomerName`) for the header line; new
+  `App.SaveOrderShareImage` (fallback-only — native Save dialog, same pattern as
+  `ExportPurchaseSummary`). No migration.
+- **Bug found during first live test**: clicking the button always fell into the
+  Save-dialog fallback instead of copying to clipboard. Root cause: the code awaited the
+  image render (`toPng`) *before* calling `navigator.clipboard.write()` — Safari/WebKit
+  (the macOS dev build's WKWebView) revokes the click's clipboard permission the moment
+  any `await` happens first. Fixed by calling `clipboard.write()` as the very first async
+  step, handed a still-pending render promise via `ClipboardItem` instead of an
+  already-awaited one, so the write call itself stays synchronous with the click.
+- Seeded a throwaway test company/8 items/customer ("Amber Traders" / nick "Amber Ji" /
+  Meerut, matching the client's reference)/order directly into the real DB
+  (`/Users/harshit/Downloads/inventory.db`, client's explicit choice over a scratch DB)
+  via a one-off `cmd/seedtest` script (deleted after running) so the client could visually
+  compare the rendered image against their reference. **Client confirmed it looks good —
+  this test data (company "TEST - Sample Co (delete me)" id 10, items id 95-102,
+  customer id 4, order id 4) is still in the real DB and needs manual cleanup via the
+  app's own Delete buttons.**
+- `go build/vet/test` ✅, `npm run build` ✅. Docs updated (DATA_MODEL, FEATURES — moved to
+  Shipped, DECISIONS).
+
+**Next steps:** delete the seeded test data (company/items/customer/order listed above)
+from the real DB via the app's Delete buttons. Clipboard-write behavior is unverified on
+the shipping Windows/WebView2 target — worth a specific check next time a Windows build
+is tested; the Save-dialog fallback covers it either way if clipboard write is blocked
+there. No release tagged this session.
+
+---
+
 ## 2026-09-27 — Order delivered status + a stale-form nav bug fix
 **Did:**
 - **Order delivered status**: new `sales_orders.delivered` column (migration id 8,

@@ -22,6 +22,22 @@ date-range filter, Indian (en-IN) number formatting, the reworded unsaved-change
 **top-nav redesign** (sidebar → flat top bar). v0.2.1 (2026-06-10): Company master,
 items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, batch-1 polish._
 
+- **Copy Order Image (WhatsApp sharing)** — new "Copy Order Image" button on the order
+  detail view (`/orders`, `OrderDetail`). Renders the order as a PNG in a purpose-built,
+  customer-facing layout (`ShareableOrderImage.tsx`: yellow header/footer bars,
+  black-bordered grid, header line `{customer nickname or name} - {city}` + date,
+  columns Qty/Item/Unit(pack size)/Rate/Amount, bold total row — no GST%/HSN, and no
+  packaging-type column since that's not tracked data) and copies it straight to the
+  clipboard for pasting into a WhatsApp chat. The app never opens WhatsApp or builds a
+  message itself — WhatsApp has no way to auto-attach a file via a link, so a manual
+  paste is the whole interaction. Falls back to a native Save Image dialog only if the
+  clipboard write itself fails (`navigator.clipboard.write()` is called synchronously
+  with the click, handed a still-pending render promise, since Safari/WebKit revokes the
+  click's clipboard permission across an earlier `await`). Backend:
+  `App.SaveOrderShareImage` (`app.go`, fallback only) + `CustomerNickName`/`CustomerCity`
+  added to `db.SalesOrder` (`internal/db/sales_orders.go`). Verified working on macOS
+  (`wails dev`); clipboard-write behavior on the shipping Windows/WebView2 target is
+  unverified — untested there, falls back to Save-dialog if it doesn't work.
 - **Order delivered status** — new `delivered` column on `sales_orders` (migration id 8,
   defaults `false`/not-delivered for every existing and new order). Reversible toggle,
   markable from two places: an inline icon button per row in the `/orders` list table

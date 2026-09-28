@@ -1,9 +1,11 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {ArrowLeft, CheckCircle2, ClipboardList, Pencil, RotateCcw, Search, Trash2} from 'lucide-react';
+import {toPng} from 'html-to-image';
+import {ArrowLeft, CheckCircle2, ClipboardList, ImageDown, Pencil, RotateCcw, Search, Trash2} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
-import {ListSalesOrders, DeleteSalesOrder, SetSalesOrderDelivered} from '../../wailsjs/go/main/App';
+import {ListSalesOrders, DeleteSalesOrder, SetSalesOrderDelivered, SaveOrderShareImage} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
+import {ShareableOrderImage} from '@/components/ShareableOrderImage';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Switch} from '@/components/ui/switch';
@@ -38,6 +40,7 @@ import {SortableHeader} from '@/components/SortableHeader';
 import {DateRangeFilter} from '@/components/DateRangeFilter';
 import {useTableSort} from '@/hooks/useTableSort';
 import {parseDate, displayDate} from '@/lib/date';
+import {cn} from '@/lib/utils';
 import {fmt, fmtQty} from '@/lib/purchaseBill';
 import {calcOrderLine, OrderLineCalc} from '@/lib/salesOrder';
 
@@ -289,6 +292,10 @@ function OrderDetail({
     onDelete: () => void;
 }) {
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [sharing, setSharing] = useState(false);
+    const [shareNotice, setShareNotice] = useState('');
+    const [shareError, setShareError] = useState('');
+    const shareRef = useRef<HTMLDivElement>(null);
     const rows = order.items.map((it) => ({it, c: lineCalc(it)}));
     const totals = rows.reduce(
         (acc, {it, c}) => {
@@ -299,6 +306,49 @@ function OrderDetail({
         {qty: 0, finalAmount: 0},
     );
 
+    // Renders the order as an image (ShareableOrderImage, off-screen) and copies it
+    // straight to the clipboard so the user can paste it into WhatsApp themselves — the
+    // app never opens WhatsApp or builds a message; a wa.me link can only pre-fill text,
+    // never attach a file, so a manual paste is the only thing worth building. Falls back
+    // to a native Save dialog only if the clipboard write itself fails.
+    //
+    // navigator.clipboard.write() is called as the very first async step, and is handed
+    // a *pending* Promise<Blob> (not an already-awaited one) via ClipboardItem — Safari/
+    // WebKit (the macOS dev build's WKWebView) revokes the click's "user activation" the
+    // moment any `await` happens before the write call, so `await toPng(...)` first (the
+    // original approach) reliably failed there with a permission error even though the
+    // same code works fine under Chromium's more lenient timing. Handing the render's own
+    // promise straight to ClipboardItem keeps the write() call itself synchronous with
+    // the click while the actual PNG bytes are still resolving in the background.
+    async function copyOrderImage() {
+        setSharing(true);
+        setShareNotice('');
+        setShareError('');
+        const node = shareRef.current!;
+        const renderPng = () => toPng(node, {pixelRatio: 2, backgroundColor: '#ffffff'});
+        try {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'image/png': renderPng().then((dataUrl) => fetch(dataUrl)).then((res) => res.blob()),
+                }),
+            ]);
+            setShareNotice('Image copied — paste it into WhatsApp.');
+        } catch (clipboardErr) {
+            console.error('Clipboard write failed, falling back to Save dialog:', clipboardErr);
+            try {
+                const dataUrl = await renderPng();
+                const base64 = dataUrl.split(',')[1];
+                const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+                const path = await SaveOrderShareImage(Array.from(bytes), `Order-${order.id}.png`);
+                setShareNotice(path ? `Couldn't copy to clipboard — saved to ${path} instead.` : '');
+            } catch (e: any) {
+                setShareError(String(e));
+            }
+        } finally {
+            setSharing(false);
+        }
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between gap-3">
@@ -307,6 +357,10 @@ function OrderDetail({
                     Back to all orders
                 </Button>
                 <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={copyOrderImage} disabled={sharing}>
+                        <ImageDown className="size-4"/>
+                        Copy Order Image
+                    </Button>
                     <Button variant="outline" size="sm" onClick={onEdit}>
                         <Pencil className="size-4"/>
                         Edit order
@@ -321,6 +375,14 @@ function OrderDetail({
                         Delete
                     </Button>
                 </div>
+            </div>
+            {(shareNotice || shareError) && (
+                <p className={cn('text-sm', shareError ? 'text-destructive' : 'text-muted-foreground')}>
+                    {shareError || shareNotice}
+                </p>
+            )}
+            <div className="pointer-events-none fixed left-[-9999px] top-0">
+                <ShareableOrderImage ref={shareRef} order={order}/>
             </div>
 
             <Card>

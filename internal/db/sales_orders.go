@@ -8,12 +8,14 @@ import (
 // SalesOrder is a customer order header plus its line items — first piece of the Order
 // Book / Sales feature. See docs/DATA_MODEL.md (sales_orders + sales_order_items).
 type SalesOrder struct {
-	ID           int64            `json:"id"`
-	CustomerID   int64            `json:"customerId"`   // → customers(id)
-	CustomerName string           `json:"customerName"` // populated on read (JOIN); ignored on write
-	Date         string           `json:"date"`
-	Delivered    bool             `json:"delivered"` // set only via SetSalesOrderDelivered, never UpdateSalesOrder
-	Items        []SalesOrderItem `json:"items"`
+	ID               int64            `json:"id"`
+	CustomerID       int64            `json:"customerId"`       // → customers(id)
+	CustomerName     string           `json:"customerName"`     // populated on read (JOIN); ignored on write
+	CustomerNickName string           `json:"customerNickName"` // populated on read (JOIN); ignored on write
+	CustomerCity     string           `json:"customerCity"`     // populated on read (JOIN); ignored on write
+	Date             string           `json:"date"`
+	Delivered        bool             `json:"delivered"` // set only via SetSalesOrderDelivered, never UpdateSalesOrder
+	Items            []SalesOrderItem `json:"items"`
 }
 
 // SalesOrderItem is a single line on a sales order. The item is referenced by ItemID
@@ -134,7 +136,7 @@ func SetSalesOrderDelivered(conn *sql.DB, id int64, delivered bool) (SalesOrder,
 // ListSalesOrders returns all saved orders (header + line items), newest first.
 func ListSalesOrders(conn *sql.DB) ([]SalesOrder, error) {
 	rows, err := conn.Query(
-		`SELECT so.id, so.customer_id, c.name, so.date, so.delivered
+		`SELECT so.id, so.customer_id, c.name, c.nick_name, c.city, so.date, so.delivered
 			FROM sales_orders so
 			JOIN customers c ON c.id = so.customer_id
 			ORDER BY so.id DESC`,
@@ -148,7 +150,9 @@ func ListSalesOrders(conn *sql.DB) ([]SalesOrder, error) {
 	byID := map[int64]int{} // order id -> index in orders, for attaching line items
 	for rows.Next() {
 		var o SalesOrder
-		if err := rows.Scan(&o.ID, &o.CustomerID, &o.CustomerName, &o.Date, &o.Delivered); err != nil {
+		if err := rows.Scan(
+			&o.ID, &o.CustomerID, &o.CustomerName, &o.CustomerNickName, &o.CustomerCity, &o.Date, &o.Delivered,
+		); err != nil {
 			return nil, fmt.Errorf("scan order: %w", err)
 		}
 		o.Items = []SalesOrderItem{}
@@ -192,12 +196,14 @@ func ListSalesOrders(conn *sql.DB) ([]SalesOrder, error) {
 func GetSalesOrder(conn *sql.DB, id int64) (SalesOrder, error) {
 	var o SalesOrder
 	if err := conn.QueryRow(
-		`SELECT so.id, so.customer_id, c.name, so.date, so.delivered
+		`SELECT so.id, so.customer_id, c.name, c.nick_name, c.city, so.date, so.delivered
 			FROM sales_orders so
 			JOIN customers c ON c.id = so.customer_id
 			WHERE so.id = ?`,
 		id,
-	).Scan(&o.ID, &o.CustomerID, &o.CustomerName, &o.Date, &o.Delivered); err != nil {
+	).Scan(
+		&o.ID, &o.CustomerID, &o.CustomerName, &o.CustomerNickName, &o.CustomerCity, &o.Date, &o.Delivered,
+	); err != nil {
 		return SalesOrder{}, fmt.Errorf("get order %d: %w", id, err)
 	}
 

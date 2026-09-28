@@ -662,3 +662,39 @@ have to re-litigate.
   unmount/remount that re-runs the customers/items/companies cache-fetch effect
   unnecessarily on every add↔edit transition, for no behavioral benefit over an explicit
   reset.
+
+### 2026-09-28 — Order sharing: copy-to-clipboard image only, no WhatsApp Business API / wa.me
+- **Decision:** "Copy Order Image" (order detail view) renders the order to a PNG and
+  copies it to the clipboard for the user to paste into WhatsApp themselves. The app
+  never opens WhatsApp, builds a `wa.me` link, or sends anything on the user's behalf.
+- **Why:** researched the actual options first. WhatsApp's Business Cloud API can send
+  files programmatically, but needs Meta business verification, a live server/webhook,
+  and — from Oct 2026 — per-message cost even for ordinary service replies; all wrong
+  for a single-user, local-only, no-server app (see the 2026-06-04 architecture
+  decisions above). A `wa.me` deep link, the only other option, can pre-fill *text* and
+  open a chat but categorically cannot attach a file — there is no way, official or
+  otherwise, to auto-attach an image to a WhatsApp chat. Once file-attachment has to be
+  manual either way, opening WhatsApp automatically added complexity (phone-number
+  formatting, `BrowserOpenURL`, a text-message builder) for no real benefit over the
+  client's own preference: one button, image on the clipboard, they paste it themselves.
+- **Alternatives:** also open a `wa.me` chat with a pre-filled itemized text backup —
+  designed and ready to add later, but dropped for v1 per the client's explicit ask for
+  "just a button... copies the image onto clipboard." WhatsApp Business API — rejected
+  outright, wrong fit as above. Unofficial WhatsApp Web automation (driving
+  web.whatsapp.com headlessly) — rejected without building: violates WhatsApp's ToS and
+  risks the number being banned, inappropriate for a legitimate business tool.
+- **Pack-type column omitted**: the client's reference image had a "Pack" column
+  (PB/Jar/Cont/Box) separate from the numeric pack size — that packaging-type category
+  isn't tracked anywhere on the Item master today, so the shared image only shows
+  Qty/Item/Unit(pack size)/Rate/Amount. Adding a real Pack-type field is a bigger,
+  separate change (migration + Items master form) — not done here.
+- **Header format**: `{customer nickname or name} - {city}`, falling back to the full
+  Name when NickName is blank (it's an optional field on Customer) — matches the
+  client's reference image's "Amber Ji - Meerut" style. Required adding
+  `CustomerNickName`/`CustomerCity` to `db.SalesOrder`, JOIN-populated exactly like the
+  existing `CustomerName` (see DATA_MODEL).
+- **Clipboard-first, Save-dialog fallback**: a single `image/png` `ClipboardItem` write
+  (not multiple MIME types at once, where some WebView2 versions are known flaky) is
+  well-supported behind a user gesture: tried first for the smoothest UX (no dialog at
+  all), and only falls back to the app's existing native-Save-dialog pattern
+  (`SaveOrderShareImage`, mirrors `ExportPurchaseSummary`) if the clipboard write throws.

@@ -173,6 +173,32 @@ func (a *App) SetSalesOrderDelivered(id int64, delivered bool) (db.SalesOrder, e
 	return db.SetSalesOrderDelivered(a.db, id, delivered)
 }
 
+// --- Order sharing ---
+
+// SaveOrderShareImage prompts for a save location and writes the given PNG bytes
+// (rendered client-side via html-to-image) to disk. Used as the fallback when copying
+// the image straight to the clipboard fails. Returns the chosen path, or "" if the user
+// cancelled the dialog.
+func (a *App) SaveOrderShareImage(png []byte, defaultFilename string) (string, error) {
+	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:           "Save Order Image",
+		DefaultFilename: defaultFilename,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "PNG Image (*.png)", Pattern: "*.png"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := os.WriteFile(path, png, 0644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // GetRateHistory returns every past rate a customer has been charged for an item,
 // newest-insert-first (the caller sorts by parsed date — see db.RateHistory).
 func (a *App) GetRateHistory(customerID, itemID int64) ([]db.RateHistoryEntry, error) {

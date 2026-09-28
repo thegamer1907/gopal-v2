@@ -198,6 +198,20 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > firing this call directly rather than going through the edit form's Save/dirty-tracking
 > flow.
 >
+> **`CustomerNickName`/`CustomerCity`** are JOIN-populated onto `SalesOrder` the same way
+> as `CustomerName` (read-only, ignored on write) — added for the "Copy Order Image" share
+> feature's header line (`{nickname||name} - {city}`), but available to any future reader
+> that wants them without a second customer lookup.
+>
+> **"Copy Order Image"** (order detail view) renders the order as a PNG via
+> `frontend/src/components/ShareableOrderImage.tsx` (`html-to-image`, client-side only)
+> and copies it straight to the clipboard for the user to paste into WhatsApp — the app
+> never opens WhatsApp or constructs a message itself (a `wa.me` link can only pre-fill
+> text, never attach a file, so there's nothing useful to automate beyond the copy). If
+> the clipboard write fails, `App.SaveOrderShareImage(png []byte, defaultFilename string)`
+> (`app.go`) is the fallback — a plain `SaveFileDialog` + `os.WriteFile`, same shape as
+> `ExportPurchaseSummary`. No new table, no migration.
+>
 > **Rate history is derived, not a separate table**: `db.RateHistoryEntry` +
 > `RateHistory(customerID, itemID)` (same file) answers "what did this customer last pay
 > for this item" straight from `sales_order_items` JOINed to `sales_orders` — every past
