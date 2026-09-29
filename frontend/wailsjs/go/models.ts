@@ -230,6 +230,42 @@ export namespace db {
 
 export namespace reports {
 	
+	export class OrderExportHeader {
+	    orderId: number;
+	    customerLabel: string;
+	    date: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OrderExportHeader(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.orderId = source["orderId"];
+	        this.customerLabel = source["customerLabel"];
+	        this.date = source["date"];
+	    }
+	}
+	export class OrderExportRow {
+	    itemName: string;
+	    packSize: number;
+	    rate: number;
+	    qty: number;
+	    finalAmount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new OrderExportRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.itemName = source["itemName"];
+	        this.packSize = source["packSize"];
+	        this.rate = source["rate"];
+	        this.qty = source["qty"];
+	        this.finalAmount = source["finalAmount"];
+	    }
+	}
 	export class PurchaseSummaryRow {
 	    date: string;
 	    companyName: string;

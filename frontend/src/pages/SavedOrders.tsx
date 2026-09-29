@@ -1,10 +1,17 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {toPng} from 'html-to-image';
-import {ArrowLeft, CheckCircle2, ClipboardList, ImageDown, Pencil, RotateCcw, Search, Trash2} from 'lucide-react';
+import {ArrowLeft, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, ImageDown, Pencil, RotateCcw, Search, Trash2} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
-import {ListSalesOrders, DeleteSalesOrder, SetSalesOrderDelivered, SaveOrderShareImage} from '../../wailsjs/go/main/App';
-import {db} from '../../wailsjs/go/models';
+import {
+    ListSalesOrders,
+    DeleteSalesOrder,
+    SetSalesOrderDelivered,
+    SaveOrderShareImage,
+    ExportOrderExcel,
+    ExportOrderPDF,
+} from '../../wailsjs/go/main/App';
+import {db, reports} from '../../wailsjs/go/models';
 import {ShareableOrderImage} from '@/components/ShareableOrderImage';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -42,7 +49,7 @@ import {useTableSort} from '@/hooks/useTableSort';
 import {parseDate, displayDate} from '@/lib/date';
 import {cn} from '@/lib/utils';
 import {fmt, fmtQty} from '@/lib/purchaseBill';
-import {calcOrderLine, OrderLineCalc} from '@/lib/salesOrder';
+import {calcOrderLine, customerShareLabel, OrderLineCalc} from '@/lib/salesOrder';
 
 // View/Edit Orders — a list of every saved order that opens a read-only detail, from
 // which the order can be edited (full overwrite) or deleted. Mirrors View/Edit Bills
@@ -292,9 +299,11 @@ function OrderDetail({
     onDelete: () => void;
 }) {
     const [confirmDelete, setConfirmDelete] = useState(false);
-    const [sharing, setSharing] = useState(false);
-    const [shareNotice, setShareNotice] = useState('');
-    const [shareError, setShareError] = useState('');
+    // Only one export/share action can run at a time; all three share one feedback line
+    // below the button row.
+    const [busy, setBusy] = useState<'image' | 'excel' | 'pdf' | null>(null);
+    const [notice, setNotice] = useState('');
+    const [error, setError] = useState('');
     const shareRef = useRef<HTMLDivElement>(null);
     const rows = order.items.map((it) => ({it, c: lineCalc(it)}));
     const totals = rows.reduce(
@@ -321,9 +330,9 @@ function OrderDetail({
     // promise straight to ClipboardItem keeps the write() call itself synchronous with
     // the click while the actual PNG bytes are still resolving in the background.
     async function copyOrderImage() {
-        setSharing(true);
-        setShareNotice('');
-        setShareError('');
+        setBusy('image');
+        setNotice('');
+        setError('');
         const node = shareRef.current!;
         const renderPng = () => toPng(node, {pixelRatio: 2, backgroundColor: '#ffffff'});
         try {
@@ -332,7 +341,7 @@ function OrderDetail({
                     'image/png': renderPng().then((dataUrl) => fetch(dataUrl)).then((res) => res.blob()),
                 }),
             ]);
-            setShareNotice('Image copied — paste it into WhatsApp.');
+            setNotice('Image copied — paste it into WhatsApp.');
         } catch (clipboardErr) {
             console.error('Clipboard write failed, falling back to Save dialog:', clipboardErr);
             try {
@@ -340,12 +349,60 @@ function OrderDetail({
                 const base64 = dataUrl.split(',')[1];
                 const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
                 const path = await SaveOrderShareImage(Array.from(bytes), `Order-${order.id}.png`);
-                setShareNotice(path ? `Couldn't copy to clipboard — saved to ${path} instead.` : '');
+                setNotice(path ? `Couldn't copy to clipboard — saved to ${path} instead.` : '');
             } catch (e: any) {
-                setShareError(String(e));
+                setError(String(e));
             }
         } finally {
-            setSharing(false);
+            setBusy(null);
+        }
+    }
+
+    function toExportHeader(): reports.OrderExportHeader {
+        return reports.OrderExportHeader.createFrom({
+            orderId: order.id,
+            customerLabel: customerShareLabel(order),
+            date: displayDate(order.date),
+        });
+    }
+
+    function toExportRows(): reports.OrderExportRow[] {
+        return order.items.map((it) =>
+            reports.OrderExportRow.createFrom({
+                itemName: it.itemName,
+                packSize: it.itemPackSize,
+                rate: it.rate,
+                qty: it.qty,
+                finalAmount: lineCalc(it).finalAmount,
+            }),
+        );
+    }
+
+    async function downloadExcel() {
+        setBusy('excel');
+        setNotice('');
+        setError('');
+        try {
+            const path = await ExportOrderExcel(toExportHeader(), toExportRows(), `Order-${order.id}.xlsx`);
+            if (path) setNotice(`Saved to ${path}`);
+        } catch (e: any) {
+            setError(String(e));
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    async function downloadPdf() {
+        setBusy('pdf');
+        setNotice('');
+        setError('');
+        try {
+            const path = await ExportOrderPDF(toExportHeader(), toExportRows(), `Order-${order.id}.pdf`);
+            if (path) setNotice(`Saved to ${path}`);
+        } catch (e: any) {
+            setError(String(e));
+        } finally {
+            setBusy(null);
         }
     }
 
@@ -357,11 +414,19 @@ function OrderDetail({
                     Back to all orders
                 </Button>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={copyOrderImage} disabled={sharing}>
+                    <Button variant="outline" size="sm" onClick={copyOrderImage} disabled={busy !== null}>
                         <ImageDown className="size-4"/>
                         Copy Order Image
                     </Button>
-                    <Button variant="outline" size="sm" onClick={onEdit}>
+                    <Button variant="outline" size="sm" onClick={downloadExcel} disabled={busy !== null}>
+                        <FileSpreadsheet className="size-4"/>
+                        {busy === 'excel' ? 'Preparing…' : 'Download Excel'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={downloadPdf} disabled={busy !== null}>
+                        <FileText className="size-4"/>
+                        {busy === 'pdf' ? 'Preparing…' : 'Download PDF'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={onEdit} disabled={busy !== null}>
                         <Pencil className="size-4"/>
                         Edit order
                     </Button>
@@ -370,15 +435,16 @@ function OrderDetail({
                         size="sm"
                         className="text-destructive hover:text-destructive"
                         onClick={() => setConfirmDelete(true)}
+                        disabled={busy !== null}
                     >
                         <Trash2 className="size-4"/>
                         Delete
                     </Button>
                 </div>
             </div>
-            {(shareNotice || shareError) && (
-                <p className={cn('text-sm', shareError ? 'text-destructive' : 'text-muted-foreground')}>
-                    {shareError || shareNotice}
+            {(notice || error) && (
+                <p className={cn('text-sm', error ? 'text-destructive' : 'text-muted-foreground')}>
+                    {error || notice}
                 </p>
             )}
             <div className="pointer-events-none fixed left-[-9999px] top-0">

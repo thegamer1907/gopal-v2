@@ -6,6 +6,45 @@ reads the top entry first.
 
 ---
 
+## 2026-09-28 — Download Excel / Download PDF for orders
+**Did:**
+- Two new buttons beside "Copy Order Image" (order detail view): Download Excel and
+  Download PDF, same customer-facing content/style (client wanted visual consistency
+  across all three: Qty/Item/Unit/Rate/Amount, yellow header/footer, black-bordered
+  grid), as real files instead of a clipboard image.
+- Backend: new `internal/reports/order_export.go` — `WriteOrderExcel` (`excelize`,
+  matches the image's style) and `WriteOrderPDF` (new dependency
+  `github.com/signintech/gopdf` — chosen over the now-Codeberg-hosted `go-pdf/fpdf`;
+  hand-drawn cells, since gopdf's convenience table API can't do the merged header row
+  this layout needs). `App.ExportOrderExcel`/`ExportOrderPDF` mirror
+  `ExportPurchaseSummary`'s native-Save-dialog pattern.
+- Bundled Nunito Regular+Bold TTFs (SIL OFL) into `internal/reports/fonts/`, embedded via
+  `go:embed` — gopdf has no built-in fonts. A Plan-agent pass actually built and rendered
+  a working proof-of-concept against the real library before writing the final code,
+  which caught a real bug: gopdf shares its color operator between cell-fill and
+  text-glyph color, so without an explicit `SetTextColor(0,0,0)` called once up front,
+  header text renders invisible (yellow-on-yellow). Fixed and verified visually.
+- Verified the embedded font renders accented Latin correctly using the seeded test item
+  "Éclair 1/- PB" (rasterized the generated PDF and visually confirmed the "É" glyph).
+  Also added small cell padding (text was touching borders) after the first render.
+- Extracted `customerShareLabel` (the "{nickname||name} - {city}" logic) from
+  `ShareableOrderImage.tsx` into `lib/salesOrder.ts` so all three exports (image, Excel,
+  PDF) compute it identically. Generalized `OrderDetail`'s state
+  (`sharing`/`shareNotice`/`shareError` → `busy: 'image'|'excel'|'pdf'|null` +
+  `notice`/`error`) so only one export runs at a time.
+- **Known cosmetic gap**: Excel's `#,##0.00` format only does Western 3-digit grouping
+  (no Indian-grouping option in Excel's format codes), so its totals show "124,555.00"
+  while the PDF/image show "1,24,555.00" — matches the existing Purchase Summary Excel
+  export's same limitation, not new, not fixed.
+- `go build/vet/test` ✅, `npm run build` ✅. Docs updated (DATA_MODEL, FEATURES,
+  DECISIONS).
+
+**Next steps:** client verification in `wails dev` (Excel + PDF visual check against the
+existing WhatsApp image, cancel-dialog behavior, an order with many line items to check
+PDF pagination) before marking Shipped in FEATURES.md.
+
+---
+
 ## 2026-09-28 — Copy Order Image: more compact sizing
 **Did:** client asked for smaller image / more line items fitting on screen. Shrank
 `ShareableOrderImage.tsx`: font 14px → 11px, cell padding `6px 10px` → `2px 6px` (plus a

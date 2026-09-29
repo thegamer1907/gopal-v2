@@ -16,3 +16,14 @@ export function calcOrderLine(input: OrderLineCalcInput): OrderLineCalc {
     const {rate, qty, packSize} = input;
     return {finalAmount: rate * qty * packSize};
 }
+
+// customerShareLabel builds the "{nickname||name} - {city}" line used on every
+// customer-facing order export (Copy Order Image, Download Excel, Download PDF) — kept
+// in one place so all three stay identical.
+export function customerShareLabel(order: {
+    customerNickName: string;
+    customerName: string;
+    customerCity: string;
+}): string {
+    return [order.customerNickName || order.customerName, order.customerCity].filter(Boolean).join(' - ');
+}

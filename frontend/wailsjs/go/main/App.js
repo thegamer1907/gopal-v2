@@ -54,6 +54,14 @@ export function DownloadAndInstallUpdate(arg1, arg2) {
   return window['go']['main']['App']['DownloadAndInstallUpdate'](arg1, arg2);
 }
 
+export function ExportOrderExcel(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExportOrderExcel'](arg1, arg2, arg3);
+}
+
+export function ExportOrderPDF(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExportOrderPDF'](arg1, arg2, arg3);
+}
+
 export function ExportPurchaseSummary(arg1, arg2) {
   return window['go']['main']['App']['ExportPurchaseSummary'](arg1, arg2);
 }

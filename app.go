@@ -342,6 +342,54 @@ func (a *App) ExportPurchaseSummary(rows []reports.PurchaseSummaryRow, defaultFi
 	return path, nil
 }
 
+// --- Order export (Excel/PDF) ---
+
+// ExportOrderExcel prompts for a save location and writes the given order (fully
+// computed by the caller — see toExportRows/toExportHeader in SavedOrders.tsx) to a
+// simplified, customer-facing .xlsx workbook matching the "Copy Order Image" visual
+// style. Returns the chosen path, or "" if the user cancelled the dialog.
+func (a *App) ExportOrderExcel(header reports.OrderExportHeader, rows []reports.OrderExportRow, defaultFilename string) (string, error) {
+	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:           "Export Order",
+		DefaultFilename: defaultFilename,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "Excel Workbook (*.xlsx)", Pattern: "*.xlsx"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := reports.WriteOrderExcel(path, header, rows); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// ExportOrderPDF is the PDF counterpart of ExportOrderExcel — same header/rows, same
+// visual style, rendered with the app's bundled Nunito font (see internal/reports).
+func (a *App) ExportOrderPDF(header reports.OrderExportHeader, rows []reports.OrderExportRow, defaultFilename string) (string, error) {
+	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:           "Export Order",
+		DefaultFilename: defaultFilename,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "PDF Document (*.pdf)", Pattern: "*.pdf"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := reports.WriteOrderPDF(path, header, rows); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // --- Self-update (Settings → Updates) ---
 
 // GetAppVersion returns the running build's version — "dev" outside a tagged release

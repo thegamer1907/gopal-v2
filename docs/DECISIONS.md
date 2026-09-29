@@ -698,3 +698,41 @@ have to re-litigate.
   well-supported behind a user gesture: tried first for the smoothest UX (no dialog at
   all), and only falls back to the app's existing native-Save-dialog pattern
   (`SaveOrderShareImage`, mirrors `ExportPurchaseSummary`) if the clipboard write throws.
+
+### 2026-09-28 — Order Download Excel/PDF: gopdf over go-pdf/fpdf, bundled font, real bug found
+- **Decision:** Added `github.com/signintech/gopdf` (new dependency) for `WriteOrderPDF`
+  and a `WriteOrderExcel` in `internal/reports/order_export.go`, both styled to match
+  `ShareableOrderImage.tsx`'s customer-facing look (client's explicit choice — see the
+  Copy Order Image entry above) rather than `purchase_summary.go`'s plainer convention.
+- **Why gopdf, not go-pdf/fpdf**: `go-pdf/fpdf` (the natural "successor" to the classic
+  `jung-kurt/gofpdf`) is archived and now lives on Codeberg, not GitHub — extra friction
+  for a dependency this app will carry long-term. `signintech/gopdf` is pure Go, MIT,
+  actively maintained on GitHub, and its `CellWithOption`/`RectFromUpperLeftWithStyle`
+  primitives support exactly what this layout needs (per-cell fill + border + aligned
+  text). Its higher-level `NewTableLayout`/`AddColumn` convenience API was evaluated and
+  rejected — it can't represent a merged/spanning header cell and skips per-cell borders
+  on header rows, so the actual writer hand-draws every cell instead.
+- **Real bug, found before shipping**: gopdf shares its PDF color operator between
+  `SetFillColor` (cell backgrounds) and glyph fill color — without an explicit
+  `pdf.SetTextColor(0, 0, 0)` called once up front, text silently renders in whatever
+  color a background fill last used (invisible yellow-on-yellow after the first header
+  cell). Caught by generating and visually inspecting real output before considering the
+  feature done, not by reading the library's docs alone. `WriteOrderPDF` calls
+  `SetTextColor` once, before any drawing.
+- **Bundled font**: gopdf has no built-in fonts (unlike classic `gofpdf`'s Helvetica) —
+  every glyph needs an embedded TTF. Bundled static (non-variable — gopdf can't read a
+  variable font's weight axis) Nunito Regular + Bold TTFs from Google Fonts (SIL OFL,
+  freely embeddable) into `internal/reports/fonts/`, embedded via `go:embed` into
+  `[]byte`. Both weights are registered under one family name (`AddTTFFontData` for
+  Regular, `AddTTFFontDataWithOption(..., TtfOption{Style: Bold})` for Bold) — gopdf has
+  no synthetic-bold flag, true bold needs a real bold font file. Verified the embedded
+  font actually covers accented Latin characters (tested against "Éclair 1/- PB", a real
+  item name from the seeded test data) before considering this done, not assumed.
+- **Known limitation, accepted rather than solved**: Excel's `#,##0.00` custom number
+  format only supports Western 3-digit grouping — there's no standard Excel format code
+  for Indian digit grouping (1,24,555 vs 124,555). The PDF and the WhatsApp image both
+  show correct Indian grouping (computed as plain text in Go/JS, not through a
+  spreadsheet engine), so only the Excel export's totals look different. This matches
+  the pre-existing Purchase Summary Excel export's same limitation — not a regression,
+  not fixed here, would need a hand-rolled digit-grouping hack in the number format
+  string to change.

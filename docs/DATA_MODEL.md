@@ -212,6 +212,22 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > (`app.go`) is the fallback — a plain `SaveFileDialog` + `os.WriteFile`, same shape as
 > `ExportPurchaseSummary`. No new table, no migration.
 >
+> **"Download Excel"/"Download PDF"** (same order detail view, beside "Copy Order
+> Image") export the same customer-facing content (no GST%/HSN) as real files instead of
+> a clipboard image. `internal/reports/order_export.go` — `OrderExportHeader` +
+> `OrderExportRow` (built by the frontend: `SavedOrders.tsx`'s `toExportHeader`/
+> `toExportRows`, reusing `customerShareLabel` from `lib/salesOrder.ts` and the same
+> `lineCalc`/`calcOrderLine` already used on screen) — `WriteOrderExcel` (`excelize`,
+> styled to match `ShareableOrderImage.tsx`'s yellow/bordered look, unlike the plainer
+> `WritePurchaseSummary` convention) and `WriteOrderPDF` (`github.com/signintech/gopdf`,
+> hand-drawn cells — the library's convenience `NewTableLayout` API can't do the merged
+> header row or per-cell borders this layout needs). PDF text uses a bundled Nunito TTF
+> (`internal/reports/fonts/`, SIL OFL license, embedded via `go:embed` — gopdf has no
+> built-in fonts). `App.ExportOrderExcel`/`ExportOrderPDF` (`app.go`) mirror
+> `ExportPurchaseSummary`'s SaveFileDialog + write pattern exactly. No new table, no
+> migration. See DECISIONS.md for the gopdf `SetTextColor` gotcha and the Excel
+> Indian-grouping limitation.
+>
 > **Rate history is derived, not a separate table**: `db.RateHistoryEntry` +
 > `RateHistory(customerID, itemID)` (same file) answers "what did this customer last pay
 > for this item" straight from `sales_order_items` JOINed to `sales_orders` — every past

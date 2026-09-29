@@ -22,6 +22,17 @@ date-range filter, Indian (en-IN) number formatting, the reworded unsaved-change
 **top-nav redesign** (sidebar → flat top bar). v0.2.1 (2026-06-10): Company master,
 items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, batch-1 polish._
 
+- **Download Excel / Download PDF for orders** — two more buttons beside "Copy Order
+  Image" (order detail view) so an order can be saved as a file, not just copied to the
+  clipboard. Same customer-facing content/style as the WhatsApp image (Qty/Item/Unit/
+  Rate/Amount, yellow header/footer, black-bordered grid) rendered as real documents:
+  `internal/reports/order_export.go`'s `WriteOrderExcel` (`excelize`) and `WriteOrderPDF`
+  (new dependency `github.com/signintech/gopdf`, hand-drawn cells, bundled Nunito TTF
+  font — the library has no built-in fonts). `App.ExportOrderExcel`/`ExportOrderPDF`
+  mirror `ExportPurchaseSummary`'s native-Save-dialog pattern. Known cosmetic gap: the
+  Excel export's totals use Western 3-digit grouping (Excel's `#,##0.00` format has no
+  Indian-grouping option — same limitation the existing Purchase Summary export already
+  has), while the PDF and image both show true Indian grouping (computed as plain text).
 - **Copy Order Image (WhatsApp sharing)** — new "Copy Order Image" button on the order
   detail view (`/orders`, `OrderDetail`). Renders the order as a PNG in a purpose-built,
   customer-facing layout (`ShareableOrderImage.tsx`: yellow header/footer bars,

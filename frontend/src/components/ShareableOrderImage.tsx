@@ -2,7 +2,7 @@ import {forwardRef} from 'react';
 import {db} from '../../wailsjs/go/models';
 import {displayDate} from '@/lib/date';
 import {fmt, fmtQty} from '@/lib/purchaseBill';
-import {calcOrderLine} from '@/lib/salesOrder';
+import {calcOrderLine, customerShareLabel} from '@/lib/salesOrder';
 
 // Purpose-built layout for the "Copy Order Image" share feature (SavedOrders.tsx) —
 // rasterized via html-to-image and copied to the clipboard for pasting into WhatsApp.
@@ -17,9 +17,7 @@ const cell: React.CSSProperties = {border: BORDER, padding: '2px 6px', lineHeigh
 
 export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOrder}>(
     function ShareableOrderImage({order}, ref) {
-        const customerLabel = [order.customerNickName || order.customerName, order.customerCity]
-            .filter(Boolean)
-            .join(' - ');
+        const customerLabel = customerShareLabel(order);
         const rows = order.items.map((it) => ({
             it,
             finalAmount: calcOrderLine({rate: it.rate, qty: it.qty, packSize: it.itemPackSize}).finalAmount,
