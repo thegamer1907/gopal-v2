@@ -126,6 +126,15 @@ var migrations = []migration{
 		id:  8,
 		sql: `ALTER TABLE sales_orders ADD COLUMN delivered INTEGER NOT NULL DEFAULT 0;`,
 	},
+	// Custom pack size for a sales order line: 0 means "no override, use the item's
+	// master pack size" (same zero-sentinel convention as discount etc. elsewhere in
+	// this schema) — set when a specific carton on that line was physically packed
+	// differently than standard. Export-only "Less"/"Add" line, not a change to the
+	// line's own on-screen amount math — see DECISIONS.md.
+	{
+		id:  9,
+		sql: `ALTER TABLE sales_order_items ADD COLUMN custom_pack_size REAL NOT NULL DEFAULT 0;`,
+	},
 }
 
 // migrate applies any migrations not yet recorded in schema_migrations.

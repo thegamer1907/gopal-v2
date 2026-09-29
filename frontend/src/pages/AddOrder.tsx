@@ -25,6 +25,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {Badge} from '@/components/ui/badge';
 import {ItemCombobox} from '@/components/ItemCombobox';
 import {NewItemDialog} from '@/components/NewItemDialog';
 import {CustomerCombobox} from '@/components/CustomerCombobox';
@@ -52,12 +53,18 @@ interface Line {
     item: db.Item | null;
     rate: string;
     qty: string;
+    // Pack size for this specific line — defaults to the item's master pack size on
+    // selection, but is editable (a "custom pack size", for a carton physically packed
+    // differently than standard). This value drives the line's own amount directly, no
+    // separate deduction bookkeeping on screen — see lib/salesOrder.ts's buildOrderExportGroups
+    // for the export-only "Less" reformatting.
+    packSize: string;
     // Cached at item-selection time so the info button doesn't need to re-fetch.
     rateHistory: db.RateHistoryEntry[];
 }
 
 function blankLine(id: number): Line {
-    return {id, item: null, rate: '', qty: '', rateHistory: []};
+    return {id, item: null, rate: '', qty: '', packSize: '', rateHistory: []};
 }
 
 // Mandatory line fields are the item plus Rate and Qty. A line is "touched" once any
@@ -70,11 +77,16 @@ function lineComplete(l: Line): boolean {
     return l.item !== null && [l.rate, l.qty].every((v) => v.trim() !== '');
 }
 
+// True when the line's pack size has been edited away from its item's master value.
+function isCustomPackSize(l: Line): boolean {
+    return l.item !== null && l.packSize.trim() !== '' && num(l.packSize) !== l.item.packSize;
+}
+
 function calc(line: Line) {
     return calcOrderLine({
         rate: num(line.rate),
         qty: num(line.qty),
-        packSize: line.item?.packSize ?? 0,
+        packSize: line.packSize.trim() !== '' ? num(line.packSize) : (line.item?.packSize ?? 0),
     });
 }
 
@@ -185,6 +197,7 @@ export function AddOrder() {
                     item: itemById.get(oi.itemId) ?? null,
                     rate: String(oi.rate),
                     qty: String(oi.qty),
+                    packSize: String(oi.customPackSize || oi.itemPackSize),
                     rateHistory: [],
                 }));
                 setLines(prefilled.length ? prefilled : [blankLine(1)]);
@@ -244,7 +257,7 @@ export function AddOrder() {
     // customer is selected right now — doesn't retroactively refresh if the customer is
     // changed afterward.
     async function selectItem(lineId: number, item: db.Item) {
-        updateLine(lineId, {item, rateHistory: []});
+        updateLine(lineId, {item, packSize: String(item.packSize), rateHistory: []});
         if (!customer) return;
         try {
             const history = sortByDateDesc(await GetRateHistory(customer.id, item.id));
@@ -344,6 +357,7 @@ export function AddOrder() {
                 itemId: l.item!.id,
                 rate: num(l.rate),
                 qty: num(l.qty),
+                customPackSize: isCustomPackSize(l) ? num(l.packSize) : 0,
             })),
         };
 
@@ -478,7 +492,7 @@ export function AddOrder() {
                             <thead>
                                 <tr className="text-center align-bottom text-muted-foreground [&>th]:px-1.5 [&>th]:pb-2 [&>th]:font-medium [&>th]:leading-tight">
                                     <th className="text-left">Item</th>
-                                    <th className="w-12">Pack Size</th>
+                                    <th className="w-20">Pack Size</th>
                                     <th className="w-10">GST %</th>
                                     <th className="w-14">HSN</th>
                                     <th className="w-16">Stock</th>
@@ -506,8 +520,20 @@ export function AddOrder() {
                                                     className="w-72"
                                                 />
                                             </td>
-                                            <td className="text-right tabular-nums text-muted-foreground">
-                                                {line.item ? line.item.packSize : '—'}
+                                            <td>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {isCustomPackSize(line) && (
+                                                        <Badge variant="secondary" className="px-1 text-[10px]">
+                                                            Custom
+                                                        </Badge>
+                                                    )}
+                                                    <NumberInput
+                                                        className="w-14 text-right"
+                                                        value={line.packSize}
+                                                        onChange={(v) => updateLine(line.id, {packSize: v})}
+                                                        disabled={!line.item}
+                                                    />
+                                                </div>
                                             </td>
                                             <td className="text-right tabular-nums text-muted-foreground">
                                                 {line.item ? line.item.gstPercent : '—'}

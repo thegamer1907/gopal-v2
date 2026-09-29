@@ -165,6 +165,7 @@ export namespace db {
 	    hsn: number;
 	    rate: number;
 	    qty: number;
+	    customPackSize: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new SalesOrderItem(source);
@@ -179,6 +180,7 @@ export namespace db {
 	        this.hsn = source["hsn"];
 	        this.rate = source["rate"];
 	        this.qty = source["qty"];
+	        this.customPackSize = source["customPackSize"];
 	    }
 	}
 	export class SalesOrder {
@@ -230,6 +232,24 @@ export namespace db {
 
 export namespace reports {
 	
+	export class OrderExportDeduction {
+	    itemName: string;
+	    units: number;
+	    rate: number;
+	    value: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new OrderExportDeduction(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.itemName = source["itemName"];
+	        this.units = source["units"];
+	        this.rate = source["rate"];
+	        this.value = source["value"];
+	    }
+	}
 	export class OrderExportHeader {
 	    orderId: number;
 	    customerLabel: string;

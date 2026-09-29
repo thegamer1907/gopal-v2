@@ -23,13 +23,14 @@ type SalesOrder struct {
 // JOIN (not stored) — pulled regardless of which of them the UI currently shows. Final
 // Amount (rate × qty × pack size) is derived on the frontend and not stored.
 type SalesOrderItem struct {
-	ItemID       int64   `json:"itemId"`       // written; → items(id)
-	ItemName     string  `json:"itemName"`     // read (JOIN)
-	ItemPackSize float64 `json:"itemPackSize"` // read (JOIN)
-	GSTPercent   float64 `json:"gstPercent"`   // read (JOIN)
-	HSN          int64   `json:"hsn"`          // read (JOIN)
-	Rate         float64 `json:"rate"`
-	Qty          float64 `json:"qty"`
+	ItemID         int64   `json:"itemId"`       // written; → items(id)
+	ItemName       string  `json:"itemName"`     // read (JOIN)
+	ItemPackSize   float64 `json:"itemPackSize"` // read (JOIN) — the item's master pack size
+	GSTPercent     float64 `json:"gstPercent"`   // read (JOIN)
+	HSN            int64   `json:"hsn"`          // read (JOIN)
+	Rate           float64 `json:"rate"`
+	Qty            float64 `json:"qty"`
+	CustomPackSize float64 `json:"customPackSize"` // written; 0 = no override, use ItemPackSize
 }
 
 // AddSalesOrder saves an order header and all its line items in one transaction,
@@ -55,8 +56,8 @@ func AddSalesOrder(conn *sql.DB, order SalesOrder) (SalesOrder, error) {
 
 	for i, it := range order.Items {
 		if _, err := tx.Exec(
-			`INSERT INTO sales_order_items (order_id, item_id, rate, qty) VALUES (?, ?, ?, ?)`,
-			orderID, it.ItemID, it.Rate, it.Qty,
+			`INSERT INTO sales_order_items (order_id, item_id, rate, qty, custom_pack_size) VALUES (?, ?, ?, ?, ?)`,
+			orderID, it.ItemID, it.Rate, it.Qty, it.CustomPackSize,
 		); err != nil {
 			return SalesOrder{}, fmt.Errorf("insert line %d: %w", i+1, err)
 		}
@@ -98,8 +99,8 @@ func UpdateSalesOrder(conn *sql.DB, order SalesOrder) (SalesOrder, error) {
 	}
 	for i, it := range order.Items {
 		if _, err := tx.Exec(
-			`INSERT INTO sales_order_items (order_id, item_id, rate, qty) VALUES (?, ?, ?, ?)`,
-			order.ID, it.ItemID, it.Rate, it.Qty,
+			`INSERT INTO sales_order_items (order_id, item_id, rate, qty, custom_pack_size) VALUES (?, ?, ?, ?, ?)`,
+			order.ID, it.ItemID, it.Rate, it.Qty, it.CustomPackSize,
 		); err != nil {
 			return SalesOrder{}, fmt.Errorf("insert line %d: %w", i+1, err)
 		}
@@ -167,7 +168,7 @@ func ListSalesOrders(conn *sql.DB) ([]SalesOrder, error) {
 	}
 
 	itemRows, err := conn.Query(
-		`SELECT soi.order_id, soi.item_id, i.name, i.pack_size, i.gst_percent, i.hsn, soi.rate, soi.qty
+		`SELECT soi.order_id, soi.item_id, i.name, i.pack_size, i.gst_percent, i.hsn, soi.rate, soi.qty, soi.custom_pack_size
 			FROM sales_order_items soi
 			JOIN items i ON i.id = soi.item_id
 			ORDER BY soi.id`,
@@ -181,7 +182,7 @@ func ListSalesOrders(conn *sql.DB) ([]SalesOrder, error) {
 		var orderID int64
 		var it SalesOrderItem
 		if err := itemRows.Scan(
-			&orderID, &it.ItemID, &it.ItemName, &it.ItemPackSize, &it.GSTPercent, &it.HSN, &it.Rate, &it.Qty,
+			&orderID, &it.ItemID, &it.ItemName, &it.ItemPackSize, &it.GSTPercent, &it.HSN, &it.Rate, &it.Qty, &it.CustomPackSize,
 		); err != nil {
 			return nil, fmt.Errorf("scan order item: %w", err)
 		}
@@ -208,7 +209,7 @@ func GetSalesOrder(conn *sql.DB, id int64) (SalesOrder, error) {
 	}
 
 	rows, err := conn.Query(
-		`SELECT soi.item_id, i.name, i.pack_size, i.gst_percent, i.hsn, soi.rate, soi.qty
+		`SELECT soi.item_id, i.name, i.pack_size, i.gst_percent, i.hsn, soi.rate, soi.qty, soi.custom_pack_size
 			FROM sales_order_items soi
 			JOIN items i ON i.id = soi.item_id
 			WHERE soi.order_id = ?
@@ -224,7 +225,7 @@ func GetSalesOrder(conn *sql.DB, id int64) (SalesOrder, error) {
 	for rows.Next() {
 		var it SalesOrderItem
 		if err := rows.Scan(
-			&it.ItemID, &it.ItemName, &it.ItemPackSize, &it.GSTPercent, &it.HSN, &it.Rate, &it.Qty,
+			&it.ItemID, &it.ItemName, &it.ItemPackSize, &it.GSTPercent, &it.HSN, &it.Rate, &it.Qty, &it.CustomPackSize,
 		); err != nil {
 			return SalesOrder{}, fmt.Errorf("scan order item: %w", err)
 		}

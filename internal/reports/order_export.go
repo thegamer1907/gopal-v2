@@ -38,6 +38,17 @@ type OrderExportRow struct {
 	FinalAmount float64 `json:"finalAmount"`
 }
 
+// OrderExportDeduction is one "Less: N unit — Item Name" line (or "Add: ..." when
+// Units is negative — the actual pack size was larger than standard), fully computed
+// by the caller from a line whose custom pack size differed from the item's master
+// pack size. Never re-derived here — this package only lays it out.
+type OrderExportDeduction struct {
+	ItemName string  `json:"itemName"`
+	Units    float64 `json:"units"` // positive = shortfall (Less), negative = surplus (Add)
+	Rate     float64 `json:"rate"`
+	Value    float64 `json:"value"` // Units * Rate — net total = gross - sum(Value)
+}
+
 // headerYellow is #FFD966 — the shared brand color for the customer-facing export
 // header/footer bars, matching ShareableOrderImage.tsx exactly.
 var headerYellow = [3]uint8{0xFF, 0xD9, 0x66}
@@ -46,8 +57,11 @@ const orderSheetName = "Order"
 
 // WriteOrderExcel writes a single order to a new workbook at path, styled to match
 // ShareableOrderImage.tsx: a merged yellow customer/date header bar, a yellow bold
-// column-header row, black-bordered white data rows, and a bold yellow totals row.
-func WriteOrderExcel(path string, header OrderExportHeader, rows []OrderExportRow) error {
+// column-header row, black-bordered white data rows (already grouped by the caller —
+// see lib/salesOrder.ts's buildOrderExportGroups), a bold "Total" row, and — only when
+// deductions is non-empty — one "Less"/"Add" line per custom-pack-size line followed by
+// a final net "Total" row.
+func WriteOrderExcel(path string, header OrderExportHeader, rows []OrderExportRow, deductions []OrderExportDeduction) error {
 	f := excelize.NewFile()
 	defer f.Close()
 
@@ -73,8 +87,22 @@ func WriteOrderExcel(path string, header OrderExportHeader, rows []OrderExportRo
 	if err != nil {
 		return err
 	}
-	if err := writeOrderTotals(f, rows, totalsRow); err != nil {
+	grossAmount, err := writeOrderTotals(f, rows, totalsRow)
+	if err != nil {
 		return err
+	}
+	if len(deductions) > 0 {
+		nextRow, err := writeOrderDeductions(f, deductions, totalsRow+1)
+		if err != nil {
+			return err
+		}
+		var deductionTotal float64
+		for _, d := range deductions {
+			deductionTotal += d.Value
+		}
+		if err := writeOrderNetTotal(f, grossAmount-deductionTotal, nextRow); err != nil {
+			return err
+		}
 	}
 	if err := finishOrderLayout(f); err != nil {
 		return err
@@ -219,7 +247,10 @@ func writeOrderRows(f *excelize.File, rows []OrderExportRow) (int, error) {
 	return len(rows) + 3, nil
 }
 
-func writeOrderTotals(f *excelize.File, rows []OrderExportRow, totalsRow int) error {
+// writeOrderTotals writes the bold "Total" row (always the gross total — the same
+// figure a net total starts from) and returns that amount for the caller to net
+// deductions against.
+func writeOrderTotals(f *excelize.File, rows []OrderExportRow, totalsRow int) (float64, error) {
 	var qty, amount float64
 	for _, r := range rows {
 		qty += r.Qty
@@ -228,8 +259,79 @@ func writeOrderTotals(f *excelize.File, rows []OrderExportRow, totalsRow int) er
 
 	qtyStyle, err := orderCellStyle(f, headerYellowHex, "center", true, "0")
 	if err != nil {
-		return err
+		return 0, err
 	}
+	blankStyle, err := orderCellStyle(f, headerYellowHex, "left", false, "")
+	if err != nil {
+		return 0, err
+	}
+	labelStyle, err := orderCellStyle(f, headerYellowHex, "right", true, "")
+	if err != nil {
+		return 0, err
+	}
+	amountStyle, err := orderCellStyle(f, headerYellowHex, "right", true, "#,##0.00")
+	if err != nil {
+		return 0, err
+	}
+
+	if err := setOrderCell(f, "A", totalsRow, qty, qtyStyle); err != nil {
+		return 0, err
+	}
+	if err := setOrderCell(f, "B", totalsRow, "", blankStyle); err != nil {
+		return 0, err
+	}
+	if err := setOrderCell(f, "C", totalsRow, "", blankStyle); err != nil {
+		return 0, err
+	}
+	if err := setOrderCell(f, "D", totalsRow, "Total", labelStyle); err != nil {
+		return 0, err
+	}
+	if err := setOrderCell(f, "E", totalsRow, amount, amountStyle); err != nil {
+		return 0, err
+	}
+	return amount, nil
+}
+
+// writeOrderDeductions writes one row per deduction, starting at startRow (plain text,
+// no fill — matches the reference image's undecorated "Less: ..." lines), and returns
+// the row number immediately after the last one, where the net Total goes.
+func writeOrderDeductions(f *excelize.File, deductions []OrderExportDeduction, startRow int) (int, error) {
+	labelStyle, err := orderCellStyle(f, "", "left", false, "")
+	if err != nil {
+		return 0, err
+	}
+	valueStyle, err := orderCellStyle(f, "", "right", false, "#,##0.00")
+	if err != nil {
+		return 0, err
+	}
+
+	for i, d := range deductions {
+		row := startRow + i
+		verb, units, value := "Less", d.Units, d.Value
+		if units < 0 {
+			verb, units, value = "Add", -units, -value
+		}
+		label := fmt.Sprintf("%s: %s unit — %s", verb, fmtOrderQty(units), d.ItemName)
+		labelCell := fmt.Sprintf("B%d", row)
+		lastCell := fmt.Sprintf("D%d", row)
+		if err := f.SetCellValue(orderSheetName, labelCell, label); err != nil {
+			return 0, err
+		}
+		if err := f.MergeCell(orderSheetName, labelCell, lastCell); err != nil {
+			return 0, fmt.Errorf("merge deduction label: %w", err)
+		}
+		if err := f.SetCellStyle(orderSheetName, labelCell, lastCell, labelStyle); err != nil {
+			return 0, err
+		}
+		if err := setOrderCell(f, "E", row, value, valueStyle); err != nil {
+			return 0, err
+		}
+	}
+	return startRow + len(deductions), nil
+}
+
+// writeOrderNetTotal writes the final bold "Total" row (gross minus every deduction).
+func writeOrderNetTotal(f *excelize.File, amount float64, row int) error {
 	blankStyle, err := orderCellStyle(f, headerYellowHex, "left", false, "")
 	if err != nil {
 		return err
@@ -243,19 +345,19 @@ func writeOrderTotals(f *excelize.File, rows []OrderExportRow, totalsRow int) er
 		return err
 	}
 
-	if err := setOrderCell(f, "A", totalsRow, qty, qtyStyle); err != nil {
+	if err := setOrderCell(f, "A", row, "", blankStyle); err != nil {
 		return err
 	}
-	if err := setOrderCell(f, "B", totalsRow, "", blankStyle); err != nil {
+	if err := setOrderCell(f, "B", row, "", blankStyle); err != nil {
 		return err
 	}
-	if err := setOrderCell(f, "C", totalsRow, "", blankStyle); err != nil {
+	if err := setOrderCell(f, "C", row, "", blankStyle); err != nil {
 		return err
 	}
-	if err := setOrderCell(f, "D", totalsRow, "Total", labelStyle); err != nil {
+	if err := setOrderCell(f, "D", row, "Total", labelStyle); err != nil {
 		return err
 	}
-	return setOrderCell(f, "E", totalsRow, amount, amountStyle)
+	return setOrderCell(f, "E", row, amount, amountStyle)
 }
 
 func finishOrderLayout(f *excelize.File) error {
@@ -288,8 +390,9 @@ const (
 
 // WriteOrderPDF writes a single order to a new PDF at path, in the same visual style
 // as WriteOrderExcel/ShareableOrderImage.tsx, using the bundled Nunito font (no
-// built-in fonts exist in the gopdf library).
-func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow) error {
+// built-in fonts exist in the gopdf library). Mirrors WriteOrderExcel's gross Total →
+// deduction line(s) → net Total structure when deductions is non-empty.
+func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow, deductions []OrderExportDeduction) error {
 	pdf := gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.SetMargins(pdfMarginPt, pdfMarginPt, pdfMarginPt, pdfMarginPt)
@@ -339,7 +442,7 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow)
 			}
 			y += pdfHeaderRowHeight
 		}
-		cells := []string{fmtPdfQty(r.Qty), r.ItemName, fmtPdfQty(r.PackSize), fmtPdfMoney(r.Rate), fmtPdfMoney(r.FinalAmount)}
+		cells := []string{fmtOrderQty(r.Qty), r.ItemName, fmtOrderQty(r.PackSize), fmtOrderMoney(r.Rate), fmtOrderMoney(r.FinalAmount)}
 		for i, c := range cells {
 			if err := drawOrderCell(&pdf, pdfColX(i, x0), y, pdfColWidths[i], pdfRowHeight, c, aligns[i], false, nil); err != nil {
 				return err
@@ -354,26 +457,66 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow)
 		pdf.AddPage()
 		y = pdf.MarginTop()
 	}
-	if err := drawOrderCell(&pdf, pdfColX(0, x0), y, pdfColWidths[0], pdfRowHeight, fmtPdfQty(totalQty), gopdf.Center, true, &headerYellow); err != nil {
+	if err := drawOrderTotalRow(&pdf, x0, y, fmtOrderQty(totalQty), totalAmount); err != nil {
 		return err
 	}
-	if err := drawOrderCell(&pdf, pdfColX(1, x0), y, pdfColWidths[1], pdfRowHeight, "", gopdf.Left, false, &headerYellow); err != nil {
-		return err
-	}
-	if err := drawOrderCell(&pdf, pdfColX(2, x0), y, pdfColWidths[2], pdfRowHeight, "", gopdf.Left, false, &headerYellow); err != nil {
-		return err
-	}
-	if err := drawOrderCell(&pdf, pdfColX(3, x0), y, pdfColWidths[3], pdfRowHeight, "Total", gopdf.Right, true, &headerYellow); err != nil {
-		return err
-	}
-	if err := drawOrderCell(&pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtPdfMoney(totalAmount), gopdf.Right, true, &headerYellow); err != nil {
-		return err
+	y += pdfRowHeight
+
+	if len(deductions) > 0 {
+		var deductionTotal float64
+		for _, d := range deductions {
+			if y+pdfRowHeight > gopdf.PageSizeA4.H-pdf.MarginBottom() {
+				pdf.AddPage()
+				y = pdf.MarginTop()
+			}
+			verb, units, value := "Less", d.Units, d.Value
+			if units < 0 {
+				verb, units, value = "Add", -units, -value
+			}
+			label := fmt.Sprintf("%s: %s unit — %s", verb, fmtOrderQty(units), d.ItemName)
+			labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
+			if err := drawOrderCell(&pdf, x0, y, labelWidth, pdfRowHeight, label, gopdf.Left, false, nil); err != nil {
+				return err
+			}
+			if err := drawOrderCell(&pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(value), gopdf.Right, false, nil); err != nil {
+				return err
+			}
+			deductionTotal += d.Value
+			y += pdfRowHeight
+		}
+
+		if y+pdfRowHeight > gopdf.PageSizeA4.H-pdf.MarginBottom() {
+			pdf.AddPage()
+			y = pdf.MarginTop()
+		}
+		if err := drawOrderTotalRow(&pdf, x0, y, "", totalAmount-deductionTotal); err != nil {
+			return err
+		}
 	}
 
 	if err := pdf.WritePdf(path); err != nil {
 		return fmt.Errorf("write pdf %q: %w", path, err)
 	}
 	return nil
+}
+
+// drawOrderTotalRow draws one bold yellow "Total" row: qty (blank when qty is ""),
+// blank Item/Unit cells, the "Total" label, and the amount — the same shape used for
+// both the gross total and (when there are deductions) the final net total.
+func drawOrderTotalRow(pdf *gopdf.GoPdf, x0, y float64, qty string, amount float64) error {
+	if err := drawOrderCell(pdf, pdfColX(0, x0), y, pdfColWidths[0], pdfRowHeight, qty, gopdf.Center, true, &headerYellow); err != nil {
+		return err
+	}
+	if err := drawOrderCell(pdf, pdfColX(1, x0), y, pdfColWidths[1], pdfRowHeight, "", gopdf.Left, false, &headerYellow); err != nil {
+		return err
+	}
+	if err := drawOrderCell(pdf, pdfColX(2, x0), y, pdfColWidths[2], pdfRowHeight, "", gopdf.Left, false, &headerYellow); err != nil {
+		return err
+	}
+	if err := drawOrderCell(pdf, pdfColX(3, x0), y, pdfColWidths[3], pdfRowHeight, "Total", gopdf.Right, true, &headerYellow); err != nil {
+		return err
+	}
+	return drawOrderCell(pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(amount), gopdf.Right, true, &headerYellow)
 }
 
 func drawOrderColumnHeaderRow(pdf *gopdf.GoPdf, x0, y float64) error {
@@ -443,10 +586,10 @@ func indianGrouped(digits string) string {
 	return strings.Join(groups, ",")
 }
 
-// fmtPdfMoney formats an amount as 2-decimal, Indian-grouped text, matching the
+// fmtOrderMoney formats an amount as 2-decimal, Indian-grouped text, matching the
 // frontend's fmt() (lib/purchaseBill.ts) — reimplemented in Go since the PDF's cell
 // text is drawn directly, not rendered through a spreadsheet engine like Excel's cells.
-func fmtPdfMoney(n float64) string {
+func fmtOrderMoney(n float64) string {
 	neg := n < 0
 	if neg {
 		n = -n
@@ -464,9 +607,9 @@ func fmtPdfMoney(n float64) string {
 	return s
 }
 
-// fmtPdfQty formats a quantity as a whole, Indian-grouped number, matching the
+// fmtOrderQty formats a quantity as a whole, Indian-grouped number, matching the
 // frontend's fmtQty().
-func fmtPdfQty(n float64) string {
+func fmtOrderQty(n float64) string {
 	neg := n < 0
 	if neg {
 		n = -n

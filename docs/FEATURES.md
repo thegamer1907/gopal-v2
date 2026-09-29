@@ -7,6 +7,12 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
+_Shipped in **v0.7.0** (2026-09-28): order **delivered status** (reversible toggle,
+list-row + edit-page buttons, "Show delivered" filter); **Copy Order Image** (WhatsApp
+sharing via clipboard); **Download Excel/PDF for orders**; **custom pack size** per
+order line (editable Pack Size, "Less"/"Add" export reformatting). See DECISIONS for the
+notable technical calls in each._
+
 _Patch after v0.6.0 (2026-09-27): five client-reported fixes — Add Order item-search
 duplicate-row bug, Excel report number formatting (whole-number quantities, real GST %
 percentage format), a wider two-line Add Order item dropdown, Customer state field not
@@ -33,6 +39,23 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   Excel export's totals use Western 3-digit grouping (Excel's `#,##0.00` format has no
   Indian-grouping option — same limitation the existing Purchase Summary export already
   has), while the PDF and image both show true Indian grouping (computed as plain text).
+- **Custom pack size per order line** — a line's Pack Size field on Add/Edit Order is
+  now editable (defaults to the item's master pack size, same as before) instead of
+  read-only, for the rare case a specific carton is physically packed differently than
+  standard (e.g. 18 instead of 20). Enter it as a **second line** for the odd carton(s)
+  — the app already allows the same item on multiple lines. A small "Custom" badge marks
+  any line whose pack size differs from master, in both Add/Edit Order and the read-only
+  Order detail view. On-screen totals need no special handling — each line's own amount
+  already uses its own (custom-if-set) pack size, so everything nets out automatically.
+  **Exports only** (Copy Order Image / Download Excel / Download PDF) re-present this
+  the way the client's reference image does: lines for the same item+rate are combined
+  into one row shown at the standard pack size (gross), followed by the gross Total,
+  then a `"Less: N unit — Item Name"` line per custom-pack-size line (or `"Add: ..."` if
+  the custom size was larger than standard), and a final net Total. Stock tracking is
+  unaffected (carton-level, confirmed with the client). Backend: `custom_pack_size`
+  column on `sales_order_items` (migration id 9); export grouping/deduction logic lives
+  once in `frontend/src/lib/salesOrder.ts` (`buildOrderExportGroups`), reused by the
+  image, Excel, and PDF.
 - **Copy Order Image (WhatsApp sharing)** — new "Copy Order Image" button on the order
   detail view (`/orders`, `OrderDetail`). Renders the order as a PNG in a purpose-built,
   customer-facing layout (`ShareableOrderImage.tsx`: yellow header/footer bars,

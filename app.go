@@ -348,7 +348,7 @@ func (a *App) ExportPurchaseSummary(rows []reports.PurchaseSummaryRow, defaultFi
 // computed by the caller — see toExportRows/toExportHeader in SavedOrders.tsx) to a
 // simplified, customer-facing .xlsx workbook matching the "Copy Order Image" visual
 // style. Returns the chosen path, or "" if the user cancelled the dialog.
-func (a *App) ExportOrderExcel(header reports.OrderExportHeader, rows []reports.OrderExportRow, defaultFilename string) (string, error) {
+func (a *App) ExportOrderExcel(header reports.OrderExportHeader, rows []reports.OrderExportRow, deductions []reports.OrderExportDeduction, defaultFilename string) (string, error) {
 	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
 		Title:           "Export Order",
 		DefaultFilename: defaultFilename,
@@ -362,7 +362,7 @@ func (a *App) ExportOrderExcel(header reports.OrderExportHeader, rows []reports.
 	if path == "" {
 		return "", nil // cancelled
 	}
-	if err := reports.WriteOrderExcel(path, header, rows); err != nil {
+	if err := reports.WriteOrderExcel(path, header, rows, deductions); err != nil {
 		return "", err
 	}
 	return path, nil
@@ -370,7 +370,7 @@ func (a *App) ExportOrderExcel(header reports.OrderExportHeader, rows []reports.
 
 // ExportOrderPDF is the PDF counterpart of ExportOrderExcel — same header/rows, same
 // visual style, rendered with the app's bundled Nunito font (see internal/reports).
-func (a *App) ExportOrderPDF(header reports.OrderExportHeader, rows []reports.OrderExportRow, defaultFilename string) (string, error) {
+func (a *App) ExportOrderPDF(header reports.OrderExportHeader, rows []reports.OrderExportRow, deductions []reports.OrderExportDeduction, defaultFilename string) (string, error) {
 	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
 		Title:           "Export Order",
 		DefaultFilename: defaultFilename,
@@ -384,7 +384,7 @@ func (a *App) ExportOrderPDF(header reports.OrderExportHeader, rows []reports.Or
 	if path == "" {
 		return "", nil // cancelled
 	}
-	if err := reports.WriteOrderPDF(path, header, rows); err != nil {
+	if err := reports.WriteOrderPDF(path, header, rows, deductions); err != nil {
 		return "", err
 	}
 	return path, nil

@@ -49,14 +49,20 @@ import {useTableSort} from '@/hooks/useTableSort';
 import {parseDate, displayDate} from '@/lib/date';
 import {cn} from '@/lib/utils';
 import {fmt, fmtQty} from '@/lib/purchaseBill';
-import {calcOrderLine, customerShareLabel, OrderLineCalc} from '@/lib/salesOrder';
+import {
+    buildOrderExportGroups,
+    calcOrderLine,
+    customerShareLabel,
+    effectivePackSize,
+    OrderLineCalc,
+} from '@/lib/salesOrder';
 
 // View/Edit Orders — a list of every saved order that opens a read-only detail, from
 // which the order can be edited (full overwrite) or deleted. Mirrors View/Edit Bills
 // (SavedBills.tsx). No order-number column — that field doesn't exist for orders.
 
 function lineCalc(it: db.SalesOrderItem): OrderLineCalc {
-    return calcOrderLine({rate: it.rate, qty: it.qty, packSize: it.itemPackSize});
+    return calcOrderLine({rate: it.rate, qty: it.qty, packSize: effectivePackSize(it)});
 }
 
 // Per-order summaries used by the list columns/sort.
@@ -366,16 +372,27 @@ function OrderDetail({
         });
     }
 
-    function toExportRows(): reports.OrderExportRow[] {
-        return order.items.map((it) =>
-            reports.OrderExportRow.createFrom({
-                itemName: it.itemName,
-                packSize: it.itemPackSize,
-                rate: it.rate,
-                qty: it.qty,
-                finalAmount: lineCalc(it).finalAmount,
-            }),
-        );
+    function toExportRowsAndDeductions(): {rows: reports.OrderExportRow[]; deductions: reports.OrderExportDeduction[]} {
+        const {groups, deductions} = buildOrderExportGroups(order);
+        return {
+            rows: groups.map((g) =>
+                reports.OrderExportRow.createFrom({
+                    itemName: g.itemName,
+                    packSize: g.packSize,
+                    rate: g.rate,
+                    qty: g.qty,
+                    finalAmount: g.amount,
+                }),
+            ),
+            deductions: deductions.map((d) =>
+                reports.OrderExportDeduction.createFrom({
+                    itemName: d.itemName,
+                    units: d.units,
+                    rate: d.rate,
+                    value: d.value,
+                }),
+            ),
+        };
     }
 
     async function downloadExcel() {
@@ -383,7 +400,8 @@ function OrderDetail({
         setNotice('');
         setError('');
         try {
-            const path = await ExportOrderExcel(toExportHeader(), toExportRows(), `Order-${order.id}.xlsx`);
+            const {rows, deductions} = toExportRowsAndDeductions();
+            const path = await ExportOrderExcel(toExportHeader(), rows, deductions, `Order-${order.id}.xlsx`);
             if (path) setNotice(`Saved to ${path}`);
         } catch (e: any) {
             setError(String(e));
@@ -397,7 +415,8 @@ function OrderDetail({
         setNotice('');
         setError('');
         try {
-            const path = await ExportOrderPDF(toExportHeader(), toExportRows(), `Order-${order.id}.pdf`);
+            const {rows, deductions} = toExportRowsAndDeductions();
+            const path = await ExportOrderPDF(toExportHeader(), rows, deductions, `Order-${order.id}.pdf`);
             if (path) setNotice(`Saved to ${path}`);
         } catch (e: any) {
             setError(String(e));
@@ -479,7 +498,16 @@ function OrderDetail({
                                 {rows.map(({it, c}, i) => (
                                     <tr key={i} className="border-t">
                                         <td className="font-medium">{it.itemName}</td>
-                                        <td className="text-right tabular-nums text-muted-foreground">{it.itemPackSize}</td>
+                                        <td className="text-right tabular-nums text-muted-foreground">
+                                            <div className="flex items-center justify-end gap-1">
+                                                {it.customPackSize !== 0 && (
+                                                    <Badge variant="secondary" className="px-1 text-[10px]">
+                                                        Custom
+                                                    </Badge>
+                                                )}
+                                                {effectivePackSize(it)}
+                                            </div>
+                                        </td>
                                         <td className="text-right tabular-nums text-muted-foreground">{it.gstPercent}</td>
                                         <td className="text-right tabular-nums text-muted-foreground">{it.hsn}</td>
                                         <td className="text-right tabular-nums">{fmt(it.rate)}</td>

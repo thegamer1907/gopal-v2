@@ -170,7 +170,7 @@ Foreign key: `(customer_id)` → `customers(id)`.
 
 ### `sales_order_items` — sales order line items
 One row per item line on an order. Links to its parent order and to an item in the master.
-Migration id 7.
+Migration id 7; `custom_pack_size` added in migration id 9.
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key |
@@ -178,6 +178,7 @@ Migration id 7.
 | `item_id` | INTEGER NOT NULL | → `items(id)` (FK). Item name/pack size/GST %/HSN are read back via a JOIN, not stored |
 | `rate` | REAL NOT NULL DEFAULT 0 | **Rate**, entered by the user |
 | `qty` | REAL NOT NULL DEFAULT 0 | **Qty**, entered by the user |
+| `custom_pack_size` | REAL NOT NULL DEFAULT 0 | `0` = no override, use the item's master pack size. Set when a specific carton on this line was physically packed differently than standard (e.g. 18 instead of a standard 20) |
 
 Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)` →
 `items(id)`.
@@ -198,6 +199,20 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > firing this call directly rather than going through the edit form's Save/dirty-tracking
 > flow.
 >
+> **Custom pack size** is a per-line write, not JOIN-derived (unlike `ItemPackSize`),
+> and deliberately does **not** change how `calcOrderLine` works — it's fed the
+> *effective* pack size (`lib/salesOrder.ts`'s `effectivePackSize`: custom-if-set-else-
+> master) as its ordinary `packSize` input, on every on-screen screen that shows a line
+> (Add/Edit Order, Order detail, the orders list's Final Amount column) — totals are
+> correct automatically, no separate on-screen deduction bookkeeping. **Exports only**
+> (image/Excel/PDF) re-present this: `buildOrderExportGroups` (same file) groups lines by
+> `(itemId, rate)` into one row shown at the item's **standard** pack size (gross, as if
+> every carton were standard) plus a `"Less: N unit — Item Name"` line (or `"Add: ..."`
+> when the custom size was *larger* than standard) per line that had a custom pack size,
+> netting to the same true total via a second, final "Total" row. Stock (purchased minus
+> sold) is tracked at the carton level and is entirely unaffected by this — confirmed
+> with the client, no changes made to that derivation.
+>
 > **`CustomerNickName`/`CustomerCity`** are JOIN-populated onto `SalesOrder` the same way
 > as `CustomerName` (read-only, ignored on write) — added for the "Copy Order Image" share
 > feature's header line (`{nickname||name} - {city}`), but available to any future reader
@@ -215,16 +230,19 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > **"Download Excel"/"Download PDF"** (same order detail view, beside "Copy Order
 > Image") export the same customer-facing content (no GST%/HSN) as real files instead of
 > a clipboard image. `internal/reports/order_export.go` — `OrderExportHeader` +
-> `OrderExportRow` (built by the frontend: `SavedOrders.tsx`'s `toExportHeader`/
-> `toExportRows`, reusing `customerShareLabel` from `lib/salesOrder.ts` and the same
-> `lineCalc`/`calcOrderLine` already used on screen) — `WriteOrderExcel` (`excelize`,
-> styled to match `ShareableOrderImage.tsx`'s yellow/bordered look, unlike the plainer
-> `WritePurchaseSummary` convention) and `WriteOrderPDF` (`github.com/signintech/gopdf`,
-> hand-drawn cells — the library's convenience `NewTableLayout` API can't do the merged
-> header row or per-cell borders this layout needs). PDF text uses a bundled Nunito TTF
-> (`internal/reports/fonts/`, SIL OFL license, embedded via `go:embed` — gopdf has no
-> built-in fonts). `App.ExportOrderExcel`/`ExportOrderPDF` (`app.go`) mirror
-> `ExportPurchaseSummary`'s SaveFileDialog + write pattern exactly. No new table, no
+> `OrderExportRow` + `OrderExportDeduction` (all three built by the frontend:
+> `SavedOrders.tsx`'s `toExportHeader`/`toExportRowsAndDeductions`, reusing
+> `customerShareLabel`/`buildOrderExportGroups` from `lib/salesOrder.ts`) —
+> `WriteOrderExcel` (`excelize`, styled to match `ShareableOrderImage.tsx`'s
+> yellow/bordered look, unlike the plainer `WritePurchaseSummary` convention) and
+> `WriteOrderPDF` (`github.com/signintech/gopdf`, hand-drawn cells — the library's
+> convenience `NewTableLayout` API can't do the merged header row or per-cell borders
+> this layout needs). Both now render a gross "Total" row, then (only when deductions is
+> non-empty) one "Less"/"Add" line per custom-pack-size line and a final net "Total" row.
+> PDF text uses a bundled Nunito TTF (`internal/reports/fonts/`, SIL OFL license,
+> embedded via `go:embed` — gopdf has no built-in fonts). `App.ExportOrderExcel`/
+> `ExportOrderPDF` (`app.go`) mirror `ExportPurchaseSummary`'s SaveFileDialog + write
+> pattern exactly. No new table, no
 > migration. See DECISIONS.md for the gopdf `SetTextColor` gotcha and the Excel
 > Indian-grouping limitation.
 >

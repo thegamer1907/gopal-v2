@@ -2,7 +2,7 @@ import {forwardRef} from 'react';
 import {db} from '../../wailsjs/go/models';
 import {displayDate} from '@/lib/date';
 import {fmt, fmtQty} from '@/lib/purchaseBill';
-import {calcOrderLine, customerShareLabel} from '@/lib/salesOrder';
+import {buildOrderExportGroups, customerShareLabel} from '@/lib/salesOrder';
 
 // Purpose-built layout for the "Copy Order Image" share feature (SavedOrders.tsx) —
 // rasterized via html-to-image and copied to the clipboard for pasting into WhatsApp.
@@ -18,14 +18,13 @@ const cell: React.CSSProperties = {border: BORDER, padding: '2px 6px', lineHeigh
 export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOrder}>(
     function ShareableOrderImage({order}, ref) {
         const customerLabel = customerShareLabel(order);
-        const rows = order.items.map((it) => ({
-            it,
-            finalAmount: calcOrderLine({rate: it.rate, qty: it.qty, packSize: it.itemPackSize}).finalAmount,
-        }));
-        const totals = rows.reduce(
-            (acc, {it, finalAmount}) => ({qty: acc.qty + it.qty, amount: acc.amount + finalAmount}),
+        const {groups, deductions} = buildOrderExportGroups(order);
+        const grossTotals = groups.reduce(
+            (acc, g) => ({qty: acc.qty + g.qty, amount: acc.amount + g.amount}),
             {qty: 0, amount: 0},
         );
+        const deductionTotal = deductions.reduce((sum, d) => sum + d.value, 0);
+        const netAmount = grossTotals.amount - deductionTotal;
 
         return (
             <div ref={ref} style={{display: 'inline-block', background: '#fff', fontFamily: 'Arial, sans-serif'}}>
@@ -46,26 +45,52 @@ export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOr
                             <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>Rate</td>
                             <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>Amount</td>
                         </tr>
-                        {rows.map(({it, finalAmount}, i) => (
+                        {groups.map((g, i) => (
                             <tr key={i}>
-                                <td style={{...cell, textAlign: 'center'}}>{fmtQty(it.qty)}</td>
-                                <td style={cell}>{it.itemName}</td>
-                                <td style={{...cell, textAlign: 'center'}}>{fmtQty(it.itemPackSize)}</td>
-                                <td style={{...cell, textAlign: 'right'}}>{fmt(it.rate)}</td>
-                                <td style={{...cell, textAlign: 'right'}}>{fmt(finalAmount)}</td>
+                                <td style={{...cell, textAlign: 'center'}}>{fmtQty(g.qty)}</td>
+                                <td style={cell}>{g.itemName}</td>
+                                <td style={{...cell, textAlign: 'center'}}>{fmtQty(g.packSize)}</td>
+                                <td style={{...cell, textAlign: 'right'}}>{fmt(g.rate)}</td>
+                                <td style={{...cell, textAlign: 'right'}}>{fmt(g.amount)}</td>
                             </tr>
                         ))}
                         <tr>
                             <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'center'}}>
-                                {fmtQty(totals.qty)}
+                                {fmtQty(grossTotals.qty)}
                             </td>
                             <td style={{...cell, background: HEADER_BG}}/>
                             <td style={{...cell, background: HEADER_BG}}/>
                             <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>Total</td>
                             <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>
-                                {fmt(totals.amount)}
+                                {fmt(grossTotals.amount)}
                             </td>
                         </tr>
+                        {deductions.map((d, i) => {
+                            const isAdd = d.units < 0;
+                            const units = isAdd ? -d.units : d.units;
+                            const value = isAdd ? -d.value : d.value;
+                            return (
+                                <tr key={i}>
+                                    <td colSpan={4} style={cell}>
+                                        {isAdd ? 'Add' : 'Less'}: {fmtQty(units)} unit — {d.itemName}
+                                    </td>
+                                    <td style={{...cell, textAlign: 'right'}}>{fmt(value)}</td>
+                                </tr>
+                            );
+                        })}
+                        {deductions.length > 0 && (
+                            <tr>
+                                <td style={{...cell, background: HEADER_BG}}/>
+                                <td style={{...cell, background: HEADER_BG}}/>
+                                <td style={{...cell, background: HEADER_BG}}/>
+                                <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>
+                                    Total
+                                </td>
+                                <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>
+                                    {fmt(netAmount)}
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

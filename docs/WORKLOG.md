@@ -6,6 +6,43 @@ reads the top entry first.
 
 ---
 
+## 2026-09-28 — Custom pack size per order line
+**Did:**
+- Worked through the client's request (a specific carton sometimes physically packed
+  differently than an item's standard pack size — voice-dictated, with a reference
+  image) against multiple possible data models before writing any code — landed on: add
+  the item as a **second order line** for the odd carton(s), Pack Size is now an
+  editable field (was read-only), and on-screen everything stays formula-driven with
+  zero new branching (`calcOrderLine` unchanged — just fed the effective pack size).
+  Confirmed the model against the client's own worked example (20 standard, 10 cartons,
+  1 actually 18) before building.
+- Backend: `sales_order_items.custom_pack_size` (migration id 9, `0` = no override).
+- Add/Edit Order: Pack Size is now an editable `NumberInput` (defaults to the item's
+  master value on selection), with a small "Custom" badge when edited away from master.
+  Same badge + effective-value display added to Order detail's on-screen table.
+- Export-only re-grouping (Copy Order Image / Download Excel / Download PDF): new
+  `buildOrderExportGroups` (`lib/salesOrder.ts`) combines same-item-and-rate lines into
+  one row at the standard pack size (gross Total), then a `"Less: N unit — Item Name"`
+  line per custom-pack-size line (or `"Add: ..."` for a larger-than-standard override),
+  then a final net Total — reproducing the client's reference image layout exactly
+  (verified: generated real Excel/PDF output with a deduction case and confirmed the
+  numbers and layout match, including the no-deductions case staying unchanged).
+- Seeded a demonstration order (id 5: 8 cartons of Rabdi Jar at standard pack size 36 +
+  1 carton at custom pack size 30) into the real DB, reusing the customer/items already
+  seeded for the Copy Order Image feature, so the client can check the "Less: 6 unit —
+  Rabdi Jar 1/-" deduction end-to-end without manual data entry.
+- `go build/vet/test` ✅, `npm run build` ✅. Docs updated (DATA_MODEL, FEATURES,
+  DECISIONS).
+
+Client reviewed live in `wails dev` and confirmed it looks good. Marked Shipped in
+FEATURES.md.
+
+**Next steps:** the seeded demonstration order (id 5) and the earlier test
+company/items/customer (from the Copy Order Image session) are still in the real DB and
+need manual cleanup via the app's own Delete buttons whenever convenient.
+
+---
+
 ## 2026-09-28 — Download Excel / Download PDF for orders
 **Did:**
 - Two new buttons beside "Copy Order Image" (order detail view): Download Excel and

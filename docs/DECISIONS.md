@@ -736,3 +736,36 @@ have to re-litigate.
   the pre-existing Purchase Summary Excel export's same limitation — not a regression,
   not fixed here, would need a hand-rolled digit-grouping hack in the number format
   string to change.
+
+### 2026-09-28 — Custom pack size: two order lines, on-screen stays formula-driven, export re-groups
+- **Decision:** a line's Pack Size on Add/Edit Order is now editable (was read-only,
+  always the item's master value). To record that one carton in a larger order is
+  physically packed differently (client's example: standard 20, 10 cartons ordered, 1 of
+  them actually 18), add the item as a **second line** with its own qty and edited pack
+  size — not a new "split this line" UI mechanism. `sales_order_items.custom_pack_size`
+  (migration id 9, `0` = no override) is written whenever a line's entered pack size
+  differs from the item's master value.
+- **Why two lines, not one line with a blended formula**: worked through the client's
+  own reference image and follow-up example multiple ways before settling this — see the
+  full math trace in this session's transcript. The two-line model means
+  `calcOrderLine`'s formula is **never changed**; each line already computes its own true
+  amount from whatever pack size it holds, so on-screen totals (Add/Edit Order, Order
+  detail, the orders list) are correct automatically, with zero new branching in a
+  formula this codebase's docs already call "the single source of truth." It also needs
+  no new data-entry mechanism, since the app already allows the same item on multiple
+  lines with no dedup (confirmed before building anything). The alternative (one line,
+  qty stays as the total, a separate "custom pack size" field represents exactly one
+  deviating carton, `calcOrderLine` gains a `(qty-1)×standard + 1×custom` special case)
+  was rejected — client confirmed the two-line model directly against a worked example.
+- **Export-only re-grouping**: `lib/salesOrder.ts`'s `buildOrderExportGroups` groups
+  lines by `(itemId, rate)` into one row at the item's standard pack size (gross) plus a
+  `"Less: N unit — Item Name"` (or `"Add: ..."` for a larger-than-standard custom size)
+  per custom-pack-size line, and a final net Total — reproducing the client's reference
+  image exactly. This logic exists in exactly one place and backs all three exports
+  (image, Excel, PDF) — Go (`internal/reports/order_export.go`) does no math, only
+  layout, same convention as the rest of this package. Rows sharing an item but **not**
+  the same rate deliberately don't merge (kept simple — a rare edge case, and each
+  such line still renders correctly, just as its own row).
+- **Stock unaffected**: confirmed directly with the client — stock is tracked at the
+  carton level (qty), not units-within-cartons, so the existing purchased-minus-sold
+  stock derivation needed zero changes.
