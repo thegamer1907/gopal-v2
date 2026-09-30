@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
 import {Plus, Trash2, Save, Info, Calendar as CalendarIcon, CheckCircle2, RotateCcw} from 'lucide-react';
 import {
@@ -107,6 +107,7 @@ export function AddOrder() {
     const [delivered, setDelivered] = useState(false);
     const [lines, setLines] = useState<Line[]>([blankLine(1)]);
     const [nextId, setNextId] = useState(2);
+    const lastRowRef = useRef<HTMLTableRowElement>(null);
 
     // Items are global here (not scoped to anything), unlike Add Purchase Bill.
     const [customersCache, setCustomersCache] = useState<db.Customer[]>([]);
@@ -237,6 +238,11 @@ export function AddOrder() {
 
     // Clear the guard if we unmount.
     useEffect(() => () => setDirty(false), [setDirty]);
+
+    // Scroll the newest row into view whenever a line is added.
+    useEffect(() => {
+        lastRowRef.current?.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }, [lines.length]);
 
     function updateLine(id: number, patch: Partial<Line>) {
         setLines((prev) => prev.map((l) => (l.id === id ? {...l, ...patch} : l)));
@@ -492,22 +498,26 @@ export function AddOrder() {
                             <thead>
                                 <tr className="text-center align-bottom text-muted-foreground [&>th]:px-1.5 [&>th]:pb-2 [&>th]:font-medium [&>th]:leading-tight">
                                     <th className="text-left">Item</th>
+                                    <th className="w-14">Qty</th>
                                     <th className="w-20">Pack Size</th>
                                     <th className="w-10">GST %</th>
                                     <th className="w-14">HSN</th>
                                     <th className="w-16">Stock</th>
                                     <th className="w-20">Rate</th>
-                                    <th className="w-14">Qty</th>
                                     <th className="w-24 bg-muted/50">Final Amount</th>
                                     <th className="w-8"/>
                                     <th className="w-8"/>
                                 </tr>
                             </thead>
                             <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1.5 [&>tr>td]:align-middle">
-                                {lines.map((line) => {
+                                {lines.map((line, i) => {
                                     const c = calc(line);
                                     return (
-                                        <tr key={line.id} className="border-t">
+                                        <tr
+                                            key={line.id}
+                                            ref={i === lines.length - 1 ? lastRowRef : undefined}
+                                            className="border-t"
+                                        >
                                             <td>
                                                 <ItemCombobox
                                                     items={items}
@@ -518,6 +528,13 @@ export function AddOrder() {
                                                     placeholder={customer ? 'Search item…' : 'Select a customer first'}
                                                     showCompany
                                                     className="w-72"
+                                                />
+                                            </td>
+                                            <td>
+                                                <NumberInput
+                                                    className="w-14 text-right"
+                                                    value={line.qty}
+                                                    onChange={(v) => updateLine(line.id, {qty: v})}
                                                 />
                                             </td>
                                             <td>
@@ -551,13 +568,6 @@ export function AddOrder() {
                                                     onChange={(v) => updateLine(line.id, {rate: v})}
                                                 />
                                             </td>
-                                            <td>
-                                                <NumberInput
-                                                    className="w-14 text-right"
-                                                    value={line.qty}
-                                                    onChange={(v) => updateLine(line.id, {qty: v})}
-                                                />
-                                            </td>
                                             <td className="text-right tabular-nums bg-muted/50 font-medium">
                                                 {fmt(c.finalAmount)}
                                             </td>
@@ -588,8 +598,9 @@ export function AddOrder() {
                             </tbody>
                             <tfoot>
                                 <tr className="border-t-2 font-medium [&>td]:px-2 [&>td]:py-2 [&>td]:tabular-nums">
-                                    <td colSpan={6} className="text-right text-muted-foreground">Totals</td>
+                                    <td/>
                                     <td className="text-right">{fmtQty(totals.qty)}</td>
+                                    <td colSpan={5} className="text-right text-muted-foreground">Totals</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.finalAmount)}</td>
                                     <td colSpan={2}/>
                                 </tr>

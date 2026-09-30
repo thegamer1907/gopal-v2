@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {toPng} from 'html-to-image';
+import {toBlob} from 'html-to-image';
 import {ArrowLeft, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, ImageDown, Pencil, RotateCcw, Search, Trash2} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
 import {
@@ -43,6 +43,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {SortableHeader} from '@/components/SortableHeader';
 import {DateRangeFilter} from '@/components/DateRangeFilter';
 import {useTableSort} from '@/hooks/useTableSort';
@@ -310,6 +318,7 @@ function OrderDetail({
     const [busy, setBusy] = useState<'image' | 'excel' | 'pdf' | null>(null);
     const [notice, setNotice] = useState('');
     const [error, setError] = useState('');
+    const [imagePreview, setImagePreview] = useState<{blob: Blob; url: string} | null>(null);
     const shareRef = useRef<HTMLDivElement>(null);
     const rows = order.items.map((it) => ({it, c: lineCalc(it)}));
     const totals = rows.reduce(
@@ -321,46 +330,54 @@ function OrderDetail({
         {qty: 0, finalAmount: 0},
     );
 
-    // Renders the order as an image (ShareableOrderImage, off-screen) and copies it
-    // straight to the clipboard so the user can paste it into WhatsApp themselves — the
-    // app never opens WhatsApp or builds a message; a wa.me link can only pre-fill text,
-    // never attach a file, so a manual paste is the only thing worth building. Falls back
-    // to a native Save dialog only if the clipboard write itself fails.
-    //
-    // navigator.clipboard.write() is called as the very first async step, and is handed
-    // a *pending* Promise<Blob> (not an already-awaited one) via ClipboardItem — Safari/
-    // WebKit (the macOS dev build's WKWebView) revokes the click's "user activation" the
-    // moment any `await` happens before the write call, so `await toPng(...)` first (the
-    // original approach) reliably failed there with a permission error even though the
-    // same code works fine under Chromium's more lenient timing. Handing the render's own
-    // promise straight to ClipboardItem keeps the write() call itself synchronous with
-    // the click while the actual PNG bytes are still resolving in the background.
-    async function copyOrderImage() {
+    // Renders the order as an image (ShareableOrderImage, off-screen) and opens a
+    // preview dialog so the user can see exactly what will be shared before it's
+    // copied. The actual clipboard write happens later, from the dialog's own Copy
+    // button — a fresh user gesture, so (unlike the old single-click flow) it can just
+    // call navigator.clipboard.write() directly with an already-resolved Blob, with no
+    // special timing tricks needed to keep Safari/WebKit's "user activation" alive.
+    async function generateOrderImage() {
         setBusy('image');
         setNotice('');
         setError('');
-        const node = shareRef.current!;
-        const renderPng = () => toPng(node, {pixelRatio: 2, backgroundColor: '#ffffff'});
         try {
-            await navigator.clipboard.write([
-                new ClipboardItem({
-                    'image/png': renderPng().then((dataUrl) => fetch(dataUrl)).then((res) => res.blob()),
-                }),
-            ]);
+            const blob = await toBlob(shareRef.current!, {pixelRatio: 2, backgroundColor: '#ffffff'});
+            if (!blob) throw new Error('Could not render the image.');
+            setImagePreview({blob, url: URL.createObjectURL(blob)});
+        } catch (e: any) {
+            setError(String(e));
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    function closeImagePreview() {
+        if (imagePreview) URL.revokeObjectURL(imagePreview.url);
+        setImagePreview(null);
+    }
+
+    // Copies the previewed image to the clipboard so the user can paste it into
+    // WhatsApp themselves — the app never opens WhatsApp or builds a message; a wa.me
+    // link can only pre-fill text, never attach a file, so a manual paste is the only
+    // thing worth building. Falls back to a native Save dialog only if the clipboard
+    // write itself fails.
+    async function copyPreviewedImage() {
+        if (!imagePreview) return;
+        const {blob} = imagePreview;
+        try {
+            await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
             setNotice('Image copied — paste it into WhatsApp.');
+            closeImagePreview();
         } catch (clipboardErr) {
             console.error('Clipboard write failed, falling back to Save dialog:', clipboardErr);
             try {
-                const dataUrl = await renderPng();
-                const base64 = dataUrl.split(',')[1];
-                const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+                const bytes = new Uint8Array(await blob.arrayBuffer());
                 const path = await SaveOrderShareImage(Array.from(bytes), `Order-${order.id}.png`);
                 setNotice(path ? `Couldn't copy to clipboard — saved to ${path} instead.` : '');
+                closeImagePreview();
             } catch (e: any) {
                 setError(String(e));
             }
-        } finally {
-            setBusy(null);
         }
     }
 
@@ -433,9 +450,9 @@ function OrderDetail({
                     Back to all orders
                 </Button>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={copyOrderImage} disabled={busy !== null}>
+                    <Button variant="outline" size="sm" onClick={generateOrderImage} disabled={busy !== null}>
                         <ImageDown className="size-4"/>
-                        Copy Order Image
+                        {busy === 'image' ? 'Preparing…' : 'Copy Order Image'}
                     </Button>
                     <Button variant="outline" size="sm" onClick={downloadExcel} disabled={busy !== null}>
                         <FileSpreadsheet className="size-4"/>
@@ -486,11 +503,11 @@ function OrderDetail({
                             <thead>
                                 <tr className="text-center align-bottom text-muted-foreground [&>th]:px-1.5 [&>th]:pb-2 [&>th]:font-medium [&>th]:leading-tight">
                                     <th className="text-left">Item</th>
+                                    <th className="w-14">Qty</th>
                                     <th className="w-12">Pack Size</th>
                                     <th className="w-10">GST %</th>
                                     <th className="w-14">HSN</th>
                                     <th className="w-20">Rate</th>
-                                    <th className="w-14">Qty</th>
                                     <th className="w-24 bg-muted/50">Final Amount</th>
                                 </tr>
                             </thead>
@@ -498,6 +515,7 @@ function OrderDetail({
                                 {rows.map(({it, c}, i) => (
                                     <tr key={i} className="border-t">
                                         <td className="font-medium">{it.itemName}</td>
+                                        <td className="text-right tabular-nums">{fmtQty(it.qty)}</td>
                                         <td className="text-right tabular-nums text-muted-foreground">
                                             <div className="flex items-center justify-end gap-1">
                                                 {it.customPackSize !== 0 && (
@@ -511,15 +529,15 @@ function OrderDetail({
                                         <td className="text-right tabular-nums text-muted-foreground">{it.gstPercent}</td>
                                         <td className="text-right tabular-nums text-muted-foreground">{it.hsn}</td>
                                         <td className="text-right tabular-nums">{fmt(it.rate)}</td>
-                                        <td className="text-right tabular-nums">{fmtQty(it.qty)}</td>
                                         <td className="text-right tabular-nums bg-muted/50 font-medium">{fmt(c.finalAmount)}</td>
                                     </tr>
                                 ))}
                             </tbody>
                             <tfoot>
                                 <tr className="border-t-2 font-medium [&>td]:px-2 [&>td]:py-2 [&>td]:tabular-nums">
-                                    <td colSpan={5} className="text-right text-muted-foreground">Totals</td>
+                                    <td/>
                                     <td className="text-right">{fmtQty(totals.qty)}</td>
+                                    <td colSpan={4} className="text-right text-muted-foreground">Totals</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.finalAmount)}</td>
                                 </tr>
                             </tfoot>
@@ -548,6 +566,28 @@ function OrderDetail({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <Dialog open={imagePreview !== null} onOpenChange={(open) => !open && closeImagePreview()}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Order image</DialogTitle>
+                        <DialogDescription>
+                            Copy this image to paste into WhatsApp, or cancel to discard it.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {imagePreview && (
+                        <img src={imagePreview.url} alt={`Order #${order.id}`} className="w-full rounded border"/>
+                    )}
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={closeImagePreview}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={copyPreviewedImage}>
+                            Copy
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

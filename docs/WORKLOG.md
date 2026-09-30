@@ -6,6 +6,52 @@ reads the top entry first.
 
 ---
 
+## 2026-09-30 — Order pages polish: column order, image preview dialog, export styling, auto-scroll, cursor styling
+**Did:**
+- **Qty column moved to second position** (right after Item) in both Add/Edit Order
+  (`AddOrder.tsx`) and the read-only Order detail table (`OrderDetail` in
+  `SavedOrders.tsx`) — client wanted it more prominent. Totals-row column spans adjusted
+  accordingly.
+- **Copy Order Image now opens a preview dialog** instead of copying straight to the
+  clipboard — a new shadcn `Dialog` shows the rendered image with Copy/Cancel buttons,
+  so the client can see exactly what will be shared before it's copied. Side effect: the
+  old Safari/WebKit clipboard-timing hack (handing `ClipboardItem` a still-pending
+  render promise to dodge lost "user activation" across an `await`) is gone — the
+  dialog's own Copy click is a fresh user gesture, so the write can just use an
+  already-resolved `Blob` directly. Swapped `html-to-image`'s `toPng`+dataURL-slicing
+  for `toBlob` throughout, including the Save-dialog fallback path.
+- **Visual cleanup applied identically to the shareable image, Excel export, and PDF
+  export** (all three already mirrored each other's layout, so all three needed the
+  same four tweaks): merged customer/date header into one seamless bar (no dividing
+  line, header text a step larger than body text — 11→13 in the image, similarly
+  11→13pt in Excel via an explicit font size, 10→12pt in the PDF); the gross-totals row
+  merges its Item/Unit/Rate cells behind a right-aligned "Total" (Qty and Amount stay
+  their own cells); deduction lines drop the word "unit" ("Less: 6 — Item" instead of
+  "Less: 6 unit — Item") and are now right-aligned; the final net-total row merges all
+  four of Qty/Item/Unit/Rate (its Qty cell was already blank, unlike the gross row).
+  Excel achieves the "no dividing line" header via a border-sides helper (Excel can't
+  merge two independently left/right-aligned text runs into one cell); PDF gained a
+  `drawOrderHeaderBar` helper and a `mergeQty` flag on the shared totals-row drawer.
+  Verified by generating real `.xlsx`/`.pdf` files directly from the Go export code
+  (bypassing the browser) and inspecting the rendered output/underlying XML.
+- **Auto-scroll to the newest row** on "Add row" in both Add Order and Add Purchase
+  Bill — a ref on the last `<tr>` plus a `useEffect` keyed on `lines.length` calls
+  `scrollIntoView({behavior: 'smooth', block: 'center'})`. Verified in the browser by
+  adding many rows in a row.
+- **`cursor-pointer` added to the shadcn `Button` base class** — every button (Logout
+  included) now shows a pointer cursor on hover, matching the nav's `<a>` links which
+  got it for free from the browser. One-line fix in `button.tsx`, app-wide.
+- All five verified end-to-end: build/vet/tests pass, and every change was exercised
+  live in the app via `wails dev` + the Chrome extension (column order, the new preview
+  dialog including a real clipboard copy, auto-scroll, and the export layout changes on
+  a real order with a custom-pack-size deduction).
+
+**Next steps:** none outstanding for this batch. The still-open cleanup item from
+2026-09-28 (deleting the seeded demonstration order #5 and the earlier test
+company/items/customer from the real DB) remains open.
+
+---
+
 ## 2026-09-28 — Custom pack size per order line
 **Did:**
 - Worked through the client's request (a specific carton sometimes physically packed

@@ -147,12 +147,32 @@ func setOrderCell(f *excelize.File, col string, row int, value interface{}, styl
 	return f.SetCellStyle(orderSheetName, cell, cell, styleID)
 }
 
+// orderHeaderBarStyle builds a style for one half of the header bar: only the given
+// border sides (so the two halves meet with no dividing line between them, reading as
+// one continuous bar — Excel can't merge two independently-aligned text runs into a
+// single cell the way an HTML flex layout can) plus the shared yellow fill and a bumped
+// font size (13pt vs the sheet's default ~11pt elsewhere), matching
+// ShareableOrderImage.tsx's slightly-larger header text.
+func orderHeaderBarStyle(f *excelize.File, align string, sides []string) (int, error) {
+	borders := make([]excelize.Border, len(sides))
+	for i, s := range sides {
+		borders[i] = excelize.Border{Type: s, Color: "#000000", Style: 1}
+	}
+	style := &excelize.Style{
+		Border:    borders,
+		Alignment: &excelize.Alignment{Horizontal: align, Vertical: "center"},
+		Fill:      excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{headerYellowHex}},
+		Font:      &excelize.Font{Bold: true, Size: 13},
+	}
+	return f.NewStyle(style)
+}
+
 func writeOrderHeaderBar(f *excelize.File, header OrderExportHeader) error {
-	leftStyle, err := orderCellStyle(f, headerYellowHex, "left", true, "")
+	leftStyle, err := orderHeaderBarStyle(f, "left", []string{"left", "top", "bottom"})
 	if err != nil {
 		return err
 	}
-	rightStyle, err := orderCellStyle(f, headerYellowHex, "right", true, "")
+	rightStyle, err := orderHeaderBarStyle(f, "right", []string{"top", "bottom", "right"})
 	if err != nil {
 		return err
 	}
@@ -261,10 +281,6 @@ func writeOrderTotals(f *excelize.File, rows []OrderExportRow, totalsRow int) (f
 	if err != nil {
 		return 0, err
 	}
-	blankStyle, err := orderCellStyle(f, headerYellowHex, "left", false, "")
-	if err != nil {
-		return 0, err
-	}
 	labelStyle, err := orderCellStyle(f, headerYellowHex, "right", true, "")
 	if err != nil {
 		return 0, err
@@ -277,13 +293,15 @@ func writeOrderTotals(f *excelize.File, rows []OrderExportRow, totalsRow int) (f
 	if err := setOrderCell(f, "A", totalsRow, qty, qtyStyle); err != nil {
 		return 0, err
 	}
-	if err := setOrderCell(f, "B", totalsRow, "", blankStyle); err != nil {
+	labelCell := fmt.Sprintf("B%d", totalsRow)
+	lastCell := fmt.Sprintf("D%d", totalsRow)
+	if err := f.SetCellValue(orderSheetName, labelCell, "Total"); err != nil {
 		return 0, err
 	}
-	if err := setOrderCell(f, "C", totalsRow, "", blankStyle); err != nil {
-		return 0, err
+	if err := f.MergeCell(orderSheetName, labelCell, lastCell); err != nil {
+		return 0, fmt.Errorf("merge totals label: %w", err)
 	}
-	if err := setOrderCell(f, "D", totalsRow, "Total", labelStyle); err != nil {
+	if err := f.SetCellStyle(orderSheetName, labelCell, lastCell, labelStyle); err != nil {
 		return 0, err
 	}
 	if err := setOrderCell(f, "E", totalsRow, amount, amountStyle); err != nil {
@@ -296,7 +314,7 @@ func writeOrderTotals(f *excelize.File, rows []OrderExportRow, totalsRow int) (f
 // no fill — matches the reference image's undecorated "Less: ..." lines), and returns
 // the row number immediately after the last one, where the net Total goes.
 func writeOrderDeductions(f *excelize.File, deductions []OrderExportDeduction, startRow int) (int, error) {
-	labelStyle, err := orderCellStyle(f, "", "left", false, "")
+	labelStyle, err := orderCellStyle(f, "", "right", false, "")
 	if err != nil {
 		return 0, err
 	}
@@ -311,7 +329,7 @@ func writeOrderDeductions(f *excelize.File, deductions []OrderExportDeduction, s
 		if units < 0 {
 			verb, units, value = "Add", -units, -value
 		}
-		label := fmt.Sprintf("%s: %s unit — %s", verb, fmtOrderQty(units), d.ItemName)
+		label := fmt.Sprintf("%s: %s — %s", verb, fmtOrderQty(units), d.ItemName)
 		labelCell := fmt.Sprintf("B%d", row)
 		lastCell := fmt.Sprintf("D%d", row)
 		if err := f.SetCellValue(orderSheetName, labelCell, label); err != nil {
@@ -331,11 +349,9 @@ func writeOrderDeductions(f *excelize.File, deductions []OrderExportDeduction, s
 }
 
 // writeOrderNetTotal writes the final bold "Total" row (gross minus every deduction).
+// Unlike the gross totals row, this row's qty cell is already blank (net qty isn't
+// shown), so the label merges across all four of qty/item/unit/rate.
 func writeOrderNetTotal(f *excelize.File, amount float64, row int) error {
-	blankStyle, err := orderCellStyle(f, headerYellowHex, "left", false, "")
-	if err != nil {
-		return err
-	}
 	labelStyle, err := orderCellStyle(f, headerYellowHex, "right", true, "")
 	if err != nil {
 		return err
@@ -345,16 +361,15 @@ func writeOrderNetTotal(f *excelize.File, amount float64, row int) error {
 		return err
 	}
 
-	if err := setOrderCell(f, "A", row, "", blankStyle); err != nil {
+	labelCell := fmt.Sprintf("A%d", row)
+	lastCell := fmt.Sprintf("D%d", row)
+	if err := f.SetCellValue(orderSheetName, labelCell, "Total"); err != nil {
 		return err
 	}
-	if err := setOrderCell(f, "B", row, "", blankStyle); err != nil {
-		return err
+	if err := f.MergeCell(orderSheetName, labelCell, lastCell); err != nil {
+		return fmt.Errorf("merge net total label: %w", err)
 	}
-	if err := setOrderCell(f, "C", row, "", blankStyle); err != nil {
-		return err
-	}
-	if err := setOrderCell(f, "D", row, "Total", labelStyle); err != nil {
+	if err := f.SetCellStyle(orderSheetName, labelCell, lastCell, labelStyle); err != nil {
 		return err
 	}
 	return setOrderCell(f, "E", row, amount, amountStyle)
@@ -386,6 +401,10 @@ const (
 	pdfHeaderRowHeight = 22.0
 	pdfRowHeight       = 18.0
 	pdfFontSize        = 10
+	// pdfHeaderFontSize is used only for the merged customer/date header bar — a step
+	// larger than the body text, mirroring ShareableOrderImage.tsx's slightly-larger
+	// header row.
+	pdfHeaderFontSize = pdfFontSize + 2
 )
 
 // WriteOrderPDF writes a single order to a new PDF at path, in the same visual style
@@ -416,12 +435,7 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 	x0 := pdfMarginPt
 	y := pdfMarginPt
 
-	labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2]
-	dateWidth := pdfColWidths[3] + pdfColWidths[4]
-	if err := drawOrderCell(&pdf, x0, y, labelWidth, pdfHeaderRowHeight, header.CustomerLabel, gopdf.Left, true, &headerYellow); err != nil {
-		return err
-	}
-	if err := drawOrderCell(&pdf, x0+labelWidth, y, dateWidth, pdfHeaderRowHeight, header.Date, gopdf.Right, true, &headerYellow); err != nil {
+	if err := drawOrderHeaderBar(&pdf, x0, y, header.CustomerLabel, header.Date); err != nil {
 		return err
 	}
 	y += pdfHeaderRowHeight
@@ -457,7 +471,7 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 		pdf.AddPage()
 		y = pdf.MarginTop()
 	}
-	if err := drawOrderTotalRow(&pdf, x0, y, fmtOrderQty(totalQty), totalAmount); err != nil {
+	if err := drawOrderTotalRow(&pdf, x0, y, fmtOrderQty(totalQty), totalAmount, false); err != nil {
 		return err
 	}
 	y += pdfRowHeight
@@ -473,9 +487,9 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 			if units < 0 {
 				verb, units, value = "Add", -units, -value
 			}
-			label := fmt.Sprintf("%s: %s unit — %s", verb, fmtOrderQty(units), d.ItemName)
+			label := fmt.Sprintf("%s: %s — %s", verb, fmtOrderQty(units), d.ItemName)
 			labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
-			if err := drawOrderCell(&pdf, x0, y, labelWidth, pdfRowHeight, label, gopdf.Left, false, nil); err != nil {
+			if err := drawOrderCell(&pdf, x0, y, labelWidth, pdfRowHeight, label, gopdf.Right, false, nil); err != nil {
 				return err
 			}
 			if err := drawOrderCell(&pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(value), gopdf.Right, false, nil); err != nil {
@@ -489,7 +503,7 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 			pdf.AddPage()
 			y = pdf.MarginTop()
 		}
-		if err := drawOrderTotalRow(&pdf, x0, y, "", totalAmount-deductionTotal); err != nil {
+		if err := drawOrderTotalRow(&pdf, x0, y, "", totalAmount-deductionTotal, true); err != nil {
 			return err
 		}
 	}
@@ -500,23 +514,48 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 	return nil
 }
 
-// drawOrderTotalRow draws one bold yellow "Total" row: qty (blank when qty is ""),
-// blank Item/Unit cells, the "Total" label, and the amount — the same shape used for
-// both the gross total and (when there are deductions) the final net total.
-func drawOrderTotalRow(pdf *gopdf.GoPdf, x0, y float64, qty string, amount float64) error {
-	if err := drawOrderCell(pdf, pdfColX(0, x0), y, pdfColWidths[0], pdfRowHeight, qty, gopdf.Center, true, &headerYellow); err != nil {
-		return err
-	}
-	if err := drawOrderCell(pdf, pdfColX(1, x0), y, pdfColWidths[1], pdfRowHeight, "", gopdf.Left, false, &headerYellow); err != nil {
-		return err
-	}
-	if err := drawOrderCell(pdf, pdfColX(2, x0), y, pdfColWidths[2], pdfRowHeight, "", gopdf.Left, false, &headerYellow); err != nil {
-		return err
-	}
-	if err := drawOrderCell(pdf, pdfColX(3, x0), y, pdfColWidths[3], pdfRowHeight, "Total", gopdf.Right, true, &headerYellow); err != nil {
-		return err
+// drawOrderTotalRow draws one bold yellow "Total" row, then the amount. When mergeQty
+// is false (the gross total, which still shows a real qty sum), the qty cell is drawn
+// on its own and "Total" merges across the Item/Unit/Rate cells. When mergeQty is true
+// (the final net total, whose qty is already blank), "Total" merges across all four of
+// Qty/Item/Unit/Rate instead.
+func drawOrderTotalRow(pdf *gopdf.GoPdf, x0, y float64, qty string, amount float64, mergeQty bool) error {
+	if mergeQty {
+		labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
+		if err := drawOrderCell(pdf, pdfColX(0, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, &headerYellow); err != nil {
+			return err
+		}
+	} else {
+		if err := drawOrderCell(pdf, pdfColX(0, x0), y, pdfColWidths[0], pdfRowHeight, qty, gopdf.Center, true, &headerYellow); err != nil {
+			return err
+		}
+		labelWidth := pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
+		if err := drawOrderCell(pdf, pdfColX(1, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, &headerYellow); err != nil {
+			return err
+		}
 	}
 	return drawOrderCell(pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(amount), gopdf.Right, true, &headerYellow)
+}
+
+// drawOrderHeaderBar draws the customer-label/date header as a single bordered, filled
+// rect (no dividing line down the middle, unlike two separately-bordered cells) with
+// the label left-aligned and the date right-aligned inside it, at pdfHeaderFontSize.
+func drawOrderHeaderBar(pdf *gopdf.GoPdf, x0, y float64, label, date string) error {
+	labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2]
+	totalWidth := labelWidth + pdfColWidths[3] + pdfColWidths[4]
+
+	pdf.SetFillColor(headerYellow[0], headerYellow[1], headerYellow[2])
+	pdf.RectFromUpperLeftWithStyle(x0, y, totalWidth, pdfHeaderRowHeight, "FD")
+
+	if err := pdf.SetFont("Nunito", "B", pdfHeaderFontSize); err != nil {
+		return fmt.Errorf("set font: %w", err)
+	}
+	pdf.SetXY(x0+pdfCellPadX, y)
+	if err := pdf.CellWithOption(&gopdf.Rect{W: labelWidth - pdfCellPadX, H: pdfHeaderRowHeight}, label, gopdf.CellOption{Align: gopdf.Left | gopdf.Middle, Border: 0}); err != nil {
+		return err
+	}
+	pdf.SetXY(x0, y)
+	return pdf.CellWithOption(&gopdf.Rect{W: totalWidth - pdfCellPadX, H: pdfHeaderRowHeight}, date, gopdf.CellOption{Align: gopdf.Right | gopdf.Middle, Border: 0})
 }
 
 func drawOrderColumnHeaderRow(pdf *gopdf.GoPdf, x0, y float64) error {

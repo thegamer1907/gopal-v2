@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
 import {Plus, Trash2, Save, Calendar as CalendarIcon} from 'lucide-react';
 import {
@@ -104,6 +104,7 @@ export function AddPurchaseBill() {
     const [dateOpen, setDateOpen] = useState(false);
     const [lines, setLines] = useState<Line[]>([blankLine(1)]);
     const [nextId, setNextId] = useState(2);
+    const lastRowRef = useRef<HTMLTableRowElement>(null);
 
     // Items are company-scoped: fetched for the selected company, not cached globally.
     const [itemsForCompany, setItemsForCompany] = useState<db.Item[]>([]);
@@ -219,6 +220,11 @@ export function AddPurchaseBill() {
 
     // Clear the guard if we unmount (e.g. after confirming "switch anyway").
     useEffect(() => () => setDirty(false), [setDirty]);
+
+    // Scroll the newest row into view whenever a line is added.
+    useEffect(() => {
+        lastRowRef.current?.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }, [lines.length]);
 
     function updateLine(id: number, patch: Partial<Line>) {
         setLines((prev) => prev.map((l) => (l.id === id ? {...l, ...patch} : l)));
@@ -445,10 +451,14 @@ export function AddPurchaseBill() {
                                 </tr>
                             </thead>
                             <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1.5 [&>tr>td]:align-middle">
-                                {lines.map((line) => {
+                                {lines.map((line, i) => {
                                     const c = calc(line);
                                     return (
-                                        <tr key={line.id} className="border-t">
+                                        <tr
+                                            key={line.id}
+                                            ref={i === lines.length - 1 ? lastRowRef : undefined}
+                                            className="border-t"
+                                        >
                                             <td>
                                                 <ItemCombobox
                                                     items={itemsForCompany}

@@ -31,11 +31,11 @@ export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOr
                 <table style={{borderCollapse: 'collapse', fontSize: 11, color: '#000'}}>
                     <tbody>
                         <tr>
-                            <td colSpan={3} style={{...cell, background: HEADER_BG, fontWeight: 700}}>
-                                {customerLabel}
-                            </td>
-                            <td colSpan={2} style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>
-                                {displayDate(order.date)}
+                            <td colSpan={5} style={{...cell, background: HEADER_BG, fontWeight: 700, fontSize: 13}}>
+                                <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                                    <span>{customerLabel}</span>
+                                    <span>{displayDate(order.date)}</span>
+                                </div>
                             </td>
                         </tr>
                         <tr>
@@ -58,9 +58,9 @@ export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOr
                             <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'center'}}>
                                 {fmtQty(grossTotals.qty)}
                             </td>
-                            <td style={{...cell, background: HEADER_BG}}/>
-                            <td style={{...cell, background: HEADER_BG}}/>
-                            <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>Total</td>
+                            <td colSpan={3} style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>
+                                Total
+                            </td>
                             <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>
                                 {fmt(grossTotals.amount)}
                             </td>
@@ -71,8 +71,8 @@ export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOr
                             const value = isAdd ? -d.value : d.value;
                             return (
                                 <tr key={i}>
-                                    <td colSpan={4} style={cell}>
-                                        {isAdd ? 'Add' : 'Less'}: {fmtQty(units)} unit — {d.itemName}
+                                    <td colSpan={4} style={{...cell, textAlign: 'right'}}>
+                                        {isAdd ? 'Add' : 'Less'}: {fmtQty(units)} — {d.itemName}
                                     </td>
                                     <td style={{...cell, textAlign: 'right'}}>{fmt(value)}</td>
                                 </tr>
@@ -80,10 +80,7 @@ export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOr
                         })}
                         {deductions.length > 0 && (
                             <tr>
-                                <td style={{...cell, background: HEADER_BG}}/>
-                                <td style={{...cell, background: HEADER_BG}}/>
-                                <td style={{...cell, background: HEADER_BG}}/>
-                                <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>
+                                <td colSpan={4} style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>
                                     Total
                                 </td>
                                 <td style={{...cell, background: HEADER_BG, fontWeight: 700, textAlign: 'right'}}>
