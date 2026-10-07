@@ -119,9 +119,9 @@ var migrations = []migration{
 			FOREIGN KEY (item_id) REFERENCES items(id)
 		);`,
 	},
-	// Delivered status for sales orders. Every existing and new order defaults to
-	// not-delivered (0); flipped only via SetSalesOrderDelivered's targeted update, never
-	// via UpdateSalesOrder's whole-row overwrite (see sales_orders.go).
+	// Delivered status for sales orders. Superseded by delivery_number (migration 10) as the
+	// source of truth, but still written in step with it so the column never contradicts it
+	// — an older build rolled back to by the updater reads this and nothing else.
 	{
 		id:  8,
 		sql: `ALTER TABLE sales_orders ADD COLUMN delivered INTEGER NOT NULL DEFAULT 0;`,
@@ -135,7 +135,32 @@ var migrations = []migration{
 		id:  9,
 		sql: `ALTER TABLE sales_order_items ADD COLUMN custom_pack_size REAL NOT NULL DEFAULT 0;`,
 	},
+	// Sequential delivery number, assigned when an order is marked delivered — which is
+	// now a one-way action (see DECISIONS.md, superseding the earlier reversible toggle).
+	// `0` = not yet delivered, the same zero-sentinel convention as custom_pack_size above,
+	// and the single source of truth for delivery status: `delivered` is kept in sync but
+	// no longer read. Deliberately not UNIQUE — numbers are allocated as MAX + 1, so
+	// deleting the highest-numbered order frees its number for reuse, and a UNIQUE
+	// constraint would hard-fail that legitimate mark.
+	{
+		id:  10,
+		sql: `ALTER TABLE sales_orders ADD COLUMN delivery_number INTEGER NOT NULL DEFAULT 0;`,
+	},
+	// Backfill: give the orders already marked delivered before migration 10 their numbers.
+	{
+		id:  11,
+		sql: backfillDeliveryNumbersSQL,
+	},
 }
+
+// backfillDeliveryNumbersSQL numbers the already-delivered orders 1..N in id order. Keyed
+// on the legacy `delivered` flag, which is all a pre-delivery_number database has to go on.
+// Kept as a const because the migration-11 test runs this exact statement. Re-running it is
+// harmless: it recomputes the same ranks. The inner copy must keep its `s2` alias — that's
+// what lets the unqualified `sales_orders.id` resolve to the row being updated.
+const backfillDeliveryNumbersSQL = `UPDATE sales_orders SET delivery_number = (
+		SELECT COUNT(1) FROM sales_orders s2 WHERE s2.delivered = 1 AND s2.id <= sales_orders.id
+	) WHERE delivered = 1;`
 
 // migrate applies any migrations not yet recorded in schema_migrations.
 func migrate(conn *sql.DB) error {

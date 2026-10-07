@@ -156,15 +156,17 @@ order still uses the customer).
 > dropdown (an earlier shadcn `Select` was replaced with this per client feedback).
 
 ### `sales_orders` — sales order header (first piece of the Order Book / Sales feature)
-One row per order (from the Add Order form: Customer, Date). No order number for v1 — the
-internal `id` is the only identifier so far. Migration id 6; `delivered` added in
-migration id 8.
+One row per order (from the Add Order form: Customer, Date). No order number at entry time
+— the internal `id` is the only identifier until the order is delivered, at which point it
+also gets a sequential `delivery_number`. Migration id 6; `delivered` added in migration id
+8, `delivery_number` in id 10 (backfilled by id 11).
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key (FK target for line items) |
 | `customer_id` | INTEGER NOT NULL | → `customers(id)` (FK) — the order references the customer by id, not name |
 | `date` | TEXT NOT NULL | order date, same `dd-mmm-yy` convention/handling as `purchase_bills.date` |
-| `delivered` | INTEGER NOT NULL DEFAULT 0 | delivery status; `0` = not yet delivered (every existing/new order defaults here). Written only by `SetSalesOrderDelivered` — `UpdateSalesOrder` deliberately excludes it from its SET clause so a content-only edit/save can never reset it |
+| `delivery_number` | INTEGER NOT NULL DEFAULT 0 | **the source of truth for delivery status.** `0` = not yet delivered (every existing/new order defaults here); anything above `0` is the order's sequential delivery number, assigned once by `MarkSalesOrderDelivered` and never cleared. Deliberately **not** UNIQUE — see the numbering note below |
+| `delivered` | INTEGER NOT NULL DEFAULT 0 | **legacy mirror, kept only for backward compatibility.** Set to `1` in the same statement that assigns `delivery_number`, so it can never contradict it, but Go no longer reads it — `SalesOrder.Delivered` is derived as `delivery_number > 0`. It exists because the in-app updater keeps one generation of rollback: a client who reverts to a pre-`delivery_number` build reads this column and still sees correct delivery status. Not dropped, because dropping a column is a breaking change under the migration policy above |
 
 Foreign key: `(customer_id)` → `customers(id)`.
 
@@ -184,20 +186,46 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 `items(id)`.
 
 > Go: `db.SalesOrder`/`db.SalesOrderItem` + `AddSalesOrder` / `ListSalesOrders` /
-> `GetSalesOrder` / `UpdateSalesOrder` / `DeleteSalesOrder` in `internal/db/sales_orders.go`
+> `GetSalesOrder` / `UpdateSalesOrder` / `UpdateDeliveredSalesOrder` / `DeleteSalesOrder` /
+> `MarkSalesOrderDelivered` in `internal/db/sales_orders.go`
 > (each a direct structural mirror of `purchase_bills.go`'s equivalent — same
 > transactional delete-and-reinsert shape for Update, same two-query header-then-lines
 > shape for List/Get); exposed via `app.go`. **Final Amount** (rate × qty × pack size) is
 > derived on the frontend and not stored (shared helper `frontend/src/lib/salesOrder.ts`),
 > same pattern as Purchase Bill's calculated columns.
 >
-> **Delivered status** is a targeted, single-column write path, kept separate from the
-> whole-row `UpdateSalesOrder` overwrite: `SetSalesOrderDelivered(id, delivered)` (same
-> file) does `UPDATE sales_orders SET delivered = ? WHERE id = ?` and returns the updated
-> row. Reversible by design — the same call flips it either direction — from a button in
-> the `/orders` list row and a button on the order's edit page (`AddOrder.tsx`), both
-> firing this call directly rather than going through the edit form's Save/dirty-tracking
-> flow.
+> **Delivery is one-way** (this supersedes the original reversible toggle — see
+> DECISIONS.md). `MarkSalesOrderDelivered(id)` is a single statement, kept separate from
+> the whole-row `UpdateSalesOrder` overwrite:
+>
+> ```sql
+> UPDATE sales_orders
+>    SET delivery_number = (SELECT COALESCE(MAX(delivery_number), 0) + 1 FROM sales_orders),
+>        delivered = 1
+>  WHERE id = ? AND delivery_number = 0
+> ```
+>
+> One statement rather than read-then-write because the pool isn't pinned to a single
+> connection; `AND delivery_number = 0` is what enforces irreversibility in SQL, so a second
+> attempt matches no rows and errors. It's called directly from a button in the `/orders`
+> list row and one on the order's edit page (`AddOrder.tsx`), both behind a confirmation
+> dialog, and both bypassing the edit form's Save/dirty-tracking flow.
+>
+> **Numbering** is `MAX + 1`, so numbers can have gaps (delivered orders can still be
+> deleted) and the number of a deleted *highest* order is reused by the next mark. Both are
+> accepted — single-user app, and the number is in-app only, never shown to the customer —
+> which is also why `delivery_number` carries no UNIQUE index: it would hard-fail that
+> legitimate reuse.
+>
+> **A delivered order is frozen apart from Qty and Rate.** `UpdateSalesOrder` reads
+> `delivery_number` as the first statement in its transaction and refuses outright if it's
+> set, so the whole-row overwrite (and its `DELETE FROM sales_order_items`) can never reach
+> a delivered order. The only write path for one is `UpdateDeliveredSalesOrder`, which
+> verifies customer, date, line count, and each line's `item_id`/`custom_pack_size` against
+> the stored row before issuing a targeted `UPDATE ... SET rate = ?, qty = ?` per line.
+> Lines are matched positionally against rows read back in `id` order (the same order every
+> read returns), so the row ids never leave `internal/db` and a reordered payload is
+> rejected rather than misapplied.
 >
 > **Custom pack size** is a per-line write, not JOIN-derived (unlike `ItemPackSize`),
 > and deliberately does **not** change how `calcOrderLine` works — it's fed the

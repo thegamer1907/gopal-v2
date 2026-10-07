@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
-import {Plus, Trash2, Save, Info, Calendar as CalendarIcon, CheckCircle2, RotateCcw} from 'lucide-react';
+import {Plus, Trash2, Save, Info, Calendar as CalendarIcon, CheckCircle2} from 'lucide-react';
 import {
     ListCustomers,
     ListItems,
@@ -8,8 +8,9 @@ import {
     AddSalesOrder,
     GetSalesOrder,
     UpdateSalesOrder,
+    UpdateDeliveredSalesOrder,
     GetRateHistory,
-    SetSalesOrderDelivered,
+    MarkSalesOrderDelivered,
 } from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button, buttonVariants} from '@/components/ui/button';
@@ -31,6 +32,7 @@ import {NewItemDialog} from '@/components/NewItemDialog';
 import {CustomerCombobox} from '@/components/CustomerCombobox';
 import {EditCustomerDialog} from '@/components/EditCustomerDialog';
 import {RateHistoryDialog} from '@/components/RateHistoryDialog';
+import {MarkDeliveredDialog} from '@/components/MarkDeliveredDialog';
 import {NumberInput} from '@/components/NumberInput';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {Calendar} from '@/components/ui/calendar';
@@ -104,7 +106,10 @@ export function AddOrder() {
     const [customer, setCustomer] = useState<db.Customer | null>(null);
     const [date, setDate] = useState(todayDate());
     const [dateOpen, setDateOpen] = useState(false);
-    const [delivered, setDelivered] = useState(false);
+    // 0 until delivered; a delivered order is frozen apart from Qty and Rate.
+    const [deliveryNo, setDeliveryNo] = useState(0);
+    const delivered = deliveryNo > 0;
+    const [confirmDeliver, setConfirmDeliver] = useState(false);
     const [lines, setLines] = useState<Line[]>([blankLine(1)]);
     const [nextId, setNextId] = useState(2);
     const lastRowRef = useRef<HTMLTableRowElement>(null);
@@ -152,7 +157,8 @@ export function AddOrder() {
         if (editId != null) return;
         setCustomer(null);
         setDate(todayDate());
-        setDelivered(false);
+        setDeliveryNo(0);
+        setConfirmDeliver(false);
         setLines([blankLine(1)]);
         setNextId(2);
         setHistoryLineId(null);
@@ -192,7 +198,7 @@ export function AddOrder() {
                         } as db.Customer),
                 );
                 setDate(displayDate(order.date));
-                setDelivered(order.delivered);
+                setDeliveryNo(order.deliveryNo);
                 const prefilled: Line[] = order.items.map((oi, i) => ({
                     id: i + 1,
                     item: itemById.get(oi.itemId) ?? null,
@@ -369,8 +375,13 @@ export function AddOrder() {
 
         try {
             if (editId != null) {
-                // Edit mode: complete overwrite, then return to the list.
-                await UpdateSalesOrder(order as db.SalesOrder);
+                // Edit mode. A delivered order is frozen apart from Qty and Rate, so it goes
+                // through the narrow update path; everything else is a complete overwrite.
+                if (delivered) {
+                    await UpdateDeliveredSalesOrder(order as db.SalesOrder);
+                } else {
+                    await UpdateSalesOrder(order as db.SalesOrder);
+                }
                 setDirty(false);
                 navigate('/orders');
                 return;
@@ -390,15 +401,15 @@ export function AddOrder() {
 
     const historyLine = lines.find((l) => l.id === historyLineId) ?? null;
 
-    // Marking delivered/not-delivered is a direct, immediate write independent of the
-    // form's Save flow — it doesn't touch customer/date/lines state, doesn't interact
-    // with the unsaved-changes guard, and doesn't navigate away.
-    async function toggleDelivered() {
+    // Marking delivered is a direct, immediate write independent of the form's Save flow —
+    // it doesn't touch customer/date/lines state, doesn't interact with the unsaved-changes
+    // guard, and doesn't navigate away. One-way, so it's confirmed first.
+    async function markDelivered() {
         if (editId == null) return;
         try {
-            const updated = await SetSalesOrderDelivered(editId, !delivered);
-            setDelivered(updated.delivered);
-            setSaved(`Order marked ${updated.delivered ? 'delivered' : 'not delivered'}.`);
+            const updated = await MarkSalesOrderDelivered(editId);
+            setDeliveryNo(updated.deliveryNo);
+            setSaved(`Order marked delivered as #${updated.deliveryNo}.`);
         } catch (e: any) {
             setError(String(e));
         }
@@ -408,20 +419,20 @@ export function AddOrder() {
         <form onSubmit={handleSubmit} className="space-y-6">
             {editId != null && (
                 <div className="flex items-center justify-between gap-3">
-                    <h1 className="text-2xl font-semibold tracking-tight">Edit order</h1>
-                    <Button type="button" variant="outline" size="sm" onClick={toggleDelivered}>
-                        {delivered ? (
-                            <>
-                                <RotateCcw className="size-4"/>
-                                Mark not delivered
-                            </>
-                        ) : (
-                            <>
-                                <CheckCircle2 className="size-4"/>
-                                Mark delivered
-                            </>
-                        )}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-semibold tracking-tight">Edit order</h1>
+                        {delivered && <Badge variant="default">Delivered #{deliveryNo}</Badge>}
+                    </div>
+                    {delivered ? (
+                        <p className="text-sm text-muted-foreground">
+                            Delivered — only Qty and Rate can be changed.
+                        </p>
+                    ) : (
+                        <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDeliver(true)}>
+                            <CheckCircle2 className="size-4"/>
+                            Mark delivered
+                        </Button>
+                    )}
                 </div>
             )}
             <Card>
@@ -440,6 +451,7 @@ export function AddOrder() {
                                 value={customer}
                                 onSelect={requestCustomer}
                                 onAddNew={(name) => setCustomerDialog({open: true, name})}
+                                disabled={delivered}
                             />
                         </div>
                         <div className="grid gap-2">
@@ -452,11 +464,13 @@ export function AddOrder() {
                                     className="pr-9"
                                     value={date}
                                     onChange={(e) => setDate(e.target.value)}
+                                    disabled={delivered}
                                 />
                                 <Popover open={dateOpen} onOpenChange={setDateOpen}>
                                     <PopoverTrigger
                                         type="button"
                                         aria-label="Pick a date"
+                                        disabled={delivered}
                                         className={cn(
                                             buttonVariants({variant: 'ghost', size: 'icon'}),
                                             'absolute right-1 top-1 size-7 text-muted-foreground',
@@ -524,7 +538,7 @@ export function AddOrder() {
                                                     value={line.item}
                                                     onSelect={(item) => selectItem(line.id, item)}
                                                     onAddNew={(name) => openNewItem(line.id, name)}
-                                                    disabled={!customer}
+                                                    disabled={!customer || delivered}
                                                     placeholder={customer ? 'Search item…' : 'Select a customer first'}
                                                     showCompany
                                                     className="w-72"
@@ -548,7 +562,7 @@ export function AddOrder() {
                                                         className="w-14 text-right"
                                                         value={line.packSize}
                                                         onChange={(v) => updateLine(line.id, {packSize: v})}
-                                                        disabled={!line.item}
+                                                        disabled={!line.item || delivered}
                                                     />
                                                 </div>
                                             </td>
@@ -582,15 +596,19 @@ export function AddOrder() {
                                                     <Info className="size-4"/>
                                                 </Button>
                                             </td>
+                                            {/* Keep the cell even when delivered, so the column
+                                                count stays in step with the totals row. */}
                                             <td>
-                                                <Button
-                                                    type="button" variant="ghost" size="icon"
-                                                    className="text-muted-foreground hover:text-destructive"
-                                                    disabled={lines.length === 1}
-                                                    onClick={() => removeLine(line.id)}
-                                                >
-                                                    <Trash2 className="size-4"/>
-                                                </Button>
+                                                {!delivered && (
+                                                    <Button
+                                                        type="button" variant="ghost" size="icon"
+                                                        className="text-muted-foreground hover:text-destructive"
+                                                        disabled={lines.length === 1}
+                                                        onClick={() => removeLine(line.id)}
+                                                    >
+                                                        <Trash2 className="size-4"/>
+                                                    </Button>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -608,12 +626,14 @@ export function AddOrder() {
                         </table>
                     </div>
 
-                    <div>
-                        <Button type="button" variant="outline" size="sm" onClick={addLine}>
-                            <Plus className="size-4"/>
-                            Add row
-                        </Button>
-                    </div>
+                    {!delivered && (
+                        <div>
+                            <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                                <Plus className="size-4"/>
+                                Add row
+                            </Button>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -641,6 +661,14 @@ export function AddOrder() {
                 initialName={customerDialog.name}
                 onOpenChange={(open) => setCustomerDialog((d) => ({...d, open, name: open ? d.name : ''}))}
                 onSaved={onCustomerCreated}
+            />
+
+            <MarkDeliveredDialog
+                open={confirmDeliver}
+                onOpenChange={setConfirmDeliver}
+                orderId={editId ?? 0}
+                customerName={customer?.name ?? ''}
+                onConfirm={markDelivered}
             />
 
             <RateHistoryDialog

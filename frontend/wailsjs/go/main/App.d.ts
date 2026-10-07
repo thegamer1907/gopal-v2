@@ -58,17 +58,19 @@ export function ListPurchaseBills():Promise<Array<db.PurchaseBill>>;
 
 export function ListSalesOrders():Promise<Array<db.SalesOrder>>;
 
+export function MarkSalesOrderDelivered(arg1:number):Promise<db.SalesOrder>;
+
 export function OpenExistingDatabase():Promise<string>;
 
 export function Quit():Promise<void>;
 
 export function SaveOrderShareImage(arg1:Array<number>,arg2:string):Promise<string>;
 
-export function SetSalesOrderDelivered(arg1:number,arg2:boolean):Promise<db.SalesOrder>;
-
 export function UpdateCompany(arg1:number,arg2:string):Promise<db.Company>;
 
 export function UpdateCustomer(arg1:db.Customer):Promise<db.Customer>;
+
+export function UpdateDeliveredSalesOrder(arg1:db.SalesOrder):Promise<db.SalesOrder>;
 
 export function UpdateItem(arg1:number,arg2:number,arg3:string,arg4:number,arg5:number,arg6:number):Promise<db.Item>;
 

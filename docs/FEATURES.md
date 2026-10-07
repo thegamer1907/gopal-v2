@@ -74,18 +74,26 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   added to `db.SalesOrder` (`internal/db/sales_orders.go`). Verified working on macOS
   (`wails dev`); clipboard-write behavior on the shipping Windows/WebView2 target is
   unverified — untested there, falls back to Save-dialog if it doesn't work.
-- **Order delivered status** — new `delivered` column on `sales_orders` (migration id 8,
-  defaults `false`/not-delivered for every existing and new order). Reversible toggle,
-  markable from two places: an inline icon button per row in the `/orders` list table
-  (`SavedOrders.tsx`) and a "Mark delivered" / "Mark not delivered" button on the order's
-  edit page (`AddOrder.tsx`, next to the "Edit order" heading) — both call the new
-  `SetSalesOrderDelivered` method directly, independent of the edit page's own Save flow.
-  The `/orders` list shows **only undelivered orders by default**, with a "Show delivered"
-  `Switch` in the toolbar to include them; when shown, each row (and the read-only detail
-  view) carries a Delivered/Pending `Badge`. `UpdateSalesOrder` deliberately never touches
-  `delivered`, so saving unrelated order edits can't reset it. Backend:
-  `SetSalesOrderDelivered` in `internal/db/sales_orders.go` + `app.go`. First use of a
-  boolean column, and first `switch`/`badge` shadcn components, in this codebase.
+- **Order delivered status — irreversible, numbered, edit-locked** (reworked 2026-10-06;
+  originally shipped in v0.7.0 as a reversible toggle). Marking an order delivered is now
+  **one-way** and **assigns a sequential delivery number** (first = 1, then last + 1 —
+  deleting an order leaves a permanent gap rather than one that gets refilled). Markable
+  from the same two places as before — an inline icon button per row in the `/orders` list
+  (`SavedOrders.tsx`) and a "Mark delivered" button on the order's edit page
+  (`AddOrder.tsx`) — but now behind a **confirmation dialog** (shared
+  `MarkDeliveredDialog`), the way deleting already was. A delivered order is **frozen apart
+  from Qty and Rate**: no adding/removing lines, no item swap, no pack-size change, no
+  customer or date change — enforced in Go, not just disabled in the UI, so a stale frontend
+  can't get around it. The `/orders` "Delivered only" toggle is now **exclusive** (on =
+  delivered only, off = undelivered only); the delivered list carries a sortable
+  **Delivery #** column and the detail/edit header shows a `Delivered #N` badge. The number
+  is deliberately **in-app only** — the WhatsApp image and the Excel/PDF exports are
+  unchanged. Deleting a delivered order is still allowed. Backend: `delivery_number` column
+  (migration id 10, backfilled by id 11) as the source of truth, with the old `delivered`
+  boolean kept in sync purely so an updater rollback to an older build still reads correctly;
+  `MarkSalesOrderDelivered` + `UpdateDeliveredSalesOrder` in `internal/db/sales_orders.go` +
+  `app.go`, and the codebase's first sales-order tests. See DECISIONS for the column-over-table
+  call and the accepted number-reuse wrinkle.
 - **Customers master** (first piece of the **Sales / Order Book** feature) — new
   `/customers` page: add/edit/delete customers (Name, Nick Name, Address 1/2, City, State,
   Pincode, GSTIN, Mobile). Only **Name and City are required**; everything else can be

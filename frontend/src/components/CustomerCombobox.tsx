@@ -15,6 +15,7 @@ interface Props {
     // When omitted, the "add … as new customer" option isn't offered (pick-only).
     onAddNew?: (query: string) => void;
     id?: string;
+    disabled?: boolean;
 }
 
 // "Name (Nickname)" — nickname parenthetical omitted when blank.
@@ -27,7 +28,7 @@ function label(c: db.Customer): string {
     return c.city ? `${nameLabel(c)} · ${c.city}` : nameLabel(c);
 }
 
-export function CustomerCombobox({customers, value, onSelect, onAddNew, id}: Props) {
+export function CustomerCombobox({customers, value, onSelect, onAddNew, id, disabled}: Props) {
     const [query, setQuery] = useState('');
     const [open, setOpen] = useState(false);
     const blurTimer = useRef<number | undefined>(undefined);
@@ -62,6 +63,7 @@ export function CustomerCombobox({customers, value, onSelect, onAddNew, id}: Pro
                 id={id}
                 placeholder="Search customer by name, nickname, or city…"
                 autoComplete="off"
+                disabled={disabled}
                 value={query}
                 onChange={(e) => {
                     setQuery(e.target.value);
@@ -72,7 +74,7 @@ export function CustomerCombobox({customers, value, onSelect, onAddNew, id}: Pro
                     blurTimer.current = window.setTimeout(() => setOpen(false), 150);
                 }}
             />
-            {open && (
+            {open && !disabled && (
                 <div
                     className="absolute left-0 right-0 z-50 mt-1 max-h-64 overflow-auto rounded-md border bg-background p-1 shadow-md"
                     // Keep the input focused (so onBlur doesn't fire) when clicking inside.

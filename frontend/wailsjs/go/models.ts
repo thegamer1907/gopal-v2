@@ -190,6 +190,7 @@ export namespace db {
 	    customerNickName: string;
 	    customerCity: string;
 	    date: string;
+	    deliveryNo: number;
 	    delivered: boolean;
 	    items: SalesOrderItem[];
 	
@@ -205,6 +206,7 @@ export namespace db {
 	        this.customerNickName = source["customerNickName"];
 	        this.customerCity = source["customerCity"];
 	        this.date = source["date"];
+	        this.deliveryNo = source["deliveryNo"];
 	        this.delivered = source["delivered"];
 	        this.items = this.convertValues(source["items"], SalesOrderItem);
 	    }

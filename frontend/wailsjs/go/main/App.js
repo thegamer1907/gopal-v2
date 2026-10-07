@@ -110,6 +110,10 @@ export function ListSalesOrders() {
   return window['go']['main']['App']['ListSalesOrders']();
 }
 
+export function MarkSalesOrderDelivered(arg1) {
+  return window['go']['main']['App']['MarkSalesOrderDelivered'](arg1);
+}
+
 export function OpenExistingDatabase() {
   return window['go']['main']['App']['OpenExistingDatabase']();
 }
@@ -122,16 +126,16 @@ export function SaveOrderShareImage(arg1, arg2) {
   return window['go']['main']['App']['SaveOrderShareImage'](arg1, arg2);
 }
 
-export function SetSalesOrderDelivered(arg1, arg2) {
-  return window['go']['main']['App']['SetSalesOrderDelivered'](arg1, arg2);
-}
-
 export function UpdateCompany(arg1, arg2) {
   return window['go']['main']['App']['UpdateCompany'](arg1, arg2);
 }
 
 export function UpdateCustomer(arg1) {
   return window['go']['main']['App']['UpdateCustomer'](arg1);
+}
+
+export function UpdateDeliveredSalesOrder(arg1) {
+  return window['go']['main']['App']['UpdateDeliveredSalesOrder'](arg1);
 }
 
 export function UpdateItem(arg1, arg2, arg3, arg4, arg5, arg6) {

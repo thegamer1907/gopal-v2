@@ -157,9 +157,15 @@ func (a *App) GetSalesOrder(id int64) (db.SalesOrder, error) {
 	return db.GetSalesOrder(a.db, id)
 }
 
-// UpdateSalesOrder overwrites a sales order completely (header + all line items).
+// UpdateSalesOrder overwrites an undelivered sales order completely (header + all line
+// items). Errors on a delivered order — use UpdateDeliveredSalesOrder for those.
 func (a *App) UpdateSalesOrder(order db.SalesOrder) (db.SalesOrder, error) {
 	return db.UpdateSalesOrder(a.db, order)
+}
+
+// UpdateDeliveredSalesOrder updates only qty and rate on a delivered order's existing lines.
+func (a *App) UpdateDeliveredSalesOrder(order db.SalesOrder) (db.SalesOrder, error) {
+	return db.UpdateDeliveredSalesOrder(a.db, order)
 }
 
 // DeleteSalesOrder removes a sales order and its line items.
@@ -167,10 +173,10 @@ func (a *App) DeleteSalesOrder(id int64) error {
 	return db.DeleteSalesOrder(a.db, id)
 }
 
-// SetSalesOrderDelivered marks a sales order delivered/not-delivered and returns the
-// updated order.
-func (a *App) SetSalesOrderDelivered(id int64, delivered bool) (db.SalesOrder, error) {
-	return db.SetSalesOrderDelivered(a.db, id, delivered)
+// MarkSalesOrderDelivered irreversibly marks a sales order delivered, assigning it the next
+// delivery number, and returns the updated order.
+func (a *App) MarkSalesOrderDelivered(id int64) (db.SalesOrder, error) {
+	return db.MarkSalesOrderDelivered(a.db, id)
 }
 
 // --- Order sharing ---

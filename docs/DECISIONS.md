@@ -769,3 +769,61 @@ have to re-litigate.
 - **Stock unaffected**: confirmed directly with the client — stock is tracked at the
   carton level (qty), not units-within-cartons, so the existing purchased-minus-sold
   stock derivation needed zero changes.
+
+### 2026-10-06 — Delivery is irreversible and numbered (supersedes 2026-09-27's reversible toggle)
+- **Decision:** Marking a sales order delivered is now **one-way**, and each delivered order
+  gets a **sequential delivery number** (first = 1). Stored as a new
+  `sales_orders.delivery_number` column (migration id 10, `INTEGER NOT NULL DEFAULT 0`,
+  backfilled for already-delivered rows by id 11) — **not** a separate `delivered_orders`
+  table. `delivery_number > 0` is the sole source of truth for delivery status; the old
+  `delivered` boolean is kept and written in step with it, but never read. Once delivered,
+  an order is frozen apart from **Qty and Rate** — no line add/remove, no item swap, no
+  pack-size change, no customer or date change — and the `/orders` "Delivered only" toggle
+  became **exclusive** (on = delivered only, off = undelivered only) rather than
+  "also include delivered". Marking is **confirmed with an `AlertDialog`**, the way deleting
+  already was. Deleting a delivered order is still allowed (client's call).
+- **Why:** The client changed their mind about reversibility — a delivered order has
+  physically gone out, so it's a fact, not a status, and the number is how they refer to it.
+  **A column over a table:** moving delivered rows into a second table would be a
+  data-relocating migration against the client's real data (which DATA_MODEL's policy says
+  to avoid and flag), it doesn't fit the migration runner's one-statement-per-id shape, and
+  it would force a `UNION` into every derived read — item stock (`itemSelect`, which runs on
+  every item listing) and the `DeleteCustomer` guard. It also cuts against two existing
+  decisions that rejected extra tables for derived data (item stock, rate history). A
+  defaulted column is purely additive: it applies itself to the client's database with zero
+  data loss and nothing for them to do. **Keeping `delivered`:** dropping a column is a
+  breaking change, and the column has a real use — the in-app updater keeps one generation
+  of rollback, so a client who reverts to a v0.7 build still reads it and sees correct
+  status. Writing both in one statement makes divergence structurally impossible rather than
+  merely unlikely.
+- **Enforced in Go, not just the UI**, following the same principle as the original
+  entry: `UpdateSalesOrder` reads `delivery_number` as the first statement in its
+  transaction and refuses a delivered order outright, so its whole-row overwrite and
+  `DELETE FROM sales_order_items` can't reach one even from a stale frontend. The narrow
+  `UpdateDeliveredSalesOrder` validates customer/date/line-count/item/pack-size against the
+  stored rows, then issues a targeted per-line `UPDATE ... SET rate, qty`. Line rows are
+  matched positionally against ids read back inside the function, so `SalesOrderItem` gains
+  no `ID` field and the frontend is never trusted to round-trip row ids.
+- **Numbering is `MAX(delivery_number) + 1`**, allocated in the same statement as the mark
+  (`WHERE id = ? AND delivery_number = 0` — the irreversibility guard lives in SQL). Gaps
+  are permanent: if the last number was 9 and 8's order was deleted, the next is 10, never
+  8. The one accepted wrinkle is that deleting the *highest*-numbered order frees its number
+  for reuse; a counter table would prevent it, but the number is in-app only (deliberately
+  absent from the WhatsApp image / Excel / PDF exports) and deleting a delivered order is
+  rare. Hence no UNIQUE index on the column — it would hard-fail that legitimate reuse.
+- **Alternatives:** A `delivered_orders` table, as originally floated — rejected for the
+  reasons above. Making a double-mark a silent no-op — rejected in favour of an error, since
+  the only way to reach it is a stale view, which is worth surfacing. A dual-mode
+  `UpdateSalesOrder` that branches internally — rejected: two genuinely different contracts
+  deserve two named functions, and the delivered path stays greppable.
+- **Rollback asymmetry, for the record:** an older `.exe` can set `delivered = 0` while
+  `delivery_number` stays > 0. Coming back to the new build, the order still reads as
+  delivered with its original number — the correct outcome, since the number is the truth.
+- First sales-order tests in the codebase (`internal/db/sales_orders_test.go`), including
+  one that pins the accepted number-reuse behaviour so it can't be "fixed" by accident, and
+  one that runs migration 11's statement verbatim against rows in the pre-migration shape.
+  `go build/vet/test` ✅, `npm run build` ✅, and the whole flow exercised in `wails dev`
+  against a copy of the real dev database — the pre-existing delivered order backfilled to
+  #1, two more marked to #2 and #3, the lockdown and the confirm dialogs verified on screen,
+  and a delivered order's Qty/Rate edit confirmed to leave the `sales_order_items` row ids
+  untouched (i.e. a targeted update, not a delete-and-reinsert).

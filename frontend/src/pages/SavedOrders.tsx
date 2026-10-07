@@ -1,17 +1,18 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {toBlob} from 'html-to-image';
-import {ArrowLeft, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, ImageDown, Pencil, RotateCcw, Search, Trash2} from 'lucide-react';
+import {ArrowLeft, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, ImageDown, Pencil, Search, Trash2} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
 import {
     ListSalesOrders,
     DeleteSalesOrder,
-    SetSalesOrderDelivered,
+    MarkSalesOrderDelivered,
     SaveOrderShareImage,
     ExportOrderExcel,
     ExportOrderPDF,
 } from '../../wailsjs/go/main/App';
 import {db, reports} from '../../wailsjs/go/models';
+import {MarkDeliveredDialog} from '@/components/MarkDeliveredDialog';
 import {ShareableOrderImage} from '@/components/ShareableOrderImage';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -86,11 +87,12 @@ const orderSortAccessors = {
     date: (o: db.SalesOrder) => parseDate(o.date) ?? new Date(0),
     qty: totalQtyOf,
     amount: finalAmountOf,
+    deliveryNo: (o: db.SalesOrder) => o.deliveryNo,
 };
 
-function DeliveredBadge({delivered}: {delivered: boolean}) {
-    return delivered ? (
-        <Badge variant="default">Delivered</Badge>
+function DeliveredBadge({order}: {order: db.SalesOrder}) {
+    return order.delivered ? (
+        <Badge variant="default">Delivered #{order.deliveryNo}</Badge>
     ) : (
         <Badge variant="secondary">Pending</Badge>
     );
@@ -105,6 +107,7 @@ export function SavedOrders() {
     const [search, setSearch] = useState('');
     const [range, setRange] = useState<DateRange | undefined>(undefined);
     const [showDelivered, setShowDelivered] = useState(false);
+    const [confirmDeliver, setConfirmDeliver] = useState<db.SalesOrder | null>(null);
 
     function refresh() {
         return ListSalesOrders()
@@ -122,15 +125,15 @@ export function SavedOrders() {
         [orders, selectedId],
     );
 
-    // Filter by search (customer name), by date range (inclusive, either bound
-    // optional), and by delivered status (undelivered-only unless the toggle is on),
-    // then sort. The date range's `to` is taken as end-of-day.
+    // Filter by search (customer name), by date range (inclusive, either bound optional),
+    // and by delivered status — the toggle is exclusive, showing delivered orders only when
+    // on and undelivered only when off — then sort. The date range's `to` is end-of-day.
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         const from = range?.from;
         const to = range?.to;
         return orders.filter((o) => {
-            if (!showDelivered && o.delivered) {
+            if (o.delivered !== showDelivered) {
                 return false;
             }
             if (q && !o.customerName.toLowerCase().includes(q)) {
@@ -161,10 +164,12 @@ export function SavedOrders() {
         }
     }
 
-    async function toggleDelivered(order: db.SalesOrder) {
+    // One-way, and the order leaves the (pending) view it was marked from, so refresh the
+    // whole list rather than patching the row in place.
+    async function markDelivered(id: number) {
         try {
-            const updated = await SetSalesOrderDelivered(order.id, !order.delivered);
-            setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+            await MarkSalesOrderDelivered(id);
+            await refresh();
         } catch (e: any) {
             setError(String(e));
         }
@@ -225,7 +230,7 @@ export function SavedOrders() {
                                     onCheckedChange={setShowDelivered}
                                 />
                                 <Label htmlFor="show-delivered" className="font-normal text-muted-foreground">
-                                    Show delivered
+                                    Delivered only
                                 </Label>
                             </div>
                         </div>
@@ -242,13 +247,18 @@ export function SavedOrders() {
                             ) : (
                                 <Table>
                                     <TableHeader>
+                                        {/* The filter is exclusive, so every visible row has the
+                                            same status: no Status column. Delivered rows carry
+                                            their number instead; pending rows get the mark action. */}
                                         <TableRow>
-                                            <SortableHeader label="Customer" sortKey="customer" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
+                                            {showDelivered && (
+                                                <SortableHeader label="Delivery #" sortKey="deliveryNo" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
+                                            )}
+                                            <SortableHeader label="Customer" sortKey="customer" activeKey={sortKey} dir={sortDir} onSort={toggle} className={showDelivered ? undefined : 'pl-4'}/>
                                             <SortableHeader label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                             <SortableHeader label="Qty" sortKey="qty" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                             <SortableHeader label="Final Amount" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="w-10 pr-4"/>
+                                            {!showDelivered && <TableHead className="w-10 pr-4"/>}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -258,32 +268,30 @@ export function SavedOrders() {
                                                 onClick={() => setSelectedId(order.id)}
                                                 className="cursor-pointer"
                                             >
-                                                <TableCell className="pl-4 font-medium">{order.customerName}</TableCell>
+                                                {showDelivered && (
+                                                    <TableCell className="pl-4 tabular-nums font-medium">#{order.deliveryNo}</TableCell>
+                                                )}
+                                                <TableCell className={cn('font-medium', !showDelivered && 'pl-4')}>{order.customerName}</TableCell>
                                                 <TableCell className="tabular-nums text-muted-foreground">{displayDate(order.date)}</TableCell>
                                                 <TableCell className="text-right tabular-nums text-muted-foreground">{fmtQty(totalQtyOf(order))}</TableCell>
-                                                <TableCell className="text-right tabular-nums font-medium">{fmt(finalAmountOf(order))}</TableCell>
-                                                <TableCell>
-                                                    <DeliveredBadge delivered={order.delivered}/>
-                                                </TableCell>
-                                                <TableCell className="pr-4 text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="size-8"
-                                                        aria-label={order.delivered ? 'Mark not delivered' : 'Mark delivered'}
-                                                        title={order.delivered ? 'Mark not delivered' : 'Mark delivered'}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleDelivered(order);
-                                                        }}
-                                                    >
-                                                        {order.delivered ? (
-                                                            <RotateCcw className="size-4"/>
-                                                        ) : (
+                                                <TableCell className={cn('text-right tabular-nums font-medium', showDelivered && 'pr-4')}>{fmt(finalAmountOf(order))}</TableCell>
+                                                {!showDelivered && (
+                                                    <TableCell className="pr-4 text-right">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="size-8"
+                                                            aria-label="Mark delivered"
+                                                            title="Mark delivered"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setConfirmDeliver(order);
+                                                            }}
+                                                        >
                                                             <CheckCircle2 className="size-4"/>
-                                                        )}
-                                                    </Button>
-                                                </TableCell>
+                                                        </Button>
+                                                    </TableCell>
+                                                )}
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -293,6 +301,14 @@ export function SavedOrders() {
                     </Card>
                 </>
             )}
+
+            <MarkDeliveredDialog
+                open={confirmDeliver !== null}
+                onOpenChange={(open) => !open && setConfirmDeliver(null)}
+                orderId={confirmDeliver?.id ?? 0}
+                customerName={confirmDeliver?.customerName ?? ''}
+                onConfirm={() => confirmDeliver && markDelivered(confirmDeliver.id)}
+            />
         </div>
     );
 }
@@ -491,7 +507,7 @@ function OrderDetail({
                 <CardHeader>
                     <div className="flex items-center gap-2">
                         <CardTitle>Order #{order.id}</CardTitle>
-                        <DeliveredBadge delivered={order.delivered}/>
+                        <DeliveredBadge order={order}/>
                     </div>
                     <CardDescription>
                         {order.customerName} · {displayDate(order.date)}

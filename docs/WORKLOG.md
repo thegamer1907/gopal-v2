@@ -6,6 +6,60 @@ reads the top entry first.
 
 ---
 
+## 2026-10-06 — Delivered orders: irreversible, numbered, edit-locked
+**Did:**
+- **Reworked delivery from a reversible boolean into a one-way, numbered state** — the
+  client changed their mind on reversibility (superseding the 2026-09-27 decision). New
+  `sales_orders.delivery_number` column (migration id 10) is now the source of truth, with
+  migration id 11 backfilling already-delivered rows 1..N in id order. Chose a **column
+  over the `delivered_orders` table the client floated**: moving rows would be a
+  data-relocating migration against real client data, wouldn't fit the runner's
+  one-statement-per-id shape, and would force a `UNION` into every derived read (item
+  stock, the customer delete-guard). The old `delivered` boolean is kept and written in the
+  same statement — never read by Go — purely so an updater rollback to a v0.7 build still
+  shows correct status.
+- **Numbering is `MAX + 1`**, allocated inside the mark statement itself
+  (`WHERE id = ? AND delivery_number = 0`, so irreversibility is enforced in SQL and a
+  double-mark errors). Gaps are permanent; the one accepted wrinkle — deleting the
+  *highest*-numbered order frees its number for reuse — is documented and pinned by a test.
+  Deleting a delivered order stays allowed, per the client.
+- **A delivered order is frozen apart from Qty and Rate**, enforced in Go rather than only
+  in the UI: `UpdateSalesOrder` now reads `delivery_number` as the first statement in its
+  transaction and refuses a delivered order outright (so its whole-row overwrite and
+  `DELETE FROM sales_order_items` can't reach one), and the new `UpdateDeliveredSalesOrder`
+  validates customer/date/line-count/item/pack-size against the stored rows before issuing
+  targeted per-line `UPDATE ... SET rate, qty`. Lines match positionally against ids read
+  inside the function, so `SalesOrderItem` gained no `ID` field and the frontend is never
+  trusted to round-trip row ids.
+- **Frontend**: the `/orders` "Delivered only" toggle became **exclusive** (on = delivered
+  only, off = undelivered only), the now-redundant Status column was dropped, and the
+  delivered view gained a sortable **Delivery #** column while the pending view keeps the
+  mark-delivered button. **Marking is confirmed** by a new shared `MarkDeliveredDialog` —
+  the client's ask, matching the existing delete confirm — used from both the list row and
+  the edit page. Detail/edit headers show a `Delivered #N` badge; the edit page disables
+  Customer, Date, item picker and Pack Size and hides Add-row/delete-row. `CustomerCombobox`
+  gained a `disabled` prop. Exports (WhatsApp image / Excel / PDF) are deliberately
+  untouched — the number is in-app only.
+- **First sales-order tests in the codebase** (`internal/db/sales_orders_test.go`, 11 of
+  them) covering numbering, one-wayness, the `UpdateSalesOrder` refusal, the allowed
+  qty/rate edit (asserting the line row ids survive, i.e. a targeted update), every
+  rejection case, the delete-gap/number-reuse behaviour, and migration 11's statement run
+  verbatim against pre-migration-shaped rows.
+- Verified end-to-end: `go build/vet/test` ✅, `npm run build` ✅, and the whole flow walked
+  in `wails dev` + the Chrome extension against a **copy of the real dev DB** — the
+  pre-existing delivered order backfilled to #1, two more marked to #2/#3 (confirm dialog
+  opening and Cancel writing nothing both checked), the lockdown verified on screen, a
+  delivered order's Qty/Rate edit confirmed to leave `sales_order_items.id` untouched, and
+  Copy Order Image re-rendered correctly with no delivery number. **The dev DB was restored
+  to its pre-test state afterwards** (backup taken before the run), so those test marks
+  aren't sitting in it — the migration simply re-applies on next open.
+
+**Next steps:** none outstanding for this batch. The still-open cleanup item from
+2026-09-28 (deleting the seeded demonstration order #5 and the earlier test
+company/items/customer from the real DB) remains open.
+
+---
+
 ## 2026-09-30 — Order pages polish: column order, image preview dialog, export styling, auto-scroll, cursor styling
 **Did:**
 - **Qty column moved to second position** (right after Item) in both Add/Edit Order

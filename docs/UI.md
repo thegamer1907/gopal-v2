@@ -165,7 +165,9 @@ Screens, flows, and visual decisions, recorded as they firm up.
   bill editor: the same component handles `/orders/:id/edit` (route param via
   `useParams`). Edit mode prefills header + lines from `GetSalesOrder`, shows an "Edit
   order" heading + "Update order" button, and saves via a **complete overwrite**
-  (`UpdateSalesOrder`) before returning to View/Edit Orders. The customer is resolved from
+  (`UpdateSalesOrder`) before returning to View/Edit Orders — unless the order is delivered,
+  in which case it saves through the narrow `UpdateDeliveredSalesOrder` instead (see the
+  delivered-order section below). The customer is resolved from
   a freshly-fetched full customer list (not a partial reconstruction the way Add Purchase
   Bill does for Company) since `CustomerCombobox` dereferences fields — nickname, city —
   that a partial object wouldn't have. Each existing line's rate history is fetched (info
@@ -186,6 +188,17 @@ Screens, flows, and visual decisions, recorded as they firm up.
   exist under different companies). **Column order**: Item · Pack Size · GST % · HSN ·
   **Stock** (all read-only, from the selected item) · **Rate · Qty** (inputs) ·
   **Final Amount** (calculated, shaded band) · info button · delete.
+- **Delivered orders are locked down** (edit mode only). The heading gains a
+  **`Delivered #N`** badge and, in place of the Mark-delivered button, the line
+  "Delivered — only Qty and Rate can be changed." Customer, Date, the item picker and Pack
+  Size all render `disabled`; the per-row delete button and the "Add row" button disappear
+  entirely. **Qty and Rate stay editable**, and "Update order" saves them through
+  `UpdateDeliveredSalesOrder`, which re-validates everything else server-side.
+- **"Mark delivered"** sits beside the "Edit order" heading on an undelivered order and
+  opens the shared `MarkDeliveredDialog` confirm (same wording as the `/orders` list). It's
+  a direct write that bypasses the form's Save flow and the unsaved-changes guard: on
+  confirm the badge, the lockdown and a "Order marked delivered as #N." message all appear
+  in place without navigating away. There is no un-mark — delivery is one-way.
 - **Stock**: current on-hand quantity for the selected item — total purchased minus total
   sold, **derived** (not stored; see `docs/DATA_MODEL.md`'s `items.stock` note), already
   present on every cached item so it needs no extra fetch. The cached item list is
@@ -216,16 +229,29 @@ Screens, flows, and visual decisions, recorded as they firm up.
   **list → detail**, single page. Loads all orders via `ListSalesOrders` on mount
   (`refresh()` reused after a delete).
 - **List**: a card with a table of orders — columns **Customer · Date · Qty · Final
-  Amount** (no "order number" column — that field doesn't exist). **Default sort: Date,
-  newest first**; every column header is a `SortableHeader`. Above the table: a **search
-  box** (customer name only) and a **`DateRangeFilter`** (same inclusive/end-of-day
-  behavior as View/Edit Bills).
-- **Detail**: clicking a row swaps in a read-only view — "Back to all orders" plus **Edit
-  order** and **Delete** actions, a header card ("Order #{id}" / "{customerName} ·
-  {date}"), and a display-only line-items grid (Item · Pack Size · GST % · HSN · Rate ·
-  Qty · Final Amount, footer Totals row for Qty and Final Amount). **No Stock column
-  here** — Stock is a live decision-support figure for placing a *new* order, not a fact
-  about a saved one.
+  Amount**. **Default sort: Date, newest first**; every column header is a
+  `SortableHeader`. Above the table: a **search box** (customer name only), a **"Delivered
+  only" `Switch`**, and a **`DateRangeFilter`** (same inclusive/end-of-day behavior as
+  View/Edit Bills).
+  - The **"Delivered only" toggle is exclusive**: off (the default) shows only undelivered
+    orders, on shows only delivered ones. Because every visible row therefore has the same
+    status, there's no Status column — instead the two modes differ:
+    - **off (pending)**: each row ends with an inline **mark-delivered icon button**.
+    - **on (delivered)**: a leading sortable **Delivery #** column, and no action button
+      (there's nothing left to do to a delivered order from the list).
+  - **Marking delivered is one-way and confirmed**: the icon button opens a
+    `MarkDeliveredDialog` (shared with the edit page) spelling out that the order gets the
+    next delivery number and can't be moved back to pending. On confirm the list refreshes
+    and the order moves to the other side of the toggle.
+- **Detail**: clicking a row swaps in a read-only view — "Back to all orders" plus **Copy
+  Order Image**, **Download Excel**, **Download PDF**, **Edit order** and **Delete**
+  actions, a header card ("Order #{id}" + a **`Delivered #N`** or **`Pending`** badge /
+  "{customerName} · {date}"), and a display-only line-items grid (Item · Qty · Pack Size ·
+  GST % · HSN · Rate · Final Amount, footer Totals row for Qty and Final Amount). **No
+  Stock column here** — Stock is a live decision-support figure for placing a *new* order,
+  not a fact about a saved one. Every action stays available on a delivered order,
+  including Delete; the exports are identical either way (**no delivery number in the
+  customer-facing image/Excel/PDF** — it's an in-app identifier).
   - **Edit order** → navigates to `/orders/:id/edit` (the same `AddOrder.tsx` form in
     edit mode).
   - **Delete** → a controlled `AlertDialog` confirm → `DeleteSalesOrder` → back to the
