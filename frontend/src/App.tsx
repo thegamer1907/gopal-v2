@@ -24,7 +24,7 @@ function App() {
             <UnsavedChangesProvider>
                 <div className="flex h-svh flex-col">
                     <TopNav/>
-                    <main className="flex-1 overflow-auto px-6 py-8">
+                    <main className="flex-1 overflow-auto px-6 py-4">
                         <Routes>
                             <Route path="/" element={<Dashboard/>}/>
                             <Route path="/purchase-bills/new" element={<AddPurchaseBill/>}/>

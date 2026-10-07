@@ -12,13 +12,7 @@ import {SortableHeader} from '@/components/SortableHeader';
 import {useTableSort} from '@/hooks/useTableSort';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {fmtQty} from '@/lib/purchaseBill';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import {Card, CardContent, CardHeader} from '@/components/ui/card';
 import {
     Table,
     TableBody,
@@ -135,16 +129,8 @@ export function Items() {
     }
 
     return (
-        <div className="space-y-6">
-            <p className="text-sm text-muted-foreground">
-                {items.length} {items.length === 1 ? 'item' : 'items'}
-            </p>
-
+        <div className="space-y-4">
             <Card>
-                <CardHeader>
-                    <CardTitle>Add item</CardTitle>
-                    <CardDescription>Create a new item in the master list.</CardDescription>
-                </CardHeader>
                 <CardContent>
                     <form
                         className="flex flex-wrap items-end gap-3"
@@ -209,9 +195,8 @@ export function Items() {
             </Card>
 
             <Card>
-                <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
-                    <CardTitle>Items</CardTitle>
-                    {items.length > 0 && (
+                {items.length > 0 && (
+                    <CardHeader className="flex items-center justify-between gap-4">
                         <div className="relative w-64">
                             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
                             <Input
@@ -222,16 +207,19 @@ export function Items() {
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
-                    )}
-                </CardHeader>
-                <CardContent>
+                        <span className="text-sm text-muted-foreground">
+                            {sorted.length} {sorted.length === 1 ? 'item' : 'items'}
+                        </span>
+                    </CardHeader>
+                )}
+                <CardContent className="p-0">
                     {items.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
                             <Package className="size-8 opacity-40"/>
                             <p className="text-sm">No items yet. Add one above to get started.</p>
                         </div>
                     ) : filtered.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
                             <Search className="size-8 opacity-40"/>
                             <p className="text-sm">No items match "{search}".</p>
                         </div>
@@ -239,25 +227,25 @@ export function Items() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <SortableHeader label="Company" sortKey="company" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
+                                    <SortableHeader label="Company" sortKey="company" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
                                     <SortableHeader label="Item" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                     <SortableHeader label="Pack Size" sortKey="packSize" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                     <SortableHeader label="GST %" sortKey="gstPercent" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <SortableHeader label="HSN" sortKey="hsn" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                     <SortableHeader label="Stock" sortKey="stock" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
-                                    <TableHead className="w-24 text-right">Actions</TableHead>
+                                    <TableHead className="w-24 pr-4 text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {sorted.map((it) => (
                                     <TableRow key={it.id}>
-                                        <TableCell className="text-muted-foreground">{it.companyName}</TableCell>
+                                        <TableCell className="pl-4 text-muted-foreground">{it.companyName}</TableCell>
                                         <TableCell className="font-medium">{it.name}</TableCell>
                                         <TableCell>{it.packSize}</TableCell>
                                         <TableCell className="text-right tabular-nums">{it.gstPercent}</TableCell>
                                         <TableCell>{it.hsn}</TableCell>
                                         <TableCell className="text-right tabular-nums">{fmtQty(it.stock)}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="pr-4 text-right">
                                             <div className="flex justify-end gap-1">
                                                 <Button
                                                     variant="ghost"

@@ -22,13 +22,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import {Card, CardContent} from '@/components/ui/card';
 import {ItemCombobox} from '@/components/ItemCombobox';
 import {NewItemDialog} from '@/components/NewItemDialog';
 import {CompanyCombobox} from '@/components/CompanyCombobox';
@@ -347,19 +341,15 @@ export function AddPurchaseBill() {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
             {editId != null && (
-                <h1 className="text-2xl font-semibold tracking-tight">Edit purchase bill</h1>
+                <h1 className="text-base font-semibold tracking-tight">Edit purchase bill</h1>
             )}
             <Card>
-                <CardHeader>
-                    <CardTitle>Purchase bill details</CardTitle>
-                    <CardDescription>Who the bill is from and its bill number.</CardDescription>
-                </CardHeader>
                 <CardContent>
                     <div className="grid gap-4 sm:grid-cols-3">
                         <div className="grid gap-2">
-                            <Label htmlFor="company">Company name</Label>
+                            <Label htmlFor="company" className="sr-only">Company name</Label>
                             <CompanyCombobox
                                 key={companyComboKey}
                                 id="company"
@@ -370,7 +360,7 @@ export function AddPurchaseBill() {
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="bill">Bill number</Label>
+                            <Label htmlFor="bill" className="sr-only">Bill number</Label>
                             <Input
                                 id="bill"
                                 placeholder="e.g. INV-1042"
@@ -380,7 +370,7 @@ export function AddPurchaseBill() {
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="date">Date</Label>
+                            <Label htmlFor="date" className="sr-only">Date</Label>
                             <div className="relative">
                                 <Input
                                     id="date"
@@ -422,12 +412,6 @@ export function AddPurchaseBill() {
             </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Line items</CardTitle>
-                    <CardDescription>
-                        Search an item to add a line. Calculated columns update automatically.
-                    </CardDescription>
-                </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="overflow-x-auto">
                         <table className="w-full border-separate border-spacing-0 text-sm">

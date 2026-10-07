@@ -11,13 +11,7 @@ import {EditCustomerDialog} from '@/components/EditCustomerDialog';
 import {SortableHeader} from '@/components/SortableHeader';
 import {useTableSort} from '@/hooks/useTableSort';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import {Card, CardContent, CardHeader} from '@/components/ui/card';
 import {
     Table,
     TableBody,
@@ -163,18 +157,8 @@ export function Customers() {
     }
 
     return (
-        <div className="space-y-6">
-            <p className="text-sm text-muted-foreground">
-                {customers.length} {customers.length === 1 ? 'customer' : 'customers'}
-            </p>
-
+        <div className="space-y-4">
             <Card>
-                <CardHeader>
-                    <CardTitle>Add customer</CardTitle>
-                    <CardDescription>
-                        Create a new customer in the master list. Only Name and City are required.
-                    </CardDescription>
-                </CardHeader>
                 <CardContent>
                     <form
                         className="space-y-4"
@@ -260,19 +244,23 @@ export function Customers() {
                                 />
                             </div>
                         </div>
-                        <Button type="submit" disabled={!isValid}>
-                            <Plus className="size-4"/>
-                            Add
-                        </Button>
+                        <div className="flex items-center gap-3">
+                            <Button type="submit" disabled={!isValid}>
+                                <Plus className="size-4"/>
+                                Add
+                            </Button>
+                            <p className="text-xs text-muted-foreground">
+                                Only Name and City are required.
+                            </p>
+                        </div>
                     </form>
                     {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
                 </CardContent>
             </Card>
 
             <Card>
-                <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
-                    <CardTitle>Customers</CardTitle>
-                    {customers.length > 0 && (
+                {customers.length > 0 && (
+                    <CardHeader className="flex items-center justify-between gap-4">
                         <div className="relative w-64">
                             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
                             <Input
@@ -283,25 +271,27 @@ export function Customers() {
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
-                    )}
-                </CardHeader>
-                <CardContent>
+                        <span className="text-sm text-muted-foreground">
+                            {sorted.length} {sorted.length === 1 ? 'customer' : 'customers'}
+                        </span>
+                    </CardHeader>
+                )}
+                <CardContent className="p-0">
                     {customers.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
                             <Users className="size-8 opacity-40"/>
                             <p className="text-sm">No customers yet. Add one above to get started.</p>
                         </div>
                     ) : sorted.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
                             <Search className="size-8 opacity-40"/>
                             <p className="text-sm">No customers match "{search}".</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
+                        <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <SortableHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
+                                        <SortableHeader label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
                                         <SortableHeader label="Nick Name" sortKey="nickName" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                         <TableHead>Address</TableHead>
                                         <SortableHeader label="City" sortKey="city" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
@@ -309,13 +299,13 @@ export function Customers() {
                                         <SortableHeader label="Pincode" sortKey="pincode" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                         <SortableHeader label="GSTIN" sortKey="gstin" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                         <SortableHeader label="Mobile" sortKey="mobile" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
-                                        <TableHead className="w-24 text-right">Actions</TableHead>
+                                        <TableHead className="w-24 pr-4 text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {sorted.map((c) => (
                                         <TableRow key={c.id}>
-                                            <TableCell className="font-medium">{c.name}</TableCell>
+                                            <TableCell className="pl-4 font-medium">{c.name}</TableCell>
                                             <TableCell className="text-muted-foreground">{c.nickName}</TableCell>
                                             <TableCell className="text-muted-foreground">{addressOf(c)}</TableCell>
                                             <TableCell>{c.city}</TableCell>
@@ -323,7 +313,7 @@ export function Customers() {
                                             <TableCell>{c.pincode}</TableCell>
                                             <TableCell>{c.gstin}</TableCell>
                                             <TableCell>{c.mobile}</TableCell>
-                                            <TableCell className="text-right">
+                                            <TableCell className="pr-4 text-right">
                                                 <div className="flex justify-end gap-1">
                                                     <Button
                                                         variant="ghost"
@@ -349,7 +339,6 @@ export function Customers() {
                                     ))}
                                 </TableBody>
                             </Table>
-                        </div>
                     )}
                 </CardContent>
             </Card>

@@ -194,17 +194,10 @@ export function SavedOrders() {
     }
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-semibold tracking-tight">View / Edit Orders</h1>
-                <p className="text-sm text-muted-foreground">
-                    {orders.length} saved order{orders.length === 1 ? '' : 's'}. Click one to view, edit, or delete it.
-                </p>
-            </div>
-
+        <div className="space-y-4">
             {orders.length === 0 ? (
                 <Card>
-                    <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                    <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
                         <ClipboardList className="size-8 text-muted-foreground"/>
                         <p className="text-sm text-muted-foreground">No orders saved yet.</p>
                     </CardContent>
@@ -233,6 +226,9 @@ export function SavedOrders() {
                                     Delivered only
                                 </Label>
                             </div>
+                            <div className="text-sm text-muted-foreground">
+                                {sorted.length} order{sorted.length === 1 ? '' : 's'}
+                            </div>
                         </div>
                         <DateRangeFilter value={range} onChange={setRange}/>
                     </div>
@@ -240,7 +236,7 @@ export function SavedOrders() {
                     <Card>
                         <CardContent className="p-0">
                             {sorted.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+                                <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-muted-foreground">
                                     <Search className="size-8 opacity-40"/>
                                     <p className="text-sm">No orders match the current filters.</p>
                                 </div>
@@ -459,7 +455,7 @@ function OrderDetail({
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
                 <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
                     <ArrowLeft className="size-4"/>

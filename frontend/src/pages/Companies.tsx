@@ -9,13 +9,7 @@ import {EditCompanyDialog} from '@/components/EditCompanyDialog';
 import {SortableHeader} from '@/components/SortableHeader';
 import {useTableSort} from '@/hooks/useTableSort';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import {Card, CardContent, CardHeader} from '@/components/ui/card';
 import {
     Table,
     TableBody,
@@ -106,16 +100,8 @@ export function Companies() {
     }
 
     return (
-        <div className="space-y-6">
-            <p className="text-sm text-muted-foreground">
-                {companies.length} {companies.length === 1 ? 'company' : 'companies'}
-            </p>
-
+        <div className="space-y-4">
             <Card>
-                <CardHeader>
-                    <CardTitle>Add company</CardTitle>
-                    <CardDescription>Create a new company in the master list.</CardDescription>
-                </CardHeader>
                 <CardContent>
                     <form
                         className="flex flex-wrap items-end gap-3"
@@ -125,7 +111,7 @@ export function Companies() {
                         }}
                     >
                         <div className="grid flex-1 gap-2 min-w-48">
-                            <Label htmlFor="name">Company name</Label>
+                            <Label htmlFor="name" className="sr-only">Company name</Label>
                             <Input
                                 id="name"
                                 placeholder="e.g. Acme Supplies"
@@ -144,9 +130,8 @@ export function Companies() {
             </Card>
 
             <Card>
-                <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
-                    <CardTitle>Companies</CardTitle>
-                    {companies.length > 0 && (
+                {companies.length > 0 && (
+                    <CardHeader className="flex items-center justify-between gap-4">
                         <div className="relative w-64">
                             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
                             <Input
@@ -157,16 +142,19 @@ export function Companies() {
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
-                    )}
-                </CardHeader>
-                <CardContent>
+                        <span className="text-sm text-muted-foreground">
+                            {sorted.length} {sorted.length === 1 ? 'company' : 'companies'}
+                        </span>
+                    </CardHeader>
+                )}
+                <CardContent className="p-0">
                     {companies.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
                             <Building2 className="size-8 opacity-40"/>
                             <p className="text-sm">No companies yet. Add one above to get started.</p>
                         </div>
                     ) : sorted.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
                             <Search className="size-8 opacity-40"/>
                             <p className="text-sm">No companies match "{search}".</p>
                         </div>
@@ -174,15 +162,15 @@ export function Companies() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <SortableHeader label="Company" sortKey="company" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
-                                    <TableHead className="w-24 text-right">Actions</TableHead>
+                                    <SortableHeader label="Company" sortKey="company" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
+                                    <TableHead className="w-24 pr-4 text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {sorted.map((c) => (
                                     <TableRow key={c.id}>
-                                        <TableCell className="font-medium">{c.name}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="pl-4 font-medium">{c.name}</TableCell>
+                                        <TableCell className="pr-4 text-right">
                                             <div className="flex justify-end gap-1">
                                                 <Button
                                                     variant="ghost"

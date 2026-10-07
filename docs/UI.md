@@ -49,7 +49,7 @@ Screens, flows, and visual decisions, recorded as they firm up.
   fills the screen but keeps the OS title bar.
 - **Layout** (`src/App.tsx`): a **flat, always-visible top navigation bar**
   (`src/components/TopNav.tsx`) above the routed content — an outer `div.flex.h-svh.flex-col`
-  › `TopNav` + `<main className="flex-1 overflow-auto px-6 py-8">`. The `<main>` is the
+  › `TopNav` + `<main className="flex-1 overflow-auto px-6 py-4">`. The `<main>` is the
   **full-width** padded content area that fills the window and scrolls **vertically**. No
   max-width cap, so wide screens (e.g. the bill line-items grid) use the whole window — and
   there's no sidebar eating width. Each page lives in `src/pages/`. (Replaced the old
@@ -73,6 +73,40 @@ Screens, flows, and visual decisions, recorded as they firm up.
   keep editing) and two buttons: **"Discard changes"** (outline; discards and navigates) and
   **"Continue editing"** (primary/default, auto-focused; just closes). Add Purchase Bill is the
   first consumer.
+
+## Density — read before adding a screen
+The client's standing feedback is that the UI **uses too much space**, so a density pass
+(2026-10-06) stripped the redundant chrome app-wide. The rules that came out of it:
+
+- **No page `<h1>` + subtitle** on a screen the top nav already names. The nav link is the
+  page title. An `<h1>` is right only where the nav *doesn't* name the state — the edit-mode
+  "Edit order" / "Edit purchase bill" headings, which are `text-base`, not `text-2xl`.
+- **No `CardHeader` over a form or table that speaks for itself.** A card wrapping the
+  Customer/Date fields doesn't need to say "Order details"; a card wrapping the line-items
+  table doesn't need to say "Line items". Keep a `CardHeader` only where it carries real
+  identity — a record ("Order #7", "Bill MDUN/26-27/1085"), a section (Settings' "Database",
+  "Updates") or a tile (Reports' "Purchase Summary").
+- **If a description states a non-obvious behaviour, keep the fact and drop the sentence** —
+  move it inline as `text-xs text-muted-foreground` next to the Add/Save button, where it
+  costs no height (e.g. "Rate prefills from this customer's last order for the item, if any."
+  on Add Order; "Only Name and City are required." on Customers).
+- **Record counts live in the toolbar**, to the right of the search box — never as a
+  standalone line above the card.
+- **Drop a field `<Label>` to `className="sr-only"` only when the placeholder already names
+  the field**, and only if every field in that row loses its label too (a half-labelled row
+  misaligns). Keep the label when the placeholder is an example *value* (Pack Size "100",
+  GST % "18", HSN "3401"). Use `sr-only` rather than `aria-label` — `CompanyCombobox` and
+  `ItemCombobox` don't forward arbitrary props.
+- **List tables use `CardContent className="p-0"`** with `pl-4` on the first cell/header and
+  `pr-4` on the last, so the table sits flush in the card and still lines up with the search
+  box above.
+- `Card` defaults are `py-4`/`gap-4`/`px-4`; page roots are `space-y-4`; `<main>` is `py-4`;
+  empty states are `py-10`.
+- **`CardHeader` is `display: grid`.** `flex-row` alone does nothing to it — use `flex` if
+  you want its children on one row. (Three pages shipped with that bug for months.)
+- **Control sizing is deliberately untouched** — input/button heights, table row height and
+  font size are all unchanged, on the client's explicit call. Don't shrink them without
+  asking; see DECISIONS.md.
 
 ## Screens
 ### Dashboard (`/`) — placeholder
@@ -158,8 +192,8 @@ Screens, flows, and visual decisions, recorded as they firm up.
 
 ### Add Order (`/orders/new`) — top-nav "Add Order" (first piece of the Order Book / Sales feature)
 - `src/pages/AddOrder.tsx`. Closely mirrors Add Purchase Bill, adapted for a Customer
-  header instead of a Company: **Order details** card (Customer, Date) + **Line items**
-  card, Save centered below both, same unsaved-changes guard. No order number (just the
+  header instead of a Company: an untitled header card (Customer, Date) + an untitled
+  line-items card, Save centered below both, same unsaved-changes guard. No order number (just the
   internal id) — that field doesn't exist for orders.
 - **Also serves as the order editor**, exactly like `AddPurchaseBill.tsx` doubles as the
   bill editor: the same component handles `/orders/:id/edit` (route param via
@@ -261,8 +295,8 @@ Screens, flows, and visual decisions, recorded as they firm up.
     invalidate or resync.
 
 ### Items (`/items`) — item master
-- A live item count, a company-scoped "Add item" card (**Company, Item, Pack Size, GST %, HSN** +
-  Add), and a card with the items table (Company / Item / Pack Size / GST % / HSN /
+- An untitled company-scoped add card (**Company, Item, Pack Size, GST %, HSN** + Add),
+  and a card whose header is just the search box and the item count, over the items table (Company / Item / Pack Size / GST % / HSN /
   **Stock** + **Actions**). Pack Size / GST % / HSN use `NumberInput` (no spinner); same
   in the on-the-fly `NewItemDialog`.
 - **Stock** is current on-hand quantity — total purchased minus total sold, **derived**
@@ -283,8 +317,8 @@ Screens, flows, and visual decisions, recorded as they firm up.
   `NewCompanyDialog` (see Add Purchase Bill).
 
 ### Customers (`/customers`) — customer master (first piece of the Order Book / Sales feature)
-- `src/pages/Customers.tsx`. Same Companies/Items master pattern: a live customer count,
-  an "Add customer" card, and a card with the customers table + search + sort.
+- `src/pages/Customers.tsx`. Same Companies/Items master pattern: an untitled add card, and
+  a card whose header is the search box + customer count, over the customers table.
 - **Add customer** — a responsive grid (`grid gap-3 sm:grid-cols-2 lg:grid-cols-3`) of all
   9 fields (Name, Nick Name, Mobile, Address 1, Address 2, City, State, Pincode, GSTIN).
   **Only Name and City are required** — Add stays disabled until both are filled; every

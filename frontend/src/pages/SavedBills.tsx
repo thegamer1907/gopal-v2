@@ -148,17 +148,10 @@ export function SavedBills() {
     }
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-semibold tracking-tight">View / Edit Bills</h1>
-                <p className="text-sm text-muted-foreground">
-                    {bills.length} saved bill{bills.length === 1 ? '' : 's'}. Click one to view, edit, or delete it.
-                </p>
-            </div>
-
+        <div className="space-y-4">
             {bills.length === 0 ? (
                 <Card>
-                    <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                    <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
                         <FileText className="size-8 text-muted-foreground"/>
                         <p className="text-sm text-muted-foreground">No purchase bills saved yet.</p>
                     </CardContent>
@@ -166,15 +159,20 @@ export function SavedBills() {
             ) : (
                 <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="relative w-64">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
-                            <Input
-                                className="pl-8"
-                                placeholder="Search company or bill no.…"
-                                autoComplete="off"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="relative w-64">
+                                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
+                                <Input
+                                    className="pl-8"
+                                    placeholder="Search company or bill no.…"
+                                    autoComplete="off"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                />
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                {sorted.length} bill{sorted.length === 1 ? '' : 's'}
+                            </div>
                         </div>
                         <DateRangeFilter value={range} onChange={setRange}/>
                     </div>
@@ -182,7 +180,7 @@ export function SavedBills() {
                     <Card>
                         <CardContent className="p-0">
                             {sorted.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+                                <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-muted-foreground">
                                     <Search className="size-8 opacity-40"/>
                                     <p className="text-sm">No bills match the current filters.</p>
                                 </div>
@@ -256,7 +254,7 @@ function BillDetail({
     );
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
                 <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
                     <ArrowLeft className="size-4"/>

@@ -105,11 +105,7 @@ export function Settings() {
     const {dir, file} = splitPath(path);
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-                <p className="text-sm text-muted-foreground">Manage how the app stores its data.</p>
-            </div>
+        <div className="space-y-4">
 
             <Card>
                 <CardHeader>
@@ -122,7 +118,7 @@ export function Settings() {
                         start fresh.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-4">
                     <div className="space-y-1.5">
                         <p className="text-sm font-medium">Current location</p>
                         <div className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm break-all">

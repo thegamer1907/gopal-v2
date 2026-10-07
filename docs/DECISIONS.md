@@ -827,3 +827,50 @@ have to re-litigate.
   #1, two more marked to #2 and #3, the lockdown and the confirm dialogs verified on screen,
   and a delivered order's Qty/Rate edit confirmed to leave the `sales_order_items` row ids
   untouched (i.e. a targeted update, not a delete-and-reinsert).
+
+### 2026-10-06 — UI density pass: strip chrome, keep control sizing
+- **Decision:** Removed redundant layout chrome app-wide and tightened container padding,
+  while leaving **font size, input/button heights and table row heights untouched**. Four
+  rules, now written into `docs/UI.md` as the standard for new screens: (1) no page `<h1>` +
+  subtitle where the top nav already names the page; (2) no `CardHeader` over a form or table
+  that speaks for itself — keep one only where it carries record, section or tile identity;
+  (3) record counts move into the toolbar beside the search box; (4) a field `<Label>` goes
+  `sr-only` only when the placeholder already names the field, and only if every field in
+  that row loses its label too. Shared defaults changed once in `ui/card.tsx`
+  (`py-6`/`gap-6`/`px-6` → `py-4`/`gap-4`/`px-4`), `App.tsx`'s `<main>` (`py-8`→`py-4`), page
+  roots (`space-y-6`→`space-y-4`) and empty states (`py-16`/`py-12`→`py-10`).
+- **Why:** Client feedback that the UI "uses too much space" and that labels like "Line
+  items" over an obvious table are self-explanatory. Measured on a 1470x801 window, the first
+  data row started at 681px on Customers (3 rows visible) and 489px on Items (6 rows) — almost
+  all of it chrome. After: 481px/6 rows and 289px/10 rows; View/Edit Orders went 289px→181px,
+  4 rows→12. Roughly +67% content on screen.
+- **Alternatives:** Shrinking rows and controls as well (rows 49→37, inputs 36→32, base font
+  14→13px) — **declined by the client**, who reads the app at arm's length. This caps the win:
+  at a 49px row height, ~10 rows on Items is the ceiling, and 15 is arithmetically impossible
+  even with the Add card deleted entirely. Don't relitigate without asking. Also considered
+  moving the Items/Companies/Customers "Add" forms into dialogs behind an Add button — that
+  would have taken Customers to ~13 rows, but the client preferred keeping them inline.
+- **Kept deliberately:** the two edit-mode headings ("Edit order" / "Edit purchase bill",
+  shrunk to `text-base`) — the nav says "Add Order"/"Add Purchase Bill" in edit mode too, so
+  they're the only signal you're changing an existing record, not creating one. Also the
+  `CardHeader`s on the order/bill detail views, Reports' tile, and Settings' sections.
+- **Behaviour facts rescued from deleted descriptions** and re-placed inline next to the
+  Add/Save button as `text-xs text-muted-foreground`: "Rate prefills from this customer's last
+  order for the item, if any." (Add Order) and "Only Name and City are required." (Customers).
+  "Calculated columns update automatically." (Add Purchase Bill) was genuinely redundant and
+  was just dropped.
+- **Bug found and fixed in passing:** Items/Companies/Customers each wrote their list-card
+  header as `CardHeader className="flex-row items-center justify-between gap-4 space-y-0"`,
+  intending the title and search box to share a row. `flex-row` does **not** set
+  `display: flex`, and `CardHeader`'s own `grid` class won — so the element stayed a grid with
+  `grid-template-rows: 16px 36px` and the two **stacked**, costing 32px each and looking
+  unintentional. (`space-y-0` was also a dead Tailwind-v3 leftover.) Now `flex`. Worth
+  remembering: `CardHeader` is a grid, so `flex-row` alone does nothing to it.
+- `sr-only` was chosen over `aria-label` for the hidden labels because `CompanyCombobox` takes
+  only `id` and `ItemCombobox` takes neither, so an `aria-label` would silently not reach them;
+  `sr-only` is `position: absolute`, so it also drops out of the grid and the wrapper's `gap-2`
+  collapses — layout-neutral, and click-to-focus still works.
+- Verified by re-measuring every list page in the running app (not by eye), plus a visual walk
+  of all 10 routes, both detail views and the delivered-order edit lockdown; the Dashboard's
+  centered text stays exactly centered and the unsaved-changes guard still fires.
+  `npm run build` ✅.

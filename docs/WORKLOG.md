@@ -6,6 +6,44 @@ reads the top entry first.
 
 ---
 
+## 2026-10-06 — UI density pass: strip redundant chrome across every page
+**Did:**
+- Acted on client feedback that the UI "uses too much space" and that labels like "Line
+  items" over an obvious table are self-explanatory. **Measured first rather than guessing**:
+  on a 1470x801 window the first data row started at 681px on Customers (3 rows visible) and
+  489px on Items (6 rows), nearly all of it chrome.
+- **Shared, one-line-each changes:** `ui/card.tsx` `py-6`/`gap-6`/`px-6` → `py-4`/`gap-4`/
+  `px-4`; `App.tsx`'s `<main>` `py-8`→`py-4`; 12 `space-y-6` page roots → `space-y-4`; empty
+  states `py-16`/`py-12` → `py-10`.
+- **Removed:** 7 decorative `CardHeader`s (Add Order's "Order details" and "Line items", the
+  two on Add Purchase Bill, and the "Add item"/"Add company"/"Add customer" headers), 4 page
+  `<h1>` + subtitle blocks (View/Edit Orders, View/Edit Bills, Reports, Settings), 3 orphan
+  count lines, and the 3 `CardTitle`s that were verbatim nav labels. Record counts moved into
+  the toolbar beside the search box. Redundant field labels went `sr-only` (chosen over
+  `aria-label` because the comboboxes don't forward arbitrary props).
+- **Kept on purpose:** the edit-mode "Edit order"/"Edit purchase bill" headings (shrunk to
+  `text-base`) — the nav says "Add …" in edit mode too, so they're the only sign you're
+  changing an existing record — plus the detail-view, Reports-tile and Settings-section
+  headers. Two behaviour facts buried in deleted descriptions were rescued inline next to the
+  Add/Save button rather than lost.
+- **Bug found and fixed in passing:** Items/Companies/Customers wrote their list-card header
+  as `flex-row items-center justify-between space-y-0`, but `flex-row` doesn't set
+  `display: flex` and `CardHeader`'s own `grid` won — so the title and search box had been
+  *stacking* rather than sharing a row, costing 32px per page. Now real `flex`.
+- **Result, re-measured in the app rather than assumed:** Items 489→289px (6→10 rows),
+  Customers 681→481px (3→6), Companies 489→267px (9→10), View/Edit Orders 289→181px (4→12),
+  View/Edit Bills 289→181px (→16). Roughly +67% content on screen.
+- Verified with a visual walk of all 10 routes, both detail views and the delivered-order
+  edit lockdown; Dashboard stays exactly centered, unsaved-changes guard still fires.
+  `npm run build` ✅.
+
+**Next steps:** the client declined the second tier (shrinking rows 49→37, inputs 36→32,
+base font 14→13px), which is what would take Items past ~10 rows to ~13 — offer it again
+once they've lived with this. The 2026-09-28 cleanup item (deleting the seeded demonstration
+order and test masters from the real DB) is still open.
+
+---
+
 ## 2026-10-06 — Delivered orders: irreversible, numbered, edit-locked
 **Did:**
 - **Reworked delivery from a reversible boolean into a one-way, numbered state** — the

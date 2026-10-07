@@ -25,7 +25,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {Card, CardContent} from '@/components/ui/card';
 import {Badge} from '@/components/ui/badge';
 import {ItemCombobox} from '@/components/ItemCombobox';
 import {NewItemDialog} from '@/components/NewItemDialog';
@@ -416,11 +416,11 @@ export function AddOrder() {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
             {editId != null && (
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-semibold tracking-tight">Edit order</h1>
+                        <h1 className="text-base font-semibold tracking-tight">Edit order</h1>
                         {delivered && <Badge variant="default">Delivered #{deliveryNo}</Badge>}
                     </div>
                     {delivered ? (
@@ -436,14 +436,10 @@ export function AddOrder() {
                 </div>
             )}
             <Card>
-                <CardHeader>
-                    <CardTitle>Order details</CardTitle>
-                    <CardDescription>Who the order is for and its date.</CardDescription>
-                </CardHeader>
                 <CardContent>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="grid gap-2">
-                            <Label htmlFor="customer">Customer</Label>
+                            <Label htmlFor="customer" className="sr-only">Customer</Label>
                             <CustomerCombobox
                                 key={customerComboKey}
                                 id="customer"
@@ -455,7 +451,7 @@ export function AddOrder() {
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="date">Date</Label>
+                            <Label htmlFor="date" className="sr-only">Date</Label>
                             <div className="relative">
                                 <Input
                                     id="date"
@@ -499,13 +495,6 @@ export function AddOrder() {
             </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Line items</CardTitle>
-                    <CardDescription>
-                        Search an item to add a line. Rate prefills from this customer's last order for
-                        it, if any.
-                    </CardDescription>
-                </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="overflow-x-auto">
                         <table className="w-full border-separate border-spacing-0 text-sm">
@@ -627,11 +616,14 @@ export function AddOrder() {
                     </div>
 
                     {!delivered && (
-                        <div>
+                        <div className="flex items-center gap-3">
                             <Button type="button" variant="outline" size="sm" onClick={addLine}>
                                 <Plus className="size-4"/>
                                 Add row
                             </Button>
+                            <p className="text-xs text-muted-foreground">
+                                Rate prefills from this customer's last order for the item, if any.
+                            </p>
                         </div>
                     )}
                 </CardContent>
