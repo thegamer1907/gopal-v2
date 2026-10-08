@@ -348,6 +348,53 @@ func (a *App) ExportPurchaseSummary(rows []reports.PurchaseSummaryRow, defaultFi
 	return path, nil
 }
 
+// ExportStockReport prompts for a save location and writes the given (fully computed —
+// see computeStockRows in Reports.tsx) rows to an .xlsx workbook. asOfDate is passed
+// through only to label the title row, not re-derived from rows. Returns the chosen
+// path, or "" if the user cancelled the dialog.
+func (a *App) ExportStockReport(rows []reports.StockReportRow, asOfDate string, defaultFilename string) (string, error) {
+	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:           "Export Stock Report",
+		DefaultFilename: defaultFilename,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "Excel Workbook (*.xlsx)", Pattern: "*.xlsx"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := reports.WriteStockReport(path, asOfDate, rows); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// ExportOrderReport prompts for a save location and writes the given (fully computed —
+// see toOrderReportRows in Reports.tsx) order-line rows to an .xlsx workbook. Returns
+// the chosen path, or "" if the user cancelled the dialog.
+func (a *App) ExportOrderReport(rows []reports.OrderReportRow, defaultFilename string) (string, error) {
+	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:           "Export Order Report",
+		DefaultFilename: defaultFilename,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "Excel Workbook (*.xlsx)", Pattern: "*.xlsx"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := reports.WriteOrderReport(path, rows); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // --- Order export (Excel/PDF) ---
 
 // ExportOrderExcel prompts for a save location and writes the given order (fully

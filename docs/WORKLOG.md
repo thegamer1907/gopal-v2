@@ -6,6 +6,42 @@ reads the top entry first.
 
 ---
 
+## 2026-10-07 — Two new Reports: Stock Report & Order Report
+**Did:**
+- Added **Stock Report** (`/reports`): every item's stock as of a chosen date (default
+  today), columns Company/Item/Pack Size/HSN/Stock, no Totals row. Computed entirely in the
+  frontend — summed `taxQty+dQty`/`qty` from every purchase-bill/sales-order line up to the
+  cutoff date, per item — since dates are free-text and not SQL-comparable (no new DB
+  query needed; reuses `ListItems`/`ListPurchaseBills`/`ListSalesOrders`). New
+  `internal/reports/stock_report.go` (merged title row above the header, since there's no
+  per-row date column; header frozen at row 2).
+- Added **Order Report** (`/reports`): one row per sales-order line, columns
+  Date/Customer/City/Item/Pack Size/GST %/HSN/Qty/Rate/Final Amount/Delivered?/Delivery #,
+  filterable by a date range and a new tri-state delivery-status `Select` (All/Delivered
+  only/Pending only) — added as a new shared `ui/select.tsx` primitive since the existing
+  `SavedOrders.tsx` `Switch` is binary and can't express "All." Totals row sums only Qty +
+  Final Amount, mirroring the on-screen order Totals convention. New
+  `internal/reports/order_report.go`.
+- Both new Go writers mirror `purchase_summary.go`'s excelize scaffold exactly (bold
+  header, typed date/money/percent cells, frozen + auto-filtered header). Two new `app.go`
+  methods (`ExportStockReport`, `ExportOrderReport`) follow the existing 5-step
+  SaveFileDialog pattern. Bindings regenerated via `wails generate module`.
+- `npx shadcn@latest add select` generated a file importing `cn` from a stray `cn` npm
+  package instead of the project's `@/lib/utils` — fixed the import and removed the
+  accidental `"cn": "^0.4.0"` dependency it added to `package.json`.
+- Verified end-to-end in `wails dev` against the real DB: Go `go build`/`go vet` clean,
+  frontend `npm run build` clean, date picker and delivery-status `Select` both work in the
+  browser, delivered/pending counts sum correctly to "All" (1 + 13 = 14 lines, 1 + 4 = 5
+  orders). Downloaded both reports and inspected the raw `.xlsx` XML: merged title row,
+  header row/freeze pane/autofilter ranges, number formats, and Totals-row math all matched
+  spec exactly. Test export files deleted afterward (not real reports).
+
+**Next steps:** none outstanding from this session. Remaining open items are unchanged —
+the second UI density tier (declined by the client, offer again later) and the 2026-09-28
+demo-data cleanup.
+
+---
+
 ## 2026-10-06 — UI density pass: strip redundant chrome across every page
 **Did:**
 - Acted on client feedback that the UI "uses too much space" and that labels like "Line

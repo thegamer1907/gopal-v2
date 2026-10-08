@@ -288,6 +288,40 @@ export namespace reports {
 	        this.finalAmount = source["finalAmount"];
 	    }
 	}
+	export class OrderReportRow {
+	    date: string;
+	    customerName: string;
+	    customerCity: string;
+	    itemName: string;
+	    packSize: number;
+	    gstPercent: number;
+	    hsn: number;
+	    qty: number;
+	    rate: number;
+	    finalAmount: number;
+	    delivered: boolean;
+	    deliveryNo: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new OrderReportRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.customerName = source["customerName"];
+	        this.customerCity = source["customerCity"];
+	        this.itemName = source["itemName"];
+	        this.packSize = source["packSize"];
+	        this.gstPercent = source["gstPercent"];
+	        this.hsn = source["hsn"];
+	        this.qty = source["qty"];
+	        this.rate = source["rate"];
+	        this.finalAmount = source["finalAmount"];
+	        this.delivered = source["delivered"];
+	        this.deliveryNo = source["deliveryNo"];
+	    }
+	}
 	export class PurchaseSummaryRow {
 	    date: string;
 	    companyName: string;
@@ -332,6 +366,26 @@ export namespace reports {
 	        this.finalRate = source["finalRate"];
 	        this.discount = source["discount"];
 	        this.remarks = source["remarks"];
+	    }
+	}
+	export class StockReportRow {
+	    companyName: string;
+	    itemName: string;
+	    packSize: number;
+	    hsn: number;
+	    stock: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StockReportRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.companyName = source["companyName"];
+	        this.itemName = source["itemName"];
+	        this.packSize = source["packSize"];
+	        this.hsn = source["hsn"];
+	        this.stock = source["stock"];
 	    }
 	}
 

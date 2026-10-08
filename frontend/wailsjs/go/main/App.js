@@ -62,8 +62,16 @@ export function ExportOrderPDF(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ExportOrderPDF'](arg1, arg2, arg3, arg4);
 }
 
+export function ExportOrderReport(arg1, arg2) {
+  return window['go']['main']['App']['ExportOrderReport'](arg1, arg2);
+}
+
 export function ExportPurchaseSummary(arg1, arg2) {
   return window['go']['main']['App']['ExportPurchaseSummary'](arg1, arg2);
+}
+
+export function ExportStockReport(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExportStockReport'](arg1, arg2, arg3);
 }
 
 export function GetAppVersion() {

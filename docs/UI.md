@@ -344,8 +344,10 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
 
 ### Reports (`/reports`) — top-nav "Reports"
 - `src/pages/Reports.tsx`. A **card grid** (`grid gap-4 sm:grid-cols-2 lg:grid-cols-3`) — one
-  `Card` per downloadable report. Only **Purchase Summary** exists today; a future report is
-  just another card, no layout rework needed.
+  `Card` per downloadable report: Purchase Summary, Stock Report, Order Report. A future
+  report is just another card, no layout rework needed. All three share one `useEffect` on
+  mount (`ListPurchaseBills`/`ListItems`/`ListSalesOrders`, loaded once) but keep separate
+  `busy`/`saved`/`error` state per card.
 - **Purchase Summary card:** icon + title/description, a **`DateRangeFilter`** (empty = "all
   bills", same semantics as the View/Edit Bills filter — no separate "download all" toggle), a
   live preview line ("N lines across M bills · ₹total", recomputed as the range changes), and a
@@ -367,6 +369,49 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   bold, frozen, and auto-filtered; a bold **Totals** row sums Tax Qty, Tax Value, D Qty,
   D Value, GST Amount, Tax Bill Amount, Bill Value, and Discount — mirroring the footer Totals
   row on the Add/View Bill line-items grid.
+
+- **Stock Report card:** icon + title/description, a single **as-of-date** control (text
+  input + calendar-icon `Popover`, `mode="single"` — the same dd-mmm-yy text+calendar pattern
+  Add Purchase Bill/Add Order use for their header date, built inline here rather than as a
+  shared component since there's only this one consumer; see DECISIONS), defaulting to today.
+  A live preview line ("N items · stock as of dd-mmm-yy", or "Enter a valid date." while the
+  typed text doesn't parse), and a **Download Excel** button (disabled while loading/saving,
+  when the date is invalid, or when there are no items).
+  - **Data flow:** for every item (`ListItems()`, already Company→Item ordered), sums
+    `taxQty + dQty` from every purchase-bill line (`ListPurchaseBills()`) and `qty` from every
+    sales-order line (`ListSalesOrders()`) whose **parsed** date is ≤ the chosen as-of date
+    (end-of-day), then subtracts sold from purchased per item — the same formula as the live
+    "today" Stock column on the Items page, just re-derived per item for an arbitrary date
+    (dates can't be filtered in SQL; see DECISIONS). Calls `ExportStockReport(rows, asOfDate,
+    filename)`; filename is `Stock Report (as of dd-mmm-yy).xlsx`.
+  - **The workbook:** a merged, bold, centered title row ("Stock Report — as of dd-mmm-yy")
+    above the header (so header is row 2, data from row 3); Pack Size/HSN/Stock are plain
+    whole-number cells (`0`); header frozen, autofilter on the header row only. No Totals row
+    (summing stock across different items/pack sizes isn't meaningful).
+
+- **Order Report card:** icon + title/description, a **delivery-status** `Select` (All
+  orders / Delivered only / Pending only — a new three-way control; the existing
+  `SavedOrders.tsx` "Delivered only" `Switch` is binary and can't express "All," see
+  DECISIONS) next to a **`DateRangeFilter`** (same empty-range-means-all convention as
+  Purchase Summary). A live preview line ("N lines across M orders · ₹total", or "No orders
+  match this filter."), and a **Download Excel** button (disabled while loading/saving or
+  when the filtered row-set is empty).
+  - **Data flow:** loads all orders via `ListSalesOrders()`, filters by `inRange` (date) AND
+    the delivery-status match, sorts the **filtered orders** (not the flattened rows) by
+    parsed date ascending with `id` as the tie-break (orders have no bill-number-style human
+    identifier), then flattens each order's lines into one `reports.OrderReportRow` per line
+    — reusing `calcOrderLine`/`effectivePackSize` from `lib/salesOrder.ts` for Final Amount,
+    never re-derived. Calls `ExportOrderReport(rows, filename)`; filename is `Order Report
+    (All).xlsx` / `Order Report (dd-mmm-yy to dd-mmm-yy).xlsx`, with a `- Delivered`/
+    `- Pending` suffix when the filter isn't "All."
+  - **The workbook:** bold frozen header (row 1) — Date/Customer/City/Item/Pack Size/GST %/
+    HSN/Qty/Rate/Final Amount/Delivered?/Delivery #; Date is a real typed date cell, GST % a
+    real percentage cell, money columns `#,##0.00`, **Pack Size and Qty are whole numbers
+    (`0`, no decimals)** — matches `fmtQty`/the app's "quantities are always whole" rule,
+    same as Purchase Summary's Pack Size/Tax Qty/D Qty columns — Delivered? a plain
+    "Yes"/"No" text cell, Delivery # blank (not `0`) for pending lines. A bold Totals row
+    sums **only** Qty and Final Amount (the other numeric columns are left blank there),
+    mirroring the on-screen order Totals convention.
 
 ### Settings (`/settings`) — top-nav "Settings" (right-aligned group)
 - `src/pages/Settings.tsx`. First (and only) section is **Database**:

@@ -34,7 +34,11 @@ export function ExportOrderExcel(arg1:reports.OrderExportHeader,arg2:Array<repor
 
 export function ExportOrderPDF(arg1:reports.OrderExportHeader,arg2:Array<reports.OrderExportRow>,arg3:Array<reports.OrderExportDeduction>,arg4:string):Promise<string>;
 
+export function ExportOrderReport(arg1:Array<reports.OrderReportRow>,arg2:string):Promise<string>;
+
 export function ExportPurchaseSummary(arg1:Array<reports.PurchaseSummaryRow>,arg2:string):Promise<string>;
+
+export function ExportStockReport(arg1:Array<reports.StockReportRow>,arg2:string,arg3:string):Promise<string>;
 
 export function GetAppVersion():Promise<string>;
 

@@ -7,6 +7,26 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
+_Shipped in **v0.9.0** (2026-10-07): two more Reports cards — **Stock Report** (every item's
+stock as of a chosen date, default today; Company/Item/Pack Size/HSN/Stock columns, no
+Totals row) and **Order Report** (a line-item register of sales orders — one row per order
+line — filterable by a date range and a tri-state delivery status All/Delivered
+only/Pending only; Date/Customer/City/Item/Pack Size/GST %/HSN/Qty/Rate/Final
+Amount/Delivered?/Delivery # columns — Pack Size and Qty are whole numbers, matching the
+app's quantities-are-always-whole convention — Totals row sums Qty + Final Amount only).
+Both reuse the existing `ListItems`/`ListPurchaseBills`/`ListSalesOrders` bindings and
+compute all date/stock math in the frontend (dates are free text, never SQL-comparable —
+see DECISIONS). New `internal/reports/stock_report.go` + `order_report.go` (excelize, same
+bold/frozen/auto-filtered-header convention as Purchase Summary) and a new shared `Select`
+primitive (`ui/select.tsx`) for the delivery filter. See DECISIONS for the three technical
+calls (frontend-only date math, the new `Select` vs. the existing boolean `Switch`, and the
+one-off inline date picker)._
+
+_Shipped in **v0.8.0** (2026-10-06): order delivery reworked from a reversible toggle to
+**irreversible, numbered, and edit-locked** (see the 2026-10-06 WORKLOG/DECISIONS entries
+for the full rework), plus an app-wide **UI density pass** stripping redundant chrome
+(card padding, decorative headers, page titles) to fit more rows on screen._
+
 _Shipped in **v0.7.0** (2026-09-28): order **delivered status** (reversible toggle,
 list-row + edit-page buttons, "Show delivered" filter); **Copy Order Image** (WhatsApp
 sharing via clipboard); **Download Excel/PDF for orders**; **custom pack size** per
@@ -206,8 +226,6 @@ _None._
 - **Dashboard content** — decide the real KPIs / lists.
 - **As-billed snapshots** — optionally store GST%/name on the bill line so historical bills
   don't shift when the master changes.
-- **More Reports cards** — additional report types on `/reports` (e.g. sales/stock summaries),
-  each just another card in the same grid.
 - **Auto-check for updates on launch** — a silent background check (today's Check for
   Updates button is manual-only, deliberately, per the client's ask).
 - **Order number** — whether/how to add one to Sales orders is still open; not needed

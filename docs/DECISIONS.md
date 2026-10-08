@@ -874,3 +874,40 @@ have to re-litigate.
   of all 10 routes, both detail views and the delivered-order edit lockdown; the Dashboard's
   centered text stays exactly centered and the unsaved-changes guard still fires.
   `npm run build` ✅.
+
+### 2026-10-07 — Stock Report / Order Report: date math stays in the frontend, not SQL
+- **Decision:** The new Stock Report's "as of date" cutoff and the new Order Report's date
+  range filter are both computed entirely in React (`Reports.tsx`'s `computeStockRows`/
+  `inRange`), from data already returned by the existing `ListItems()`/`ListPurchaseBills()`/
+  `ListSalesOrders()` bindings — no new Go query, no SQL `WHERE date <= ?`.
+- **Why:** `purchase_bills.date`/`sales_orders.date` are free-text `dd-mmm-yy` (or legacy
+  `dd-mmm-yyyy`) strings, not real SQL dates, and are never safely comparable in SQL — every
+  existing date filter in this app (View/Edit Bills, View/Edit Orders, Purchase Summary)
+  already does this same parse-and-compare in the frontend via `@/lib/date`'s `parseDate`.
+  Stock-as-of-date math follows the same convention: sum `taxQty+dQty`/`qty` from the raw
+  bill/order lines up to the cutoff, in JS, per item — mirroring the live "today" stock
+  formula in `items.go`'s `itemSelect`, just re-derived per arbitrary date.
+- **Alternatives:** A Go-side date parser + a `StockAsOf(date)`/`ListOrdersFiltered(...)` DB
+  query — rejected: would need a brand-new Go dd-mmm-yy/legacy parser (none exists beyond one
+  single-format helper in `purchase_summary.go`'s `dateValue`), duplicating logic that already
+  lives in `@/lib/date`, for a single-user local app where the full bill/order lists are small.
+
+### 2026-10-07 — Order Report delivery filter: new `Select` primitive, not the existing `Switch`
+- **Decision:** Added `frontend/src/components/ui/select.tsx` (via `npx shadcn@latest add
+  select`) for the Order Report's tri-state **All / Delivered only / Pending only** filter,
+  rather than reusing `SavedOrders.tsx`'s boolean "Delivered only" `Switch`.
+- **Why:** The `Switch` is structurally binary (exclusive delivered-or-pending, no "both"
+  state) — it can't express "All," which the client explicitly asked this report to support.
+  Zero new npm dependency: the project already depends on the unified `radix-ui` package that
+  bundles `Select`, same as `switch.tsx`/`popover.tsx`. (The generated file imported `cn` from
+  a stray `cn` npm package instead of `@/lib/utils` — fixed to match every other `ui/*`
+  component, and the accidental `"cn": "^0.4.0"` dependency it added to `package.json` was
+  removed.)
+
+### 2026-10-07 — Stock Report's as-of-date picker stays inline, not a new shared component
+- **Decision:** The Stock Report's single-date input (text + calendar-icon popover, mirroring
+  the dd-mmm-yy pattern already duplicated inline in `AddOrder.tsx`/`AddPurchaseBill.tsx`) is
+  built directly inside `Reports.tsx`, not extracted into a new `DateInput`-style component.
+- **Why:** There is exactly one consumer today. Per the project's "don't design for
+  hypothetical future requirements" convention, extraction is deferred until a second
+  single-date picker actually shows up — revisit then.
