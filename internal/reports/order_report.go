@@ -109,7 +109,7 @@ func WriteOrderReport(path string, rows []OrderReportRow) error {
 
 func applyOrderReportColumnStyles(f *excelize.File) error {
 	dateFmt := "dd-mmm-yy"
-	dateStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &dateFmt})
+	dateStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &dateFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("date style: %w", err)
 	}
@@ -134,7 +134,7 @@ func applyOrderReportColumnStyles(f *excelize.File) error {
 	// app's own fmtQty convention and the same fix already made to Purchase Summary
 	// (quantities are always whole in this business; see docs/DECISIONS.md 2026-09-27).
 	qtyFmt := "0"
-	qtyStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &qtyFmt})
+	qtyStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &qtyFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("qty style: %w", err)
 	}
@@ -145,7 +145,7 @@ func applyOrderReportColumnStyles(f *excelize.File) error {
 	// GST % is written as a fraction (e.g. 0.18) so this is a real Excel Percentage
 	// cell, matching the Purchase Summary convention.
 	gstFmt := "0%"
-	gstStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &gstFmt})
+	gstStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &gstFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("gst style: %w", err)
 	}
@@ -157,12 +157,24 @@ func applyOrderReportColumnStyles(f *excelize.File) error {
 		return err
 	}
 
+	// HSN is centered (see docs/DECISIONS.md); Delivery # is a different kind of
+	// identifier — assigned sequentially on delivery, not a document number — and keeps
+	// its default alignment, so it needs its own (uncentered) style rather than sharing
+	// HSN's.
 	intFmt := "0"
-	intStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &intFmt})
+	hsnStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &intFmt, Alignment: center})
 	if err != nil {
-		return fmt.Errorf("int style: %w", err)
+		return fmt.Errorf("hsn style: %w", err)
 	}
-	return applyColStyleOn(f, orderReportSheetName, []int{colORHSN, colORDeliveryNo}, intStyle)
+	if err := applyColStyleOn(f, orderReportSheetName, []int{colORHSN}, hsnStyle); err != nil {
+		return err
+	}
+
+	deliveryNoStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &intFmt})
+	if err != nil {
+		return fmt.Errorf("delivery no style: %w", err)
+	}
+	return applyColStyleOn(f, orderReportSheetName, []int{colORDeliveryNo}, deliveryNoStyle)
 }
 
 func writeOrderReportHeader(f *excelize.File) error {
@@ -183,7 +195,10 @@ func writeOrderReportHeader(f *excelize.File) error {
 	if err != nil {
 		return err
 	}
-	return f.SetCellStyle(orderReportSheetName, "A1", last, boldStyle)
+	if err := f.SetCellStyle(orderReportSheetName, "A1", last, boldStyle); err != nil {
+		return err
+	}
+	return centerHeaderCells(f, orderReportSheetName, 1, []int{colORDate, colORPackSize, colORGST, colORHSN, colORQty})
 }
 
 // writeOrderReportRows writes one row per line, starting at sheet row 2, and returns
@@ -276,7 +291,7 @@ func writeOrderReportTotals(f *excelize.File, rows []OrderReportRow, totalsRow i
 	}
 
 	qtyFmt := "0"
-	boldQtyStyle, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}, CustomNumFmt: &qtyFmt})
+	boldQtyStyle, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}, CustomNumFmt: &qtyFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("totals qty style: %w", err)
 	}

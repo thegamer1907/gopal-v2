@@ -150,12 +150,41 @@ func writeHeader(f *excelize.File) error {
 	if err != nil {
 		return err
 	}
-	return f.SetCellStyle(sheetName, "A1", last, boldStyle)
+	if err := f.SetCellStyle(sheetName, "A1", last, boldStyle); err != nil {
+		return err
+	}
+	return centerHeaderCells(f, sheetName, 1, []int{colDate, colBillNumber, colHSN, colPackSize, colTaxQty, colDQty, colGSTPercent})
+}
+
+// center is the shared horizontal-alignment value for the columns the client asked to be
+// center-aligned (Date, Bill No., HSN, Pack Size, quantity columns, GST %) — see
+// docs/DECISIONS.md.
+var center = &excelize.Alignment{Horizontal: "center"}
+
+// centerHeaderCells re-applies a bold+center style to specific header cells. Needed
+// because writeHeader's blanket SetCellStyle gives every header cell an explicit per-cell
+// style (plain bold), which overrides the column's own alignment — so a centered data
+// column's header would otherwise stay left/general-aligned.
+func centerHeaderCells(f *excelize.File, sheet string, row int, cols []int) error {
+	style, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}, Alignment: center})
+	if err != nil {
+		return fmt.Errorf("bold center header style: %w", err)
+	}
+	for _, c := range cols {
+		cell, err := excelize.CoordinatesToCellName(c, row)
+		if err != nil {
+			return err
+		}
+		if err := f.SetCellStyle(sheet, cell, cell, style); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func applyColumnStyles(f *excelize.File) error {
 	dateFmt := "dd-mmm-yy"
-	dateStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &dateFmt})
+	dateStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &dateFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("date style: %w", err)
 	}
@@ -164,6 +193,18 @@ func applyColumnStyles(f *excelize.File) error {
 		return err
 	}
 	if err := f.SetColStyle(sheetName, dateCol, dateStyle); err != nil {
+		return err
+	}
+
+	billNumberStyle, err := f.NewStyle(&excelize.Style{Alignment: center})
+	if err != nil {
+		return fmt.Errorf("bill number style: %w", err)
+	}
+	billNumberCol, err := excelize.ColumnNumberToName(colBillNumber)
+	if err != nil {
+		return err
+	}
+	if err := f.SetColStyle(sheetName, billNumberCol, billNumberStyle); err != nil {
 		return err
 	}
 
@@ -177,7 +218,7 @@ func applyColumnStyles(f *excelize.File) error {
 	}
 
 	qtyFmt := "0"
-	qtyStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &qtyFmt})
+	qtyStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &qtyFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("qty style: %w", err)
 	}
@@ -189,7 +230,7 @@ func applyColumnStyles(f *excelize.File) error {
 	// not just a number with a literal "%" appended — whole-number slabs only (5, 12, 18…)
 	// so no decimals, matching the other non-amount columns.
 	gstFmt := "0%"
-	gstStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &gstFmt})
+	gstStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &gstFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("gst style: %w", err)
 	}
@@ -202,7 +243,7 @@ func applyColumnStyles(f *excelize.File) error {
 	}
 
 	hsnFmt := "0"
-	hsnStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &hsnFmt})
+	hsnStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &hsnFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("hsn style: %w", err)
 	}
@@ -337,7 +378,7 @@ func writeTotals(f *excelize.File, rows []PurchaseSummaryRow, totalsRow int) err
 	}
 
 	qtyFmt := "0"
-	boldQtyStyle, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}, CustomNumFmt: &qtyFmt})
+	boldQtyStyle, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}, CustomNumFmt: &qtyFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("totals qty style: %w", err)
 	}

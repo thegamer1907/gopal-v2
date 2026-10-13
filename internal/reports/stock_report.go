@@ -85,7 +85,7 @@ func WriteStockReport(path string, asOfDate string, rows []StockReportRow) error
 
 func applyStockColumnStyles(f *excelize.File) error {
 	qtyFmt := "0"
-	qtyStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &qtyFmt})
+	qtyStyle, err := f.NewStyle(&excelize.Style{CustomNumFmt: &qtyFmt, Alignment: center})
 	if err != nil {
 		return fmt.Errorf("qty style: %w", err)
 	}
@@ -147,7 +147,10 @@ func writeStockHeader(f *excelize.File) error {
 	if err != nil {
 		return err
 	}
-	return f.SetCellStyle(stockSheetName, "A2", last, boldStyle)
+	if err := f.SetCellStyle(stockSheetName, "A2", last, boldStyle); err != nil {
+		return err
+	}
+	return centerHeaderCells(f, stockSheetName, 2, []int{colSRPackSize, colSRHSN, colSRStock})
 }
 
 // writeStockRows writes one row per item, starting at sheet row 3 (row 1 is the title,
