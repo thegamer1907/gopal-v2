@@ -6,6 +6,139 @@ reads the top entry first.
 
 ---
 
+## 2026-10-12 — Order export filename, and delivery overwrites the order's date
+**Did:**
+- **Export filename.** Order detail view's "Download Excel"/"Download PDF" now default to
+  `{delivery no. or order id, 3-digit padded} {customer nickname} {date}.{ext}` (e.g.
+  `028 Suresh 15-Oct-26.xlsx`) instead of `Order-{id}.xlsx`/`.pdf`. New
+  `orderExportFilename` in `frontend/src/lib/salesOrder.ts`, wired into `SavedOrders.tsx`'s
+  `downloadExcel`/`downloadPdf`. Strips `\/:*?"<>|` from the free-text nickname (Windows
+  filename restriction).
+- **Delivery date.** `MarkSalesOrderDelivered` (`internal/db/sales_orders.go`) now also
+  overwrites the order's `date` to today (the actual delivery day), and `Date` joined
+  Qty/Rate as editable afterwards via `UpdateDeliveredSalesOrder` — previously Date was
+  frozen alongside Customer/line shape. Updated the lockdown text/comments across
+  `AddOrder.tsx`, `MarkDeliveredDialog.tsx`, and the Go-side error strings from "only Qty
+  and Rate" to "Qty, Rate, and Date" throughout.
+- Flagged a real consequence before implementing (see `docs/DECISIONS.md`): Stock Report's
+  "as of date" cutoff, Order Report's date filter, and Rate History all key off
+  `sales_orders.date`, so this retroactively shifts those once an order is delivered. This
+  was the explicit ask (one `date` field, changed in place), not an oversight.
+- Updated 3 Go tests whose hardcoded dates assumed `date` never changes on delivery
+  (`TestUpdateSalesOrderRefusesDeliveredOrder`, `TestUpdateDeliveredSalesOrderQtyAndRate`,
+  `TestUpdateDeliveredSalesOrderRejections`' "changed date" case — removed, since date is
+  no longer frozen) and added two new ones
+  (`TestMarkSalesOrderDeliveredSetsDateToToday`, `TestUpdateDeliveredSalesOrderDate`).
+- Verified: full `go build`/`go vet`/`go test ./...` and `npm run build` clean. In
+  `wails dev`: confirmed the Date field renders enabled (not greyed out, matching Qty/Rate)
+  on an already-delivered real order, accepts typed input, and correctly trips the
+  unsaved-changes guard — discarded without saving rather than mutating real data. Traced
+  `orderExportFilename`'s output by hand against a real pending order + its real customer
+  nickname ("Amber Traders" → nickname "Amber Ji" → `005 Amber Ji 28-Sep-26.xlsx`), matching
+  spec. Did **not** click "Mark delivered" on a real order (irreversible) or actually
+  trigger a Download Excel/PDF native Save dialog (can't be driven/observed via browser
+  automation and risks leaving it hanging) — both deliberately left unexercised live, backed
+  instead by the passing Go tests and a manual trace.
+
+**Next steps:** none outstanding from this session.
+
+---
+
+## 2026-10-12 — Single instance: focus existing window on relaunch
+**Did:**
+- Client asked: if the Windows `.exe` is launched a second time while already running,
+  can it detect that and bring the existing window forward instead of opening a duplicate?
+- Found Wails v2.16.0 (already the pinned version — no upgrade needed) has this built in:
+  `options.App.SingleInstanceLock` with a `UniqueId` and an `OnSecondInstanceLaunch`
+  callback. Each platform (Windows/macOS/Linux) has its own already-written detection
+  mechanism (named mutex + hidden `WM_COPYDATA` window on Windows; a flock'd lock file on
+  macOS) — no custom IPC code needed.
+- Added it to `main.go`: `UniqueId: "gopal-v2-single-instance"` (must stay stable across
+  releases — see DECISIONS) and `OnSecondInstanceLaunch` calling `runtime.WindowShow(app.ctx)`,
+  which on Windows un-minimizes and calls `SetForegroundWindow`/`SetFocus` internally (read
+  the Wails source to confirm — no separate unminimize call needed).
+- Verified end-to-end on this Mac: `wails build`, then `open build/bin/gopal-v2.app` twice
+  in a row — only one process stayed running both times (confirmed via `ps`), proving the
+  shared `SingleInstanceLock`/`OnSecondInstanceLaunch` wiring works; the Windows-specific
+  mutex/`WM_COPYDATA` code path itself wasn't separately exercisable from a Mac. `go build
+  ./...` / `go vet ./...` clean.
+
+**Next steps:** worth a quick real-world check (launch twice) on the client's Windows
+machine after the next release, to confirm the Windows-specific code path too.
+
+---
+
+## 2026-10-12 — Report exports: center-align Date/Bill No./HSN/Pack Size/Qty/GST % columns
+**Did:**
+- Client feedback: in the three `/reports` exports, Date, Bill Number, HSN, Pack Size,
+  quantity columns, and GST % should be center-aligned rather than Excel's default
+  left/right alignment — see `docs/DECISIONS.md` for the exact column list and two scope
+  calls (Stock Report's "Stock" column counted as a qty column; Order Report's Delivery #/
+  Delivered? left alone).
+- Added `Alignment: center` to the relevant `excelize.Style` literals in
+  `purchase_summary.go`/`stock_report.go`/`order_report.go`'s column-style setup, plus a
+  new shared `centerHeaderCells` helper (in `purchase_summary.go`) to re-apply bold+center
+  to just the affected header cells — header cells get their own explicit per-cell style
+  from the blanket header-row bold pass, which overrides the column's alignment, so the
+  header text wouldn't otherwise match the centered data below it. Also added alignment to
+  the Totals-row bold+numFmt styles for the two columns that get totaled (Tax Qty/D Qty in
+  Purchase Summary, Qty in Order Report). Split Order Report's previously-shared HSN/
+  Delivery # number style into two, since only HSN should centre.
+- Verified by writing a temporary Go test (not committed) that generated sample workbooks
+  via all three `WriteXxx` functions, then inspected every header/data/totals cell's
+  `alignment.horizontal` with `openpyxl` — confirmed every requested column is centered,
+  Company/Item/Customer/City/Remarks/money columns are untouched, and Delivery #/
+  Delivered? are untouched. `go build ./...` / `go vet ./...` clean.
+
+**Next steps:** none outstanding from this session.
+
+---
+
+## 2026-10-12 — Order detail view: add Mark delivered
+**Did:**
+- Client feedback: marking a pending order delivered was only possible from the View/Edit
+  Orders list row — the read-only order detail view (opened by clicking a row) had no way
+  to do it, forcing a trip back to the list.
+- Added a "Mark delivered" button to `OrderDetail`'s action row (`SavedOrders.tsx`), shown
+  only when `!order.delivered`, reusing the exact same `MarkDeliveredDialog` confirmation
+  and `markDelivered`/`confirmDeliver` state the list row's button already uses — one
+  dialog instance, not a duplicate.
+- Had to restructure `SavedOrders()`'s top-level return: it previously `return`ed early for
+  `<OrderDetail/>` before ever reaching `<MarkDeliveredDialog/>` (which lived further down
+  in the list's own JSX), so the dialog literally wasn't mounted while viewing a detail.
+  Now both branches render under one `<>...</>` with a single shared dialog at the end.
+- After confirming, `refresh()` updates `orders` and `selected` (a `useMemo` over
+  `orders.find(...)`) recomputes automatically, so the detail view updates in place to show
+  "Delivered #N" with the button now hidden — no navigation back to the list needed.
+- Verified in `wails dev` against the real DB: button appears on a pending order's detail,
+  opens the identical confirmation dialog (checked against a real pending order, then
+  cancelled rather than mutating real data), and is correctly absent on an already-delivered
+  order's detail. `npm run build` / `tsc --noEmit` clean.
+
+**Next steps:** none outstanding from this session.
+
+---
+
+## 2026-10-12 — Stock Report: exclude non-positive-stock items
+**Did:**
+- Client feedback: the Stock Report export was listing every item, including ones with zero
+  or negative computed stock (negative from the seeded `TEST - Sample Co` demo data), which
+  is just noise in the sheet.
+- One-line fix in `computeStockRows` (`frontend/src/pages/Reports.tsx`): filter rows to
+  `stock > 0` before building `StockReportRow`s. On-screen item count, the Download button's
+  empty-state disable, and the exported `.xlsx` all derive from this same function's return
+  value, so all three picked up the filter with no other changes needed.
+- Verified in `wails dev` against the real DB: 101 total items − 1 zero-stock item − 8
+  negative-stock `TEST` items = 92, matching the Stock Report's displayed count exactly.
+  `npm run build` clean.
+
+**Next steps:** none outstanding from this session. The 2026-09-28 demo-data cleanup (delete
+the seeded `TEST - Sample Co` items/order from the real DB) is still open and is exactly
+what's producing the negative-stock rows this fix now hides — worth doing properly at some
+point rather than relying on the filter.
+
+---
+
 ## 2026-10-07 — Two new Reports: Stock Report & Order Report
 **Did:**
 - Added **Stock Report** (`/reports`): every item's stock as of a chosen date (default

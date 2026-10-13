@@ -164,7 +164,7 @@ also gets a sequential `delivery_number`. Migration id 6; `delivered` added in m
 |--------|------|-------|
 | `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key (FK target for line items) |
 | `customer_id` | INTEGER NOT NULL | → `customers(id)` (FK) — the order references the customer by id, not name |
-| `date` | TEXT NOT NULL | order date, same `dd-mmm-yy` convention/handling as `purchase_bills.date` |
+| `date` | TEXT NOT NULL | order date, same `dd-mmm-yy` convention/handling as `purchase_bills.date`. Set at creation; **overwritten to today by `MarkSalesOrderDelivered`** (the delivery date supersedes the placed-on date), and editable afterwards via `UpdateDeliveredSalesOrder` — see the delivery note below |
 | `delivery_number` | INTEGER NOT NULL DEFAULT 0 | **the source of truth for delivery status.** `0` = not yet delivered (every existing/new order defaults here); anything above `0` is the order's sequential delivery number, assigned once by `MarkSalesOrderDelivered` and never cleared. Deliberately **not** UNIQUE — see the numbering note below |
 | `delivered` | INTEGER NOT NULL DEFAULT 0 | **legacy mirror, kept only for backward compatibility.** Set to `1` in the same statement that assigns `delivery_number`, so it can never contradict it, but Go no longer reads it — `SalesOrder.Delivered` is derived as `delivery_number > 0`. It exists because the in-app updater keeps one generation of rollback: a client who reverts to a pre-`delivery_number` build reads this column and still sees correct delivery status. Not dropped, because dropping a column is a breaking change under the migration policy above |
 
@@ -201,15 +201,17 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > ```sql
 > UPDATE sales_orders
 >    SET delivery_number = (SELECT COALESCE(MAX(delivery_number), 0) + 1 FROM sales_orders),
->        delivered = 1
+>        delivered = 1,
+>        date = ?  -- today (02-Jan-06), overwriting the placed-on date
 >  WHERE id = ? AND delivery_number = 0
 > ```
 >
 > One statement rather than read-then-write because the pool isn't pinned to a single
 > connection; `AND delivery_number = 0` is what enforces irreversibility in SQL, so a second
 > attempt matches no rows and errors. It's called directly from a button in the `/orders`
-> list row and one on the order's edit page (`AddOrder.tsx`), both behind a confirmation
-> dialog, and both bypassing the edit form's Save/dirty-tracking flow.
+> list row, the order detail view, and the order's edit page (`AddOrder.tsx`/
+> `SavedOrders.tsx`), all behind the same confirmation dialog (`MarkDeliveredDialog`), and
+> all bypassing the edit form's Save/dirty-tracking flow.
 >
 > **Numbering** is `MAX + 1`, so numbers can have gaps (delivered orders can still be
 > deleted) and the number of a deleted *highest* order is reused by the next mark. Both are
@@ -217,15 +219,16 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > which is also why `delivery_number` carries no UNIQUE index: it would hard-fail that
 > legitimate reuse.
 >
-> **A delivered order is frozen apart from Qty and Rate.** `UpdateSalesOrder` reads
+> **A delivered order is frozen apart from Qty, Rate, and Date.** `UpdateSalesOrder` reads
 > `delivery_number` as the first statement in its transaction and refuses outright if it's
 > set, so the whole-row overwrite (and its `DELETE FROM sales_order_items`) can never reach
 > a delivered order. The only write path for one is `UpdateDeliveredSalesOrder`, which
-> verifies customer, date, line count, and each line's `item_id`/`custom_pack_size` against
-> the stored row before issuing a targeted `UPDATE ... SET rate = ?, qty = ?` per line.
-> Lines are matched positionally against rows read back in `id` order (the same order every
-> read returns), so the row ids never leave `internal/db` and a reordered payload is
-> rejected rather than misapplied.
+> verifies customer, line count, and each line's `item_id`/`custom_pack_size` against the
+> stored row before issuing a targeted `UPDATE ... SET rate = ?, qty = ?` per line, plus a
+> separate `UPDATE sales_orders SET date = ?` when the date differs (e.g. correcting a
+> delivery date `MarkSalesOrderDelivered` set). Lines are matched positionally against rows
+> read back in `id` order (the same order every read returns), so the row ids never leave
+> `internal/db` and a reordered payload is rejected rather than misapplied.
 >
 > **Custom pack size** is a per-line write, not JOIN-derived (unlike `ItemPackSize`),
 > and deliberately does **not** change how `calcOrderLine` works — it's fed the
@@ -267,6 +270,10 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > convenience `NewTableLayout` API can't do the merged header row or per-cell borders
 > this layout needs). Both now render a gross "Total" row, then (only when deductions is
 > non-empty) one "Less"/"Add" line per custom-pack-size line and a final net "Total" row.
+> The default save filename is built by `orderExportFilename` (`lib/salesOrder.ts`): the
+> delivery number once delivered (else the order's `id`), zero-padded to 3 digits, then the
+> customer's nickname (free-text, so `\/:*?"<>|` are stripped — Windows forbids them in
+> filenames) and the order's date, e.g. `028 Suresh 15-Oct-26.xlsx`.
 > PDF text uses a bundled Nunito TTF (`internal/reports/fonts/`, SIL OFL license,
 > embedded via `go:embed` — gopdf has no built-in fonts). `App.ExportOrderExcel`/
 > `ExportOrderPDF` (`app.go`) mirror `ExportPurchaseSummary`'s SaveFileDialog + write

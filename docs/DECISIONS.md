@@ -911,3 +911,74 @@ have to re-litigate.
 - **Why:** There is exactly one consumer today. Per the project's "don't design for
   hypothetical future requirements" convention, extraction is deferred until a second
   single-date picker actually shows up — revisit then.
+
+### 2026-10-12 — Report exports: center-align Date/Bill No./HSN/Pack Size/Qty/GST % columns
+- **Decision:** Across all three `/reports` exports (`internal/reports/purchase_summary.go`,
+  `stock_report.go`, `order_report.go`), the **Date**, **Bill No.**, **HSN**, **Pack Size**,
+  quantity columns (**Tax Qty**/**D Qty**/**Qty**, and Stock Report's **Stock**), and
+  **GST %** columns are now center-aligned — in both the header row and the data rows, and
+  in the Totals row where one of these columns is totaled (Tax Qty/D Qty in Purchase
+  Summary, Qty in Order Report). Money columns and free-text columns (Company/Item/
+  Customer/City/Remarks) are unchanged (left for text, right/general for money).
+- **Why:** Client ask, for a cleaner, more scannable look on these short, label-like
+  values. A shared `center` alignment value and a `centerHeaderCells` helper (both in
+  `purchase_summary.go`, reused by the other two files — same package) apply it, since a
+  header cell's own explicit style always overrides the column-level style and so needs
+  the same alignment re-applied separately.
+- **Scope calls:** Stock Report's "Stock" column counts as a quantity column and is
+  centered too, even though its header literally reads "Stock" not "Qty" — same category
+  as the other quantity figures. Order Report's **Delivery #** and **Delivered?** columns
+  are deliberately left uncentered — the ask named "bill number" specifically (Purchase
+  Summary only), and Delivery # is a different kind of identifier (assigned sequentially on
+  delivery, not a document number), so it wasn't swept in by analogy.
+
+### 2026-10-12 — Single instance: use Wails' built-in `SingleInstanceLock`, not custom IPC
+- **Decision:** If the client double-launches the `.exe` while it's already running, the
+  existing window is brought to the front instead of opening a second instance. Implemented
+  entirely via `options.App.SingleInstanceLock` (`main.go`) — `UniqueId:
+  "gopal-v2-single-instance"` plus `OnSecondInstanceLaunch: func(_) {
+  runtime.WindowShow(app.ctx) }`. No custom mutex/named-pipe/lock-file code was written.
+- **Why:** Wails v2.16.0 (already the pinned version) ships this per-platform already — a
+  named mutex + hidden `WM_COPYDATA` window on Windows, a flock'd lock file on macOS, their
+  own mechanism on Linux — the second process detects the existing instance, forwards its
+  launch args, and exits before ever showing a window; the first instance's
+  `OnSecondInstanceLaunch` fires and `runtime.WindowShow` un-minimizes/focuses it
+  (confirmed by reading the Windows frontend's `ShowWindow()`). Verified end-to-end on this
+  Mac (same `SingleInstanceLock` wiring, different per-platform detection code): launching
+  `gopal-v2.app` twice left exactly one process running both times.
+- **Must-know:** `UniqueId` has to stay the same string across every future release — it's
+  what lets different versions of the app recognize each other as "the same instance" (a
+  Windows mutex name / lock file name derived from it). Don't change it without a reason.
+- **Not separately verified:** the Windows-specific mutex/`WM_COPYDATA` code path itself —
+  this dev machine is macOS, so only the macOS lock-file implementation of the same
+  `SingleInstanceLock` option was exercised directly. Worth a quick real check on the
+  client's machine after the next release.
+
+### 2026-10-12 — Order export filename, and delivery overwrites the order's date
+- **Decision (export filename):** Downloading an order's Excel/PDF from its detail view now
+  defaults to `{delivery no. or order id, 3-digit padded} {customer nickname} {date}.{ext}`
+  (e.g. `028 Suresh 15-Oct-26.xlsx`) instead of `Order-{id}.xlsx`/`.pdf` — built by the new
+  `orderExportFilename` in `lib/salesOrder.ts`. The free-text nickname has
+  `\/:*?"<>|` stripped (Windows forbids them in filenames); no other sanitization, since
+  this is only ever a *default* name in a native Save dialog the user can still edit.
+- **Decision (delivery date):** `MarkSalesOrderDelivered` now also overwrites the order's
+  `date` to the day it's actually marked delivered, not the day it was originally placed.
+  `Date` joins **Qty**/**Rate** as the fields a delivered order still allows editing
+  (`UpdateDeliveredSalesOrder`) — previously Date was frozen alongside Customer/line
+  shape/items. Client ask: the date on record should reflect when goods actually went out,
+  and a wrong delivery date should be correctable without needing an un-mark (which still
+  doesn't exist — delivery stays one-way).
+- **Known consequence, accepted:** `sales_orders.date` isn't just a display field — Stock
+  Report's "as of date" cutoff, Order Report's date-range filter, the `/orders` list's
+  sort, and Rate History's displayed date all key off it (`Reports.tsx`'s
+  `computeStockRows`/`inRange`). Stock is already decremented by an order's quantity the
+  moment it's *placed*, delivered or not (`items.go`'s `itemSelect`). So once an order is
+  delivered, its quantity stops counting toward stock-sold/report figures for any date
+  between when it was placed and when it was delivered, and starts counting as of the
+  delivery date instead — retroactively shifting any "as of a past date" report spanning
+  that window. This was flagged up front, before implementing, rather than discovered
+  later — a second "placed on" column was deliberately not added, since the ask was for the
+  one `date` field to change in place.
+- **Alternatives considered:** a separate `delivered_date` column, leaving `date` as the
+  placed-on date — rejected, since it contradicts the explicit ask ("change the date of the
+  order") and would need its own UI surface for no stated benefit.

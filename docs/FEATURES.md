@@ -7,9 +7,13 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
-_Shipped in **v0.9.0** (2026-10-07): two more Reports cards — **Stock Report** (every item's
-stock as of a chosen date, default today; Company/Item/Pack Size/HSN/Stock columns, no
-Totals row) and **Order Report** (a line-item register of sales orders — one row per order
+_Shipped (2026-10-12): single-instance behavior — launching the `.exe` while it's already
+running brings the existing window to the front instead of opening a second instance, via
+Wails' built-in `SingleInstanceLock` (see DECISIONS)._
+
+_Shipped in **v0.9.0** (2026-10-07): two more Reports cards — **Stock Report** (every item
+with positive stock as of a chosen date, default today — items at zero or negative stock
+are excluded; Company/Item/Pack Size/HSN/Stock columns, no Totals row) and **Order Report** (a line-item register of sales orders — one row per order
 line — filterable by a date range and a tri-state delivery status All/Delivered
 only/Pending only; Date/Customer/City/Item/Pack Size/GST %/HSN/Qty/Rate/Final
 Amount/Delivered?/Delivery # columns — Pack Size and Qty are whole numbers, matching the

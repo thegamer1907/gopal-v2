@@ -224,15 +224,17 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   **Final Amount** (calculated, shaded band) · info button · delete.
 - **Delivered orders are locked down** (edit mode only). The heading gains a
   **`Delivered #N`** badge and, in place of the Mark-delivered button, the line
-  "Delivered — only Qty and Rate can be changed." Customer, Date, the item picker and Pack
+  "Delivered — only Qty, Rate, and Date can be changed." Customer, the item picker and Pack
   Size all render `disabled`; the per-row delete button and the "Add row" button disappear
-  entirely. **Qty and Rate stay editable**, and "Update order" saves them through
+  entirely. **Qty, Rate, and Date stay editable**, and "Update order" saves them through
   `UpdateDeliveredSalesOrder`, which re-validates everything else server-side.
 - **"Mark delivered"** sits beside the "Edit order" heading on an undelivered order and
   opens the shared `MarkDeliveredDialog` confirm (same wording as the `/orders` list). It's
   a direct write that bypasses the form's Save flow and the unsaved-changes guard: on
-  confirm the badge, the lockdown and a "Order marked delivered as #N." message all appear
-  in place without navigating away. There is no un-mark — delivery is one-way.
+  confirm the badge, the lockdown, the updated Date (now today — see `docs/DATA_MODEL.md`)
+  and a "Order marked delivered as #N." message all appear in place without navigating
+  away. There is no un-mark — delivery is one-way. The same button/dialog is also offered
+  from the order's read-only detail view (`SavedOrders.tsx`'s `OrderDetail`).
 - **Stock**: current on-hand quantity for the selected item — total purchased minus total
   sold, **derived** (not stored; see `docs/DATA_MODEL.md`'s `items.stock` note), already
   present on every cached item so it needs no extra fetch. The cached item list is
