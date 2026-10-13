@@ -131,15 +131,21 @@ function computeStockRows(
         }
     }
 
-    return items.map((item) =>
-        reports.StockReportRow.createFrom({
-            companyName: item.companyName,
-            itemName: item.name,
-            packSize: item.packSize,
-            hsn: item.hsn,
+    return items
+        .map((item) => ({
+            item,
             stock: (purchasedByItem.get(item.id) ?? 0) - (soldByItem.get(item.id) ?? 0),
-        }),
-    );
+        }))
+        .filter(({stock}) => stock > 0)
+        .map(({item, stock}) =>
+            reports.StockReportRow.createFrom({
+                companyName: item.companyName,
+                itemName: item.name,
+                packSize: item.packSize,
+                hsn: item.hsn,
+                stock,
+            }),
+        );
 }
 
 function stockFilenameFor(asOfDate: string): string {
