@@ -206,10 +206,11 @@ func (a *App) SaveOrderShareImage(png []byte, defaultFilename string) (string, e
 	return path, nil
 }
 
-// GetRateHistory returns every past rate a customer has been charged for an item,
-// newest-insert-first (the caller sorts by parsed date — see db.RateHistory).
-func (a *App) GetRateHistory(customerID, itemID int64) ([]db.RateHistoryEntry, error) {
-	return db.RateHistory(a.db, customerID, itemID)
+// GetItemRateHistory returns every past rate an item has sold for, across every
+// customer, newest-insert-first (the caller sorts by parsed date — see
+// db.ItemRateHistory).
+func (a *App) GetItemRateHistory(itemID int64) ([]db.ItemRateHistoryEntry, error) {
+	return db.ItemRateHistory(a.db, itemID)
 }
 
 // --- Database management (Settings → Database) ---

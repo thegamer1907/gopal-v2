@@ -241,12 +241,27 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   re-fetched after a successful save so Stock stays current for the rest of the session
   (e.g. adding the same item to a second order right after). No validation blocks
   entering a Qty larger than Stock — it's shown for reference only.
-- **Rate prefill + history**: selecting an item looks up the chosen customer's past rate
-  for it (`GetRateHistory`) and prefills **Rate** with the latest one (blank if there's no
-  prior order for that pair). The **info** button opens `RateHistoryDialog`, listing every
-  past rate for that customer+item, newest first (or an empty state). This lookup is
-  **derived from past orders**, not a separate table — see `docs/DATA_MODEL.md`. Prefill
-  fires once, at the moment the item is picked.
+- **Rate prefill + history**: selecting an item fetches its full rate history across
+  every customer (`GetItemRateHistory`, not customer-scoped) and caches it on the line;
+  **Rate** is prefilled by filtering that cached array client-side for the chosen
+  customer's newest entry (blank if none). The **info** button opens the generalized
+  `RateHistoryDialog` (see below), prefiltered to the current line's customer's city and
+  customer. Changing the order's Customer afterward re-derives every line's Rate from the
+  already-cached history — no new fetch. Prefill fires once, at the moment the item is
+  picked. This lookup is **derived from past orders**, not a separate table — see
+  `docs/DATA_MODEL.md`.
+- **The generalized `RateHistoryDialog`** (new — see DECISIONS.md) is one component
+  reused from three places: the Add/Edit Order info button above (prefiltered to the
+  current line's city/customer), a new **Rate history** button on the Items master list
+  (between Edit and Delete; opens at City=All/Customer=All — the full cross-customer
+  history for that item), and a new info button per line on the order detail view
+  (`SavedOrders.tsx`'s `OrderDetail`; prefiltered to that order's city/customer). It shows
+  four columns — **City · Customer · Date · Rate** — always visible regardless of filter
+  state, with two independent `Select` filters (City, Customer; both default to "All").
+  Picking a City narrows the Customer dropdown to customers in that city; if the
+  currently-selected Customer falls outside a newly-picked City, it resets to "All" rather
+  than pointing at a no-longer-listed option. Two empty states: no history at all for the
+  item, or none matching the current filters.
 - **Changing the customer after lines already have items** prompts (controlled
   `AlertDialog`): **Cancel** (reverts the picker to the original customer), **Keep
   current rates** (applies the new customer, leaves every line's Rate untouched), or
@@ -280,14 +295,18 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
     next delivery number and can't be moved back to pending. On confirm the list refreshes
     and the order moves to the other side of the toggle.
 - **Detail**: clicking a row swaps in a read-only view — "Back to all orders" plus **Copy
-  Order Image**, **Download Excel**, **Download PDF**, **Edit order** and **Delete**
-  actions, a header card ("Order #{id}" + a **`Delivered #N`** or **`Pending`** badge /
-  "{customerName} · {date}"), and a display-only line-items grid (Item · Qty · Pack Size ·
-  GST % · HSN · Rate · Final Amount, footer Totals row for Qty and Final Amount). **No
-  Stock column here** — Stock is a live decision-support figure for placing a *new* order,
-  not a fact about a saved one. Every action stays available on a delivered order,
-  including Delete; the exports are identical either way (**no delivery number in the
-  customer-facing image/Excel/PDF** — it's an in-app identifier).
+  Order Image**, **Download Excel**, **Download PDF**, (Mark delivered, if pending),
+  **Edit order** and **Delete** actions, a header card ("Order #{id}" + a **`Delivered
+  #N`** or **`Pending`** badge / "{customerName} · {date}"), and a display-only line-items
+  grid (Item · Qty · Pack Size · GST % · HSN · Rate · Final Amount · info button, footer
+  Totals row for Qty and Final Amount). The trailing **info button** per line opens the
+  generalized `RateHistoryDialog`, prefiltered to the order's city/customer — its history
+  is eagerly fetched once per distinct item on mount (small, bounded line count), so the
+  dialog opens instantly. **No Stock column here** — Stock is a live decision-support
+  figure for placing a *new* order, not a fact about a saved one. Every action stays
+  available on a delivered order, including Delete; the exports are identical either way
+  (**no delivery number in the customer-facing image/Excel/PDF** — it's an in-app
+  identifier).
   - **Edit order** → navigates to `/orders/:id/edit` (the same `AddOrder.tsx` form in
     edit mode).
   - **Delete** → a controlled `AlertDialog` confirm → `DeleteSalesOrder` → back to the
@@ -306,7 +325,10 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   other column.
 - **Search box** (item or company name) + **sortable headers** (`useTableSort`, default by
   company). Each row has **Edit** (`EditItemDialog` — prefilled, can move the item to another
-  company) and **Delete** (controlled `AlertDialog`; backend refuses if bill lines reference it).
+  company), **Rate history** (opens the generalized `RateHistoryDialog` at City=All/
+  Customer=All — the full cross-customer history for that item; fetched lazily on click,
+  not pre-fetched for every row, since this page can list ~100 items — see DECISIONS.md),
+  and **Delete** (controlled `AlertDialog`; backend refuses if bill lines reference it).
 
 ### Companies (`/companies`) — company master
 - A live company count, an "Add company" card (just **Company name** + Add — name only), and a

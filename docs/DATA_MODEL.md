@@ -281,10 +281,13 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > migration. See DECISIONS.md for the gopdf `SetTextColor` gotcha and the Excel
 > Indian-grouping limitation.
 >
-> **Rate history is derived, not a separate table**: `db.RateHistoryEntry` +
-> `RateHistory(customerID, itemID)` (same file) answers "what did this customer last pay
-> for this item" straight from `sales_order_items` JOINed to `sales_orders` — every past
-> order already *is* the history, so nothing is duplicated/kept in sync separately. Since
-> `date` is free text, the query only orders by `id` as a cheap tie-break; the frontend
-> sorts by parsed date (`AddOrder.tsx`, `RateHistoryDialog.tsx`) — same reasoning as every
-> other date sort in this app.
+> **Rate history is derived, not a separate table**: `db.ItemRateHistoryEntry` +
+> `ItemRateHistory(itemID)` (same file) answers "what has this item sold for, to whom,
+> where" straight from `sales_order_items` JOINed to `sales_orders` and `customers` —
+> every past order already *is* the history, so nothing is duplicated/kept in sync
+> separately. Scoped to the item only (not a customer) — every customer who's ever bought
+> it comes back in one call, each row carrying its `customerId`/`customerName`/`city`, and
+> the three UI entry points (Add/Edit Order, Items master list, order detail — see
+> DECISIONS.md) filter client-side from there. Since `date` is free text, the query only
+> orders by `id` as a cheap tie-break; the frontend sorts by parsed date (`AddOrder.tsx`,
+> `RateHistoryDialog.tsx`) — same reasoning as every other date sort in this app.

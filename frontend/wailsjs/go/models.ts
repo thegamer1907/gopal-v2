@@ -70,6 +70,26 @@ export namespace db {
 	        this.stock = source["stock"];
 	    }
 	}
+	export class ItemRateHistoryEntry {
+	    customerId: number;
+	    customerName: string;
+	    city: string;
+	    date: string;
+	    rate: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ItemRateHistoryEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.customerId = source["customerId"];
+	        this.customerName = source["customerName"];
+	        this.city = source["city"];
+	        this.date = source["date"];
+	        this.rate = source["rate"];
+	    }
+	}
 	export class PurchaseBillItem {
 	    itemId: number;
 	    itemName: string;
@@ -143,20 +163,6 @@ export namespace db {
 		}
 	}
 	
-	export class RateHistoryEntry {
-	    date: string;
-	    rate: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new RateHistoryEntry(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.date = source["date"];
-	        this.rate = source["rate"];
-	    }
-	}
 	export class SalesOrderItem {
 	    itemId: number;
 	    itemName: string;

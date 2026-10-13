@@ -388,36 +388,43 @@ func GetSalesOrder(conn *sql.DB, id int64) (SalesOrder, error) {
 	return o, rows.Err()
 }
 
-// RateHistoryEntry is one past order's rate for a given customer+item pair.
-type RateHistoryEntry struct {
-	Date string  `json:"date"`
-	Rate float64 `json:"rate"`
+// ItemRateHistoryEntry is one past order's rate for an item, with the customer and city
+// it was sold to — answers "what has this item sold for, to whom, where" across every
+// customer that's ever bought it, not scoped to a single customer.
+type ItemRateHistoryEntry struct {
+	CustomerID   int64   `json:"customerId"`
+	CustomerName string  `json:"customerName"`
+	City         string  `json:"city"`
+	Date         string  `json:"date"`
+	Rate         float64 `json:"rate"`
 }
 
-// RateHistory returns every past rate a customer has been charged for an item, derived
-// directly from sales_order_items/sales_orders (no separate table to keep in sync).
-// Order is a cheap id-based tie-break only — dates are free-text (dd-mmm-yy, possibly the
-// legacy dd-mmm-yyyy) and not safely sortable as SQL strings, so the caller sorts by
-// parsed date, same as the frontend already does everywhere else it sorts by date.
-func RateHistory(conn *sql.DB, customerID, itemID int64) ([]RateHistoryEntry, error) {
+// ItemRateHistory returns every past sales-order rate for itemID, across every customer,
+// derived directly from sales_order_items/sales_orders/customers (no separate table to
+// keep in sync). Order is a cheap id-based tie-break only — dates are free-text
+// (dd-mmm-yy, possibly the legacy dd-mmm-yyyy) and not safely sortable as SQL strings, so
+// the caller sorts by parsed date, same as the frontend already does everywhere else it
+// sorts by date.
+func ItemRateHistory(conn *sql.DB, itemID int64) ([]ItemRateHistoryEntry, error) {
 	rows, err := conn.Query(
-		`SELECT so.date, soi.rate
+		`SELECT c.id, c.name, c.city, so.date, soi.rate
 			FROM sales_order_items soi
 			JOIN sales_orders so ON so.id = soi.order_id
-			WHERE so.customer_id = ? AND soi.item_id = ?
+			JOIN customers c ON c.id = so.customer_id
+			WHERE soi.item_id = ?
 			ORDER BY so.id DESC`,
-		customerID, itemID,
+		itemID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("query rate history: %w", err)
+		return nil, fmt.Errorf("query item rate history: %w", err)
 	}
 	defer rows.Close()
 
-	history := []RateHistoryEntry{}
+	history := []ItemRateHistoryEntry{}
 	for rows.Next() {
-		var e RateHistoryEntry
-		if err := rows.Scan(&e.Date, &e.Rate); err != nil {
-			return nil, fmt.Errorf("scan rate history: %w", err)
+		var e ItemRateHistoryEntry
+		if err := rows.Scan(&e.CustomerID, &e.CustomerName, &e.City, &e.Date, &e.Rate); err != nil {
+			return nil, fmt.Errorf("scan item rate history: %w", err)
 		}
 		history = append(history, e)
 	}

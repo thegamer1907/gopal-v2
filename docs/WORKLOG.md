@@ -6,6 +6,42 @@ reads the top entry first.
 
 ---
 
+## 2026-10-13 — Generalize Rate History: City/Customer filters, three entry points
+**Did:**
+- Client ask: turn the Add Order info button's per-customer rate history popup into one
+  reusable dialog — City/Customer/Date/Rate for every customer who's ever bought the item,
+  filterable by City and Customer (each with an "All" option, City narrowing Customer) —
+  and reuse it from the Items master list (opens at All/All) and the order detail view
+  (opens prefiltered to that order's city/customer), on top of its existing Add Order spot.
+- Backend: replaced `RateHistory(customerID, itemID)` with `ItemRateHistory(itemID)` in
+  `internal/db/sales_orders.go` (drops the customer filter, JOINs `customers` for
+  name/city), renamed the `app.go` binding to `GetItemRateHistory`, regenerated Wails
+  bindings. Added `TestItemRateHistory` (two customers in different cities, newest-first
+  ordering, empty-slice case for an item with no orders).
+- Generalized `RateHistoryDialog.tsx` in place (same component) — `cityFilter`/
+  `customerFilter` state reset on open from new `initialCity`/`initialCustomerId` props;
+  handles the edge case where narrowing City orphans a previously-selected Customer (resets
+  to "All" rather than leaving the Select pointed at a stale id).
+- `AddOrder.tsx`: per-line `rateHistory` cache is now the full item history (fetched once
+  per item-select/edit-load, not per customer); Rate prefill and `recalculateRates` (the
+  customer-change "keep or recalculate" flow) both now filter that cache client-side —
+  `recalculateRates` no longer makes any backend call at all.
+- `Items.tsx`: new "Rate history" button (Edit → History → Delete) — lazy fetch-then-open,
+  the whole action group disabled while a fetch is in flight (same idiom as other
+  single-`busy`-state pages in this app), since this page lists ~100 rows.
+- `SavedOrders.tsx`'s `OrderDetail`: new trailing info-button column on the line-items
+  table (didn't exist before) — eagerly fetches each distinct item's history on mount
+  (small, bounded line count per order) so the dialog opens instantly.
+- Verified end-to-end in `wails dev` against the real DB: Items page's history button
+  (All/All, correct columns); Add Order's info button (prefilled to the line's customer's
+  city/customer, matching today's rate-prefill value); order detail's new info button
+  (instant open, correctly prefilled). `go build`/`go vet`/`go test ./...` and
+  `npm run build` clean throughout.
+
+**Next steps:** none outstanding from this session.
+
+---
+
 ## 2026-10-12 — Order export filename, and delivery overwrites the order's date
 **Did:**
 - **Export filename.** Order detail view's "Download Excel"/"Download PDF" now default to

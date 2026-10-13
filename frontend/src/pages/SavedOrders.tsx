@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {toBlob} from 'html-to-image';
-import {ArrowLeft, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, ImageDown, Pencil, Search, Trash2} from 'lucide-react';
+import {ArrowLeft, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, ImageDown, Info, Pencil, Search, Trash2} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
 import {
     ListSalesOrders,
@@ -10,9 +10,11 @@ import {
     SaveOrderShareImage,
     ExportOrderExcel,
     ExportOrderPDF,
+    GetItemRateHistory,
 } from '../../wailsjs/go/main/App';
 import {db, reports} from '../../wailsjs/go/models';
 import {MarkDeliveredDialog} from '@/components/MarkDeliveredDialog';
+import {RateHistoryDialog} from '@/components/RateHistoryDialog';
 import {ShareableOrderImage} from '@/components/ShareableOrderImage';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -334,8 +336,26 @@ function OrderDetail({
     const [notice, setNotice] = useState('');
     const [error, setError] = useState('');
     const [imagePreview, setImagePreview] = useState<{blob: Blob; url: string} | null>(null);
+    const [historyByItem, setHistoryByItem] = useState<Map<number, db.ItemRateHistoryEntry[]>>(new Map());
+    const [historyLineIndex, setHistoryLineIndex] = useState<number | null>(null);
     const shareRef = useRef<HTMLDivElement>(null);
     const rows = order.items.map((it) => ({it, c: lineCalc(it)}));
+
+    // Eagerly fetch each line's rate history on mount (a small, bounded line count per
+    // order, unlike the Items master list) so the info button opens instantly. Deduped
+    // by item id since the same item can appear on more than one line.
+    useEffect(() => {
+        let cancelled = false;
+        const itemIds = [...new Set(order.items.map((it) => it.itemId))];
+        Promise.all(itemIds.map((id) => GetItemRateHistory(id).then((h) => [id, h] as const)))
+            .then((pairs) => {
+                if (!cancelled) setHistoryByItem(new Map(pairs));
+            })
+            .catch((e: any) => setError(String(e)));
+        return () => {
+            cancelled = true;
+        };
+    }, [order.id]);
     const totals = rows.reduce(
         (acc, {it, c}) => {
             acc.qty += it.qty;
@@ -530,6 +550,7 @@ function OrderDetail({
                                     <th className="w-14">HSN</th>
                                     <th className="w-20">Rate</th>
                                     <th className="w-24 bg-muted/50">Final Amount</th>
+                                    <th className="w-10"/>
                                 </tr>
                             </thead>
                             <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1.5 [&>tr>td]:align-middle">
@@ -551,6 +572,18 @@ function OrderDetail({
                                         <td className="text-right tabular-nums text-muted-foreground">{it.hsn}</td>
                                         <td className="text-right tabular-nums">{fmt(it.rate)}</td>
                                         <td className="text-right tabular-nums bg-muted/50 font-medium">{fmt(c.finalAmount)}</td>
+                                        <td>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-8 text-muted-foreground"
+                                                aria-label="Rate history"
+                                                onClick={() => setHistoryLineIndex(i)}
+                                            >
+                                                <Info className="size-4"/>
+                                            </Button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -560,6 +593,7 @@ function OrderDetail({
                                     <td className="text-right">{fmtQty(totals.qty)}</td>
                                     <td colSpan={4} className="text-right text-muted-foreground">Totals</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.finalAmount)}</td>
+                                    <td/>
                                 </tr>
                             </tfoot>
                         </table>
@@ -609,6 +643,15 @@ function OrderDetail({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <RateHistoryDialog
+                open={historyLineIndex !== null}
+                onOpenChange={(open) => !open && setHistoryLineIndex(null)}
+                itemName={historyLineIndex !== null ? rows[historyLineIndex].it.itemName : ''}
+                history={historyLineIndex !== null ? historyByItem.get(rows[historyLineIndex].it.itemId) ?? [] : []}
+                initialCity={order.customerCity}
+                initialCustomerId={order.customerId}
+            />
         </div>
     );
 }

@@ -528,3 +528,45 @@ func TestBackfillDeliveryNumbers(t *testing.T) {
 		}
 	}
 }
+
+// TestItemRateHistory checks that it spans every customer (not just one), carries each
+// row's city/customer, and comes back newest-order-first.
+func TestItemRateHistory(t *testing.T) {
+	f := seedSales(t)
+	other, err := AddCustomer(f.conn, Customer{Name: "City Traders", City: "Mumbai"})
+	if err != nil {
+		t.Fatalf("AddCustomer: %v", err)
+	}
+	f.otherCustomer = other.ID
+
+	f.addOrder(t, "01-Jan-26") // seeded customer (Pune), itemA rate 10 + itemB rate 20
+	if _, err := AddSalesOrder(f.conn, SalesOrder{
+		CustomerID: f.otherCustomer,
+		Date:       "02-Jan-26",
+		Items:      []SalesOrderItem{{ItemID: f.itemA, Rate: 15, Qty: 2}},
+	}); err != nil {
+		t.Fatalf("AddSalesOrder: %v", err)
+	}
+
+	history, err := ItemRateHistory(f.conn, f.itemA)
+	if err != nil {
+		t.Fatalf("ItemRateHistory: %v", err)
+	}
+	if len(history) != 2 {
+		t.Fatalf("want 2 entries, got %d: %+v", len(history), history)
+	}
+	if history[0].CustomerID != f.otherCustomer || history[0].City != "Mumbai" || history[0].Rate != 15 {
+		t.Errorf("want newest entry = other customer in Mumbai at rate 15, got %+v", history[0])
+	}
+	if history[1].CustomerID != f.customerID || history[1].City != "Pune" || history[1].Rate != 10 {
+		t.Errorf("want oldest entry = seeded customer in Pune at rate 10, got %+v", history[1])
+	}
+
+	empty, err := ItemRateHistory(f.conn, 9999)
+	if err != nil {
+		t.Fatalf("ItemRateHistory (no orders): %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("want empty slice for an item with no orders, got %v", empty)
+	}
+}

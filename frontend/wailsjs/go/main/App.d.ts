@@ -44,9 +44,9 @@ export function GetAppVersion():Promise<string>;
 
 export function GetDatabasePath():Promise<string>;
 
-export function GetPurchaseBill(arg1:number):Promise<db.PurchaseBill>;
+export function GetItemRateHistory(arg1:number):Promise<Array<db.ItemRateHistoryEntry>>;
 
-export function GetRateHistory(arg1:number,arg2:number):Promise<Array<db.RateHistoryEntry>>;
+export function GetPurchaseBill(arg1:number):Promise<db.PurchaseBill>;
 
 export function GetSalesOrder(arg1:number):Promise<db.SalesOrder>;
 

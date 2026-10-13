@@ -982,3 +982,41 @@ have to re-litigate.
 - **Alternatives considered:** a separate `delivered_date` column, leaving `date` as the
   placed-on date — rejected, since it contradicts the explicit ask ("change the date of the
   order") and would need its own UI surface for no stated benefit.
+
+### 2026-10-13 — Rate History generalized from per-customer to per-item, one shared dialog
+- **Decision:** Widened `RateHistory(customerID, itemID)` → `ItemRateHistory(itemID)`
+  (`internal/db/sales_orders.go`), dropping the `customer_id` filter and JOINing
+  `customers` for name/city, so one call returns every customer who's ever bought an item
+  — not just the one currently selected. `RateHistoryDialog` was generalized in place
+  (same component, not a parallel one) to show City/Customer/Date/Rate with two
+  independent "All"-capable filters (picking a City narrows the Customer dropdown to that
+  city), and is now reused from three places: Add/Edit Order (existing entry point, now
+  prefiltered-but-broadenable instead of hard-scoped), a new button on the Items master
+  list (opens at All/All), and a new info button per line on the order detail view (opens
+  prefiltered to that order's city/customer). Client ask, explicitly framed as "one common
+  dialog" reused across pages, not three separate ones.
+- **Why drop the old customer-scoped query entirely** (not keep both): nothing else needed
+  it once all three call sites moved to the broader one, and this project avoids
+  backwards-compat shims — "just change the code" (CLAUDE.md). `AddOrder.tsx`'s per-line
+  `rateHistory` cache changed shape to match (full item history instead of one customer's
+  slice); its Rate prefill and the customer-change "recalculate rates" flow both now
+  filter that cache client-side instead of hitting the backend, which also simplified
+  `recalculateRates` into a synchronous re-filter with no network round trip at all.
+- **Fetch strategy split by page** (eager vs. lazy), not uniform: `AddOrder.tsx`'s
+  edit-mode load and `OrderDetail`'s new button both eagerly fetch per line/distinct item
+  on mount, since an order's line count is small and this makes the info button open
+  instantly — mirrors the pattern `AddOrder.tsx`'s edit mode already used. The Items
+  master list (~100 rows) instead fetches on click, since eagerly fetching rate history
+  for every row on page load would be wasteful for a page that size; the clicked row's
+  button disables the whole action group while its single fetch is in flight (same
+  single-`busy`-state idiom `OrderDetail`'s export buttons already use elsewhere), and the
+  dialog itself stays a fully-controlled, synchronous component (no `loading` prop) like
+  every other dialog in this app — opened only once the fetch resolves.
+- **One correctness edge case handled explicitly:** changing the City filter while a
+  specific Customer is selected can orphan that Customer from the newly-narrowed dropdown
+  (if they're not in that city) — the dialog resets Customer to "All" in that case, rather
+  than leaving the `Select` pointed at a no-longer-listed id (which would render as
+  nothing selected).
+- **Title changed**: the dialog's title dropped "for {customerName}" (now just
+  "Rate history — {itemName}") since Customer is a filter now, not a fixed subject — a
+  visible, deliberate wording change alongside the new columns/filters, not an oversight.

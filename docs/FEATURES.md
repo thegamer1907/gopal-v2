@@ -7,6 +7,14 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
+_Shipped (2026-10-13): generalized Rate History — the Add Order info button's dialog is
+now a reusable, City/Customer-filterable view of an item's full sales history across every
+customer (City · Customer · Date · Rate, both filters defaulting to "All"), not just the
+one customer currently selected. Two new entry points: a **Rate history** button on the
+Items master list (opens at All/All) and an info button per line on the order detail view
+(opens prefiltered to that order's city/customer, matching Add Order's own prefill). See
+DECISIONS._
+
 _Shipped (2026-10-12): single-instance behavior — launching the `.exe` while it's already
 running brings the existing window to the front instead of opening a second instance, via
 Wails' built-in `SingleInstanceLock` (see DECISIONS)._
@@ -135,16 +143,18 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   new `showCompany` display flag) — **disabled until a customer is chosen** — showing
   Pack Size/GST %/HSN/**Stock** read-only, user-entered Rate and Qty, and a calculated
   **Final Amount** (`Rate × Qty × Pack Size`, `lib/salesOrder.ts`). **Rate auto-prefills
-  from the customer's own rate history for that item** (latest past order, blank if none)
-  via a derived lookup — no separate history table, just a query over past
-  `sales_order_items`/`sales_orders` — plus an info button showing the full
-  date-descending history. **Changing the customer after lines have items** prompts to
-  recalculate rates for the new customer, keep them as-is, or cancel the switch. Totals
-  row sums Qty and Final Amount. No order number (just the internal id). **Also serves as
-  the order editor** (`/orders/:id/edit`, see View/Edit Orders below) — same dual-purpose
-  component as `AddPurchaseBill.tsx`. Backend: `sales_orders`/`sales_order_items` tables,
-  `internal/db/sales_orders.go` (`AddSalesOrder`, `RateHistory`, plus the CRUD listed
-  below).
+  from the customer's own rate history for that item** (latest past order, blank if none),
+  derived client-side from that item's full rate history — no separate history table,
+  just a query over past `sales_order_items`/`sales_orders`/`customers` — plus an info
+  button opening the generalized, City/Customer-filterable `RateHistoryDialog` (also
+  reused on the Items master list and the order detail view — see below and DECISIONS.md).
+  **Changing the customer after lines have items** prompts to recalculate rates for the
+  new customer, keep them as-is, or cancel the switch (a client-side re-filter of the
+  already-cached history, no new fetch). Totals row sums Qty and Final Amount. No order
+  number (just the internal id). **Also serves as the order editor** (`/orders/:id/edit`,
+  see View/Edit Orders below) — same dual-purpose component as `AddPurchaseBill.tsx`.
+  Backend: `sales_orders`/`sales_order_items` tables, `internal/db/sales_orders.go`
+  (`AddSalesOrder`, `ItemRateHistory`, plus the CRUD listed below).
 - **Item stock** — a **Stock** column on both Add Order's line items and the Items
   master table: total purchased minus total sold, **derived** on every read (a query
   addition to the existing `itemSelect`, not a new table/column) so it's always current

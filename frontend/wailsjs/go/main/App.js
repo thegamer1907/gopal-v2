@@ -82,12 +82,12 @@ export function GetDatabasePath() {
   return window['go']['main']['App']['GetDatabasePath']();
 }
 
-export function GetPurchaseBill(arg1) {
-  return window['go']['main']['App']['GetPurchaseBill'](arg1);
+export function GetItemRateHistory(arg1) {
+  return window['go']['main']['App']['GetItemRateHistory'](arg1);
 }
 
-export function GetRateHistory(arg1, arg2) {
-  return window['go']['main']['App']['GetRateHistory'](arg1, arg2);
+export function GetPurchaseBill(arg1) {
+  return window['go']['main']['App']['GetPurchaseBill'](arg1);
 }
 
 export function GetSalesOrder(arg1) {

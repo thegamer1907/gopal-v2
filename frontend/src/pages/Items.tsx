@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
-import {Package, Pencil, Plus, Search, Trash2} from 'lucide-react';
-import {AddItem, DeleteItem, ListItems, ListCompanies} from '../../wailsjs/go/main/App';
+import {Info, Package, Pencil, Plus, Search, Trash2} from 'lucide-react';
+import {AddItem, DeleteItem, GetItemRateHistory, ListItems, ListCompanies} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -8,6 +8,7 @@ import {Label} from '@/components/ui/label';
 import {NumberInput} from '@/components/NumberInput';
 import {CompanyCombobox} from '@/components/CompanyCombobox';
 import {EditItemDialog} from '@/components/EditItemDialog';
+import {RateHistoryDialog} from '@/components/RateHistoryDialog';
 import {SortableHeader} from '@/components/SortableHeader';
 import {useTableSort} from '@/hooks/useTableSort';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
@@ -46,6 +47,8 @@ export function Items() {
     const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<db.Item | null>(null);
     const [deleting, setDeleting] = useState<db.Item | null>(null);
+    const [historyTarget, setHistoryTarget] = useState<{item: db.Item; history: db.ItemRateHistoryEntry[]} | null>(null);
+    const [loadingItemId, setLoadingItemId] = useState<number | null>(null);
     const {setDirty} = useUnsavedChanges();
 
     // All fields are mandatory — Add is enabled only when a company is chosen and
@@ -125,6 +128,22 @@ export function Items() {
         } catch (e: any) {
             setDeleting(null);
             setError(String(e));
+        }
+    }
+
+    // Fetch-then-open: the dialog itself is a fully-controlled, synchronous component
+    // (no loading state of its own), so it's only opened once the data resolves. Every
+    // row's button is disabled while any one fetch is in flight, mirroring how busy
+    // states are handled elsewhere in this app (e.g. OrderDetail's single `busy` state).
+    async function openRateHistory(it: db.Item) {
+        setLoadingItemId(it.id);
+        try {
+            const history = await GetItemRateHistory(it.id);
+            setHistoryTarget({item: it, history});
+        } catch (e: any) {
+            setError(String(e));
+        } finally {
+            setLoadingItemId(null);
         }
     }
 
@@ -233,7 +252,7 @@ export function Items() {
                                     <SortableHeader label="GST %" sortKey="gstPercent" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <SortableHeader label="HSN" sortKey="hsn" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                     <SortableHeader label="Stock" sortKey="stock" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
-                                    <TableHead className="w-24 pr-4 text-right">Actions</TableHead>
+                                    <TableHead className="w-32 pr-4 text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -255,6 +274,16 @@ export function Items() {
                                                     onClick={() => setEditing(it)}
                                                 >
                                                     <Pencil className="size-4"/>
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="size-8"
+                                                    aria-label={`Rate history for ${it.name}`}
+                                                    disabled={loadingItemId !== null}
+                                                    onClick={() => openRateHistory(it)}
+                                                >
+                                                    <Info className="size-4"/>
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
@@ -284,6 +313,13 @@ export function Items() {
                     setEditing(null);
                     refresh();
                 }}
+            />
+
+            <RateHistoryDialog
+                open={historyTarget !== null}
+                onOpenChange={(o) => !o && setHistoryTarget(null)}
+                itemName={historyTarget?.item.name ?? ''}
+                history={historyTarget?.history ?? []}
             />
 
             <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>

@@ -9,7 +9,7 @@ import {
     GetSalesOrder,
     UpdateSalesOrder,
     UpdateDeliveredSalesOrder,
-    GetRateHistory,
+    GetItemRateHistory,
     MarkSalesOrderDelivered,
 } from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
@@ -61,8 +61,9 @@ interface Line {
     // separate deduction bookkeeping on screen — see lib/salesOrder.ts's buildOrderExportGroups
     // for the export-only "Less" reformatting.
     packSize: string;
-    // Cached at item-selection time so the info button doesn't need to re-fetch.
-    rateHistory: db.RateHistoryEntry[];
+    // Cached at item-selection time so the info button doesn't need to re-fetch — the
+    // full item history across every customer, not just the one currently selected.
+    rateHistory: db.ItemRateHistoryEntry[];
 }
 
 function blankLine(id: number): Line {
@@ -92,7 +93,7 @@ function calc(line: Line) {
     });
 }
 
-function sortByDateDesc(history: db.RateHistoryEntry[]): db.RateHistoryEntry[] {
+function sortByDateDesc(history: db.ItemRateHistoryEntry[]): db.ItemRateHistoryEntry[] {
     return [...history].sort(
         (a, b) => (parseDate(b.date)?.getTime() ?? 0) - (parseDate(a.date)?.getTime() ?? 0),
     );
@@ -214,9 +215,9 @@ export function AddOrder() {
                 // info button works immediately without needing to reselect the item.
                 prefilled.forEach((l) => {
                     if (!l.item) return;
-                    GetRateHistory(order.customerId, l.item.id)
+                    GetItemRateHistory(l.item.id)
                         .then((h) => updateLine(l.id, {rateHistory: sortByDateDesc(h)}))
-                        .catch((e) => setError(String(e)));
+                        .catch((e: any) => setError(String(e)));
                 });
             } catch (e: any) {
                 if (!cancelled) setError(String(e));
@@ -264,18 +265,18 @@ export function AddOrder() {
         if (historyLineId === id) setHistoryLineId(null);
     }
 
-    // Selecting an item prefills Rate from the customer's latest past rate for it (if
-    // any) and caches the full history for the info button. Fires once, using whichever
-    // customer is selected right now — doesn't retroactively refresh if the customer is
-    // changed afterward.
+    // Selecting an item fetches its full rate history (every customer, for the info
+    // button) and prefills Rate from whichever of those rows is the currently selected
+    // customer's latest (if any). Fires once — doesn't retroactively refresh if the
+    // customer is changed afterward (see recalculateRates for that path).
     async function selectItem(lineId: number, item: db.Item) {
         updateLine(lineId, {item, packSize: String(item.packSize), rateHistory: []});
-        if (!customer) return;
         try {
-            const history = sortByDateDesc(await GetRateHistory(customer.id, item.id));
+            const history = sortByDateDesc(await GetItemRateHistory(item.id));
+            const forCustomer = customer ? history.filter((h) => h.customerId === customer.id) : [];
             updateLine(lineId, {
                 rateHistory: history,
-                rate: history.length ? String(history[0].rate) : '',
+                rate: forCustomer.length ? String(forCustomer[0].rate) : '',
             });
         } catch (e: any) {
             setError(String(e));
@@ -312,26 +313,20 @@ export function AddOrder() {
         setPendingCustomer(null);
     }
 
-    async function recalculateRates() {
+    // Each line's rateHistory already holds the full item history (every customer), so
+    // recalculating for a new customer is just a client-side re-filter — no backend call.
+    function recalculateRates() {
         const next = pendingCustomer;
         if (!next) return;
         setCustomer(next);
         setPendingCustomer(null);
-        try {
-            await Promise.all(
-                lines
-                    .filter((l) => l.item !== null)
-                    .map(async (l) => {
-                        const history = sortByDateDesc(await GetRateHistory(next.id, l.item!.id));
-                        updateLine(l.id, {
-                            rateHistory: history,
-                            rate: history.length ? String(history[0].rate) : '',
-                        });
-                    }),
-            );
-        } catch (e: any) {
-            setError(String(e));
-        }
+        setLines((prev) =>
+            prev.map((l) => {
+                if (!l.item) return l;
+                const forCustomer = l.rateHistory.filter((h) => h.customerId === next.id);
+                return {...l, rate: forCustomer.length ? String(forCustomer[0].rate) : ''};
+            }),
+        );
     }
 
     // Totals: just Qty and Final Amount, per the client's ask.
@@ -666,8 +661,9 @@ export function AddOrder() {
                 open={historyLineId !== null}
                 onOpenChange={(open) => !open && setHistoryLineId(null)}
                 itemName={historyLine?.item?.name ?? ''}
-                customerName={customer?.name ?? ''}
                 history={historyLine?.rateHistory ?? []}
+                initialCity={customer?.city}
+                initialCustomerId={customer?.id}
             />
 
             {/* Changing customer with items already on the order: offer to refresh rates
