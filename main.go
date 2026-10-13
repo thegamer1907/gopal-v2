@@ -6,6 +6,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -37,6 +38,15 @@ func main() {
 		OnShutdown:       app.shutdown,
 		Bind: []interface{}{
 			app,
+		},
+		// If the client double-launches the .exe while it's already running, bring the
+		// existing window to the front instead of opening a second instance — Wails
+		// detects this itself (a named mutex on Windows) and forwards the launch here.
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId: "gopal-v2-single-instance", // stable forever — do not change across releases
+			OnSecondInstanceLaunch: func(_ options.SecondInstanceData) {
+				wruntime.WindowShow(app.ctx)
+			},
 		},
 	})
 
