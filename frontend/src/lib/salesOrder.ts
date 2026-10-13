@@ -2,6 +2,7 @@
 // View/Edit Orders derive it from the same raw fields here, so the formula lives in
 // exactly one place, mirroring lib/purchaseBill.ts.
 
+import {reports} from '../../wailsjs/go/models';
 import {displayDate} from '@/lib/date';
 
 export interface OrderLineCalcInput {
@@ -105,4 +106,50 @@ export function buildOrderExportGroups(order: {
     }
 
     return {groups: [...groups.values()], deductions};
+}
+
+// toOrderExportData builds the full header/rows/deductions shape every customer-facing
+// order export (Copy Order Image, Download Excel, Download PDF, and Print Delivered
+// Orders) needs, from the order alone — the single place this shaping happens, so a new
+// export surface (like Print Delivered Orders) never re-derives it independently.
+export function toOrderExportData(order: {
+    id: number;
+    date: string;
+    customerNickName: string;
+    customerName: string;
+    customerCity: string;
+    items: {
+        itemId: number;
+        itemName: string;
+        itemPackSize: number;
+        rate: number;
+        qty: number;
+        customPackSize: number;
+    }[];
+}): {header: reports.OrderExportHeader; rows: reports.OrderExportRow[]; deductions: reports.OrderExportDeduction[]} {
+    const {groups, deductions} = buildOrderExportGroups(order);
+    return {
+        header: reports.OrderExportHeader.createFrom({
+            orderId: order.id,
+            customerLabel: customerShareLabel(order),
+            date: displayDate(order.date),
+        }),
+        rows: groups.map((g) =>
+            reports.OrderExportRow.createFrom({
+                itemName: g.itemName,
+                packSize: g.packSize,
+                rate: g.rate,
+                qty: g.qty,
+                finalAmount: g.amount,
+            }),
+        ),
+        deductions: deductions.map((d) =>
+            reports.OrderExportDeduction.createFrom({
+                itemName: d.itemName,
+                units: d.units,
+                rate: d.rate,
+                value: d.value,
+            }),
+        ),
+    };
 }

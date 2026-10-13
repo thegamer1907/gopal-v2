@@ -30,6 +30,8 @@ export function DeleteSalesOrder(arg1:number):Promise<void>;
 
 export function DownloadAndInstallUpdate(arg1:string,arg2:string):Promise<void>;
 
+export function ExportDeliveredOrdersPDF(arg1:Array<reports.DeliveredOrdersPrintEntry>,arg2:string):Promise<string>;
+
 export function ExportOrderExcel(arg1:reports.OrderExportHeader,arg2:Array<reports.OrderExportRow>,arg3:Array<reports.OrderExportDeduction>,arg4:string):Promise<string>;
 
 export function ExportOrderPDF(arg1:reports.OrderExportHeader,arg2:Array<reports.OrderExportRow>,arg3:Array<reports.OrderExportDeduction>,arg4:string):Promise<string>;

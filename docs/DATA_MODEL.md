@@ -261,15 +261,32 @@ Foreign keys: `(order_id)` → `sales_orders(id)` ON DELETE CASCADE; `(item_id)`
 > **"Download Excel"/"Download PDF"** (same order detail view, beside "Copy Order
 > Image") export the same customer-facing content (no GST%/HSN) as real files instead of
 > a clipboard image. `internal/reports/order_export.go` — `OrderExportHeader` +
-> `OrderExportRow` + `OrderExportDeduction` (all three built by the frontend:
-> `SavedOrders.tsx`'s `toExportHeader`/`toExportRowsAndDeductions`, reusing
-> `customerShareLabel`/`buildOrderExportGroups` from `lib/salesOrder.ts`) —
-> `WriteOrderExcel` (`excelize`, styled to match `ShareableOrderImage.tsx`'s
-> yellow/bordered look, unlike the plainer `WritePurchaseSummary` convention) and
-> `WriteOrderPDF` (`github.com/signintech/gopdf`, hand-drawn cells — the library's
-> convenience `NewTableLayout` API can't do the merged header row or per-cell borders
-> this layout needs). Both now render a gross "Total" row, then (only when deductions is
-> non-empty) one "Less"/"Add" line per custom-pack-size line and a final net "Total" row.
+> `OrderExportRow` + `OrderExportDeduction` (all three built by the frontend via
+> `toOrderExportData` in `lib/salesOrder.ts`, reusing `customerShareLabel`/
+> `buildOrderExportGroups` from the same file — the single place this shaping happens,
+> so a new export surface never re-derives it) — `WriteOrderExcel` (`excelize`, styled to
+> match `ShareableOrderImage.tsx`'s yellow/bordered look, unlike the plainer
+> `WritePurchaseSummary` convention) and `WriteOrderPDF` (`github.com/signintech/gopdf`,
+> hand-drawn cells — the library's convenience `NewTableLayout` API can't do the merged
+> header row or per-cell borders this layout needs). Both now render a gross "Total" row,
+> then (only when deductions is non-empty) one "Less"/"Add" line per custom-pack-size line
+> and a final net "Total" row.
+>
+> **Print Delivered Orders** (`/reports` — see Reports below) reuses this exact table
+> layout for *every* delivered order in a date range, as one combined A4 PDF: `WriteOrderPDF`
+> was split so its drawing body is a reusable `drawOrderBlock(pdf, x0, y, title, header,
+> rows, deductions, accent)` (returns the y position below the block) — `WriteOrderPDF`
+> now just calls it once at the page margin with `accent: &headerYellow`. The new
+> `WriteDeliveredOrdersPDF(path, entries []DeliveredOrdersPrintEntry)` calls
+> `drawOrderBlock` once per order instead, with `accent: nil` (no fill — plain
+> black-bordered tables) and `title: "Order #{deliveryNo}"`, at a horizontally-centered
+> `x0` (`(pageWidth - tableWidth) / 2`). Pagination packs as many tables as fit vertically
+> per page (`estimateOrderBlockHeight`, kept in lockstep with what `drawOrderBlock` actually
+> draws) and starts a new page before any table that wouldn't fully fit — tables are never
+> split across a page break in the normal case, only the pre-existing single-huge-order
+> fallback (`drawOrderBlock`'s own per-row page-break safety) can do that. Entries are
+> sorted by **delivery number**, not order id — confirmed with the client, since it's what
+> "print in sequence" naturally means for a delivered-only report.
 > The default save filename is built by `orderExportFilename` (`lib/salesOrder.ts`): the
 > delivery number once delivered (else the order's `id`), zero-padded to 3 digits, then the
 > customer's nickname (free-text, so `\/:*?"<>|` are stripped — Windows forbids them in

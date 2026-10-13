@@ -12,7 +12,7 @@ import {
     ExportOrderPDF,
     GetItemRateHistory,
 } from '../../wailsjs/go/main/App';
-import {db, reports} from '../../wailsjs/go/models';
+import {db} from '../../wailsjs/go/models';
 import {MarkDeliveredDialog} from '@/components/MarkDeliveredDialog';
 import {RateHistoryDialog} from '@/components/RateHistoryDialog';
 import {ShareableOrderImage} from '@/components/ShareableOrderImage';
@@ -61,11 +61,10 @@ import {parseDate, displayDate} from '@/lib/date';
 import {cn} from '@/lib/utils';
 import {fmt, fmtQty} from '@/lib/purchaseBill';
 import {
-    buildOrderExportGroups,
     calcOrderLine,
-    customerShareLabel,
     effectivePackSize,
     orderExportFilename,
+    toOrderExportData,
     OrderLineCalc,
 } from '@/lib/salesOrder';
 
@@ -416,44 +415,13 @@ function OrderDetail({
         }
     }
 
-    function toExportHeader(): reports.OrderExportHeader {
-        return reports.OrderExportHeader.createFrom({
-            orderId: order.id,
-            customerLabel: customerShareLabel(order),
-            date: displayDate(order.date),
-        });
-    }
-
-    function toExportRowsAndDeductions(): {rows: reports.OrderExportRow[]; deductions: reports.OrderExportDeduction[]} {
-        const {groups, deductions} = buildOrderExportGroups(order);
-        return {
-            rows: groups.map((g) =>
-                reports.OrderExportRow.createFrom({
-                    itemName: g.itemName,
-                    packSize: g.packSize,
-                    rate: g.rate,
-                    qty: g.qty,
-                    finalAmount: g.amount,
-                }),
-            ),
-            deductions: deductions.map((d) =>
-                reports.OrderExportDeduction.createFrom({
-                    itemName: d.itemName,
-                    units: d.units,
-                    rate: d.rate,
-                    value: d.value,
-                }),
-            ),
-        };
-    }
-
     async function downloadExcel() {
         setBusy('excel');
         setNotice('');
         setError('');
         try {
-            const {rows, deductions} = toExportRowsAndDeductions();
-            const path = await ExportOrderExcel(toExportHeader(), rows, deductions, orderExportFilename(order, 'xlsx'));
+            const {header, rows, deductions} = toOrderExportData(order);
+            const path = await ExportOrderExcel(header, rows, deductions, orderExportFilename(order, 'xlsx'));
             if (path) setNotice(`Saved to ${path}`);
         } catch (e: any) {
             setError(String(e));
@@ -467,8 +435,8 @@ function OrderDetail({
         setNotice('');
         setError('');
         try {
-            const {rows, deductions} = toExportRowsAndDeductions();
-            const path = await ExportOrderPDF(toExportHeader(), rows, deductions, orderExportFilename(order, 'pdf'));
+            const {header, rows, deductions} = toOrderExportData(order);
+            const path = await ExportOrderPDF(header, rows, deductions, orderExportFilename(order, 'pdf'));
             if (path) setNotice(`Saved to ${path}`);
         } catch (e: any) {
             setError(String(e));

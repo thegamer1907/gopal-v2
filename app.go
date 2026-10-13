@@ -445,6 +445,30 @@ func (a *App) ExportOrderPDF(header reports.OrderExportHeader, rows []reports.Or
 	return path, nil
 }
 
+// ExportDeliveredOrdersPDF prompts for a save location and writes every given delivered
+// order (fully computed by the caller — see Reports.tsx — and already sorted by delivery
+// number) as a sequence of uncolored, center-aligned tables onto A4 pages, packed as many
+// per page as fit. Returns the chosen path, or "" if the user cancelled the dialog.
+func (a *App) ExportDeliveredOrdersPDF(entries []reports.DeliveredOrdersPrintEntry, defaultFilename string) (string, error) {
+	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:           "Export Delivered Orders",
+		DefaultFilename: defaultFilename,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "PDF Document (*.pdf)", Pattern: "*.pdf"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := reports.WriteDeliveredOrdersPDF(path, entries); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // --- Self-update (Settings → Updates) ---
 
 // GetAppVersion returns the running build's version — "dev" outside a tagged release

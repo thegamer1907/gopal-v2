@@ -368,10 +368,10 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
 
 ### Reports (`/reports`) — top-nav "Reports"
 - `src/pages/Reports.tsx`. A **card grid** (`grid gap-4 sm:grid-cols-2 lg:grid-cols-3`) — one
-  `Card` per downloadable report: Purchase Summary, Stock Report, Order Report. A future
-  report is just another card, no layout rework needed. All three share one `useEffect` on
-  mount (`ListPurchaseBills`/`ListItems`/`ListSalesOrders`, loaded once) but keep separate
-  `busy`/`saved`/`error` state per card.
+  `Card` per downloadable report: Purchase Summary, Stock Report, Order Report, Print
+  Delivered Orders. A future report is just another card, no layout rework needed. All
+  four share one `useEffect` on mount (`ListPurchaseBills`/`ListItems`/`ListSalesOrders`,
+  loaded once) but keep separate `busy`/`saved`/`error` state per card.
 - **Purchase Summary card:** icon + title/description, a **`DateRangeFilter`** (empty = "all
   bills", same semantics as the View/Edit Bills filter — no separate "download all" toggle), a
   live preview line ("N lines across M bills · ₹total", recomputed as the range changes), and a
@@ -436,6 +436,26 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
     "Yes"/"No" text cell, Delivery # blank (not `0`) for pending lines. A bold Totals row
     sums **only** Qty and Final Amount (the other numeric columns are left blank there),
     mirroring the on-screen order Totals convention.
+
+- **Print Delivered Orders card:** icon (`Printer`) + title/description, a
+  **`DateRangeFilter`** (same empty-range-means-all convention as every other card). A
+  live preview line ("N orders ready to print", or "No delivered orders in this range.")
+  and a **Download PDF** button (disabled while loading/saving or when there are no
+  matching orders) — **PDF only, no Excel option**, per the client's explicit ask.
+  - **Data flow:** filters `orders` to `delivered && inRange(...)`, sorts by **delivery
+    number ascending** (not order id — confirmed with the client; see DECISIONS), and
+    builds one `reports.DeliveredOrdersPrintEntry` per order via `toOrderExportData`
+    (`lib/salesOrder.ts` — the same shaping `SavedOrders.tsx`'s own Download Excel/PDF
+    use). Calls `ExportDeliveredOrdersPDF(entries, filename)`; filename is `Delivered
+    Orders (All).pdf` / `Delivered Orders (dd-mmm-yy to dd-mmm-yy).pdf`.
+  - **The PDF:** one A4 document with every order rendered as the same
+    Qty/Item/Unit/Rate/Amount table `WriteOrderPDF` already draws (gross Total, then
+    "Less"/"Add" deduction lines and a net Total when a line had a custom pack size), but
+    **uncolored** (no yellow fill — plain black borders) and **horizontally centered** on
+    the page, each headed by a bold, larger **"Order #N"** line above its table (N = the
+    delivery number). As many tables are packed per page as fit vertically; a table that
+    wouldn't fully fit starts a fresh page rather than being split — the sequence itself
+    is never reordered across the page break.
 
 ### Settings (`/settings`) — top-nav "Settings" (right-aligned group)
 - `src/pages/Settings.tsx`. First (and only) section is **Database**:

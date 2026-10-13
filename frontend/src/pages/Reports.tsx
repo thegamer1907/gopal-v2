@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from 'react';
-import {FileSpreadsheet, Package, ClipboardList, Calendar as CalendarIcon} from 'lucide-react';
+import {FileSpreadsheet, Package, ClipboardList, Calendar as CalendarIcon, Printer} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
 import {
     ListPurchaseBills,
@@ -8,6 +8,7 @@ import {
     ListSalesOrders,
     ExportStockReport,
     ExportOrderReport,
+    ExportDeliveredOrdersPDF,
 } from '../../wailsjs/go/main/App';
 import {db, reports} from '../../wailsjs/go/models';
 import {Button, buttonVariants} from '@/components/ui/button';
@@ -19,7 +20,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/c
 import {DateRangeFilter} from '@/components/DateRangeFilter';
 import {parseDate, formatDate, displayDate, todayDate} from '@/lib/date';
 import {calcLine, fmt} from '@/lib/purchaseBill';
-import {calcOrderLine, effectivePackSize} from '@/lib/salesOrder';
+import {calcOrderLine, effectivePackSize, toOrderExportData} from '@/lib/salesOrder';
 import {cn} from '@/lib/utils';
 
 // Reports (/reports) — a grid of downloadable reports, one Card per report. A future
@@ -207,6 +208,17 @@ function orderFilenameFor(range: DateRange | undefined, filter: DeliveryFilter):
     return `Order Report${suffix} (All).xlsx`;
 }
 
+// --- Print Delivered Orders ---
+
+function deliveredOrdersFilenameFor(range: DateRange | undefined): string {
+    if (range?.from) {
+        const from = formatDate(range.from);
+        const to = range.to ? formatDate(range.to) : from;
+        return `Delivered Orders (${from} to ${to}).pdf`;
+    }
+    return `Delivered Orders (All).pdf`;
+}
+
 export function Reports() {
     const [bills, setBills] = useState<db.PurchaseBill[]>([]);
     const [items, setItems] = useState<db.Item[]>([]);
@@ -301,6 +313,42 @@ export function Reports() {
             setOrderError(String(e));
         } finally {
             setOrderBusy(false);
+        }
+    }
+
+    // --- Print Delivered Orders state ---
+    const [printRange, setPrintRange] = useState<DateRange | undefined>(undefined);
+    const [printBusy, setPrintBusy] = useState(false);
+    const [printSaved, setPrintSaved] = useState('');
+    const [printError, setPrintError] = useState('');
+
+    const deliveredOrders = useMemo(
+        () =>
+            orders
+                .filter((o) => o.delivered && inRange(o, printRange))
+                .sort((a, b) => a.deliveryNo - b.deliveryNo),
+        [orders, printRange],
+    );
+    const printEntries = useMemo(
+        () =>
+            deliveredOrders.map((o) => {
+                const {header, rows, deductions} = toOrderExportData(o);
+                return reports.DeliveredOrdersPrintEntry.createFrom({deliveryNo: o.deliveryNo, header, rows, deductions});
+            }),
+        [deliveredOrders],
+    );
+
+    async function downloadDeliveredOrders() {
+        setPrintSaved('');
+        setPrintError('');
+        setPrintBusy(true);
+        try {
+            const path = await ExportDeliveredOrdersPDF(printEntries, deliveredOrdersFilenameFor(printRange));
+            if (path) setPrintSaved(`Saved to ${path}`);
+        } catch (e: any) {
+            setPrintError(String(e));
+        } finally {
+            setPrintBusy(false);
         }
     }
 
@@ -437,6 +485,34 @@ export function Reports() {
 
                         {orderSaved && <p className="text-sm text-emerald-600">{orderSaved}</p>}
                         {orderError && <p className="text-sm text-destructive">{orderError}</p>}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center gap-2">
+                            <Printer className="size-5 text-muted-foreground"/>
+                            <CardTitle>Print Delivered Orders</CardTitle>
+                        </div>
+                        <CardDescription>Every delivered order, one printable table per order, as a single PDF.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <DateRangeFilter value={printRange} onChange={setPrintRange}/>
+
+                        <p className="text-sm text-muted-foreground">
+                            {loading
+                                ? 'Loading…'
+                                : deliveredOrders.length === 0
+                                  ? 'No delivered orders in this range.'
+                                  : `${deliveredOrders.length} order${deliveredOrders.length === 1 ? '' : 's'} ready to print`}
+                        </p>
+
+                        <Button onClick={downloadDeliveredOrders} disabled={printBusy || loading || deliveredOrders.length === 0}>
+                            {printBusy ? 'Preparing…' : 'Download PDF'}
+                        </Button>
+
+                        {printSaved && <p className="text-sm text-emerald-600">{printSaved}</p>}
+                        {printError && <p className="text-sm text-destructive">{printError}</p>}
                     </CardContent>
                 </Card>
             </div>

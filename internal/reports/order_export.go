@@ -405,6 +405,14 @@ const (
 	// larger than the body text, mirroring ShareableOrderImage.tsx's slightly-larger
 	// header row.
 	pdfHeaderFontSize = pdfFontSize + 2
+	// pdfTitleFontSize/pdfTitleHeight are used only by Print Delivered Orders' "Order
+	// #N" heading above each table — bigger than even the header bar, so it reads as a
+	// distinct label rather than part of the table.
+	pdfTitleFontSize = pdfFontSize + 6
+	pdfTitleHeight   = 26.0
+	// pdfBlockGapPt is the vertical gap between consecutive order tables sharing a page
+	// in Print Delivered Orders.
+	pdfBlockGapPt = 24.0
 )
 
 // WriteOrderPDF writes a single order to a new PDF at path, in the same visual style
@@ -432,16 +440,44 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 	pdf.SetStrokeColor(0, 0, 0)
 	pdf.SetLineWidth(0.75)
 
-	x0 := pdfMarginPt
-	y := pdfMarginPt
-
-	if err := drawOrderHeaderBar(&pdf, x0, y, header.CustomerLabel, header.Date); err != nil {
+	if _, err := drawOrderBlock(&pdf, pdfMarginPt, pdfMarginPt, "", header, rows, deductions, &headerYellow); err != nil {
 		return err
+	}
+
+	if err := pdf.WritePdf(path); err != nil {
+		return fmt.Errorf("write pdf %q: %w", path, err)
+	}
+	return nil
+}
+
+// drawOrderBlock draws one order's full table at (x0, y): an optional bold title line
+// (skipped entirely when title is ""), the customer/date header bar, column headers,
+// line rows (falling back to a mid-table page break if a single order is taller than one
+// page — the only case where a block isn't drawn atomically), a gross Total, and — when
+// deductions is non-empty — deduction lines plus a final net Total. accent is nil for a
+// plain (uncolored, border-only) table; WriteOrderPDF passes &headerYellow to keep its
+// output exactly as before this function existed. Returns the y position immediately
+// below the block, for the caller to continue from (e.g. the next order's title).
+func drawOrderBlock(pdf *gopdf.GoPdf, x0, y float64, title string, header OrderExportHeader, rows []OrderExportRow, deductions []OrderExportDeduction, accent *[3]uint8) (float64, error) {
+	if title != "" {
+		if err := pdf.SetFont("Nunito", "B", pdfTitleFontSize); err != nil {
+			return 0, fmt.Errorf("set font: %w", err)
+		}
+		tableWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3] + pdfColWidths[4]
+		pdf.SetXY(x0, y)
+		if err := pdf.CellWithOption(&gopdf.Rect{W: tableWidth, H: pdfTitleHeight}, title, gopdf.CellOption{Align: gopdf.Left | gopdf.Middle, Border: 0}); err != nil {
+			return 0, err
+		}
+		y += pdfTitleHeight
+	}
+
+	if err := drawOrderHeaderBar(pdf, x0, y, header.CustomerLabel, header.Date, accent); err != nil {
+		return 0, err
 	}
 	y += pdfHeaderRowHeight
 
-	if err := drawOrderColumnHeaderRow(&pdf, x0, y); err != nil {
-		return err
+	if err := drawOrderColumnHeaderRow(pdf, x0, y, accent); err != nil {
+		return 0, err
 	}
 	y += pdfHeaderRowHeight
 
@@ -451,15 +487,15 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 		if y+pdfRowHeight > gopdf.PageSizeA4.H-pdf.MarginBottom() {
 			pdf.AddPage()
 			y = pdf.MarginTop()
-			if err := drawOrderColumnHeaderRow(&pdf, x0, y); err != nil {
-				return err
+			if err := drawOrderColumnHeaderRow(pdf, x0, y, accent); err != nil {
+				return 0, err
 			}
 			y += pdfHeaderRowHeight
 		}
 		cells := []string{fmtOrderQty(r.Qty), r.ItemName, fmtOrderQty(r.PackSize), fmtOrderMoney(r.Rate), fmtOrderMoney(r.FinalAmount)}
 		for i, c := range cells {
-			if err := drawOrderCell(&pdf, pdfColX(i, x0), y, pdfColWidths[i], pdfRowHeight, c, aligns[i], false, nil); err != nil {
-				return err
+			if err := drawOrderCell(pdf, pdfColX(i, x0), y, pdfColWidths[i], pdfRowHeight, c, aligns[i], false, nil); err != nil {
+				return 0, err
 			}
 		}
 		totalQty += r.Qty
@@ -471,8 +507,8 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 		pdf.AddPage()
 		y = pdf.MarginTop()
 	}
-	if err := drawOrderTotalRow(&pdf, x0, y, fmtOrderQty(totalQty), totalAmount, false); err != nil {
-		return err
+	if err := drawOrderTotalRow(pdf, x0, y, fmtOrderQty(totalQty), totalAmount, false, accent); err != nil {
+		return 0, err
 	}
 	y += pdfRowHeight
 
@@ -489,11 +525,11 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 			}
 			label := fmt.Sprintf("%s: %s — %s", verb, fmtOrderQty(units), d.ItemName)
 			labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
-			if err := drawOrderCell(&pdf, x0, y, labelWidth, pdfRowHeight, label, gopdf.Right, false, nil); err != nil {
-				return err
+			if err := drawOrderCell(pdf, x0, y, labelWidth, pdfRowHeight, label, gopdf.Right, false, nil); err != nil {
+				return 0, err
 			}
-			if err := drawOrderCell(&pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(value), gopdf.Right, false, nil); err != nil {
-				return err
+			if err := drawOrderCell(pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(value), gopdf.Right, false, nil); err != nil {
+				return 0, err
 			}
 			deductionTotal += d.Value
 			y += pdfRowHeight
@@ -503,9 +539,88 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 			pdf.AddPage()
 			y = pdf.MarginTop()
 		}
-		if err := drawOrderTotalRow(&pdf, x0, y, "", totalAmount-deductionTotal, true); err != nil {
+		if err := drawOrderTotalRow(pdf, x0, y, "", totalAmount-deductionTotal, true, accent); err != nil {
+			return 0, err
+		}
+		y += pdfRowHeight
+	}
+
+	return y, nil
+}
+
+// DeliveredOrdersPrintEntry is one order's data for the Print Delivered Orders report —
+// its delivery number (printed as the table's title) plus the same header/rows/
+// deductions shape WriteOrderExcel/WriteOrderPDF already use.
+type DeliveredOrdersPrintEntry struct {
+	DeliveryNo int64                  `json:"deliveryNo"`
+	Header     OrderExportHeader      `json:"header"`
+	Rows       []OrderExportRow       `json:"rows"`
+	Deductions []OrderExportDeduction `json:"deductions"`
+}
+
+// estimateOrderBlockHeight returns the exact height drawOrderBlock will consume for a
+// titled block with this many rows/deductions, assuming it fits on one page (no mid-table
+// page break) — used to decide whether the next table fits in the remaining space on the
+// current page before drawing it. Must stay in lockstep with drawOrderBlock's layout.
+func estimateOrderBlockHeight(rows []OrderExportRow, deductions []OrderExportDeduction) float64 {
+	h := pdfTitleHeight + pdfHeaderRowHeight + pdfHeaderRowHeight // title + header bar + column headers
+	h += float64(len(rows)) * pdfRowHeight
+	h += pdfRowHeight // gross Total row
+	if len(deductions) > 0 {
+		h += float64(len(deductions)) * pdfRowHeight
+		h += pdfRowHeight // net Total row
+	}
+	return h
+}
+
+// WriteDeliveredOrdersPDF writes every entry (already sorted by delivery number by the
+// caller) as a sequence of plain, center-aligned tables onto A4 pages — packing as many
+// as fit vertically per page, starting a new page before any table that wouldn't fully
+// fit in the remaining space (tables are never split across a page break in the normal
+// case; the only exception is a single order too tall for one whole page, which falls
+// back to drawOrderBlock's own mid-table page-break safety net). The sequence itself is
+// never reordered — a table simply starts the next page when it doesn't fit.
+func WriteDeliveredOrdersPDF(path string, entries []DeliveredOrdersPrintEntry) error {
+	pdf := gopdf.GoPdf{}
+	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
+	pdf.SetMargins(pdfMarginPt, pdfMarginPt, pdfMarginPt, pdfMarginPt)
+	pdf.AddPage()
+
+	if err := pdf.AddTTFFontData("Nunito", nunitoRegularTTF); err != nil {
+		return fmt.Errorf("load regular font: %w", err)
+	}
+	if err := pdf.AddTTFFontDataWithOption("Nunito", nunitoBoldTTF, gopdf.TtfOption{Style: gopdf.Bold}); err != nil {
+		return fmt.Errorf("load bold font: %w", err)
+	}
+
+	// See WriteOrderPDF's identical comment: SetTextColor must be called up front.
+	pdf.SetTextColor(0, 0, 0)
+	pdf.SetStrokeColor(0, 0, 0)
+	pdf.SetLineWidth(0.75)
+
+	tableWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3] + pdfColWidths[4]
+	x0 := (gopdf.PageSizeA4.W - tableWidth) / 2
+
+	y := pdf.MarginTop()
+	for i, e := range entries {
+		blockHeight := estimateOrderBlockHeight(e.Rows, e.Deductions)
+		gap := 0.0
+		if i > 0 {
+			gap = pdfBlockGapPt
+		}
+		if y+gap+blockHeight > gopdf.PageSizeA4.H-pdf.MarginBottom() && y > pdf.MarginTop() {
+			pdf.AddPage()
+			y = pdf.MarginTop()
+		} else {
+			y += gap
+		}
+
+		title := fmt.Sprintf("Order #%d", e.DeliveryNo)
+		newY, err := drawOrderBlock(&pdf, x0, y, title, e.Header, e.Rows, e.Deductions, nil)
+		if err != nil {
 			return err
 		}
+		y = newY
 	}
 
 	if err := pdf.WritePdf(path); err != nil {
@@ -519,33 +634,38 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 // on its own and "Total" merges across the Item/Unit/Rate cells. When mergeQty is true
 // (the final net total, whose qty is already blank), "Total" merges across all four of
 // Qty/Item/Unit/Rate instead.
-func drawOrderTotalRow(pdf *gopdf.GoPdf, x0, y float64, qty string, amount float64, mergeQty bool) error {
+func drawOrderTotalRow(pdf *gopdf.GoPdf, x0, y float64, qty string, amount float64, mergeQty bool, accent *[3]uint8) error {
 	if mergeQty {
 		labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
-		if err := drawOrderCell(pdf, pdfColX(0, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, &headerYellow); err != nil {
+		if err := drawOrderCell(pdf, pdfColX(0, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, accent); err != nil {
 			return err
 		}
 	} else {
-		if err := drawOrderCell(pdf, pdfColX(0, x0), y, pdfColWidths[0], pdfRowHeight, qty, gopdf.Center, true, &headerYellow); err != nil {
+		if err := drawOrderCell(pdf, pdfColX(0, x0), y, pdfColWidths[0], pdfRowHeight, qty, gopdf.Center, true, accent); err != nil {
 			return err
 		}
 		labelWidth := pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
-		if err := drawOrderCell(pdf, pdfColX(1, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, &headerYellow); err != nil {
+		if err := drawOrderCell(pdf, pdfColX(1, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, accent); err != nil {
 			return err
 		}
 	}
-	return drawOrderCell(pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(amount), gopdf.Right, true, &headerYellow)
+	return drawOrderCell(pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(amount), gopdf.Right, true, accent)
 }
 
-// drawOrderHeaderBar draws the customer-label/date header as a single bordered, filled
-// rect (no dividing line down the middle, unlike two separately-bordered cells) with
-// the label left-aligned and the date right-aligned inside it, at pdfHeaderFontSize.
-func drawOrderHeaderBar(pdf *gopdf.GoPdf, x0, y float64, label, date string) error {
+// drawOrderHeaderBar draws the customer-label/date header as a single bordered rect (no
+// dividing line down the middle, unlike two separately-bordered cells) with the label
+// left-aligned and the date right-aligned inside it, at pdfHeaderFontSize. accent is nil
+// for a plain (border-only, unfilled) bar.
+func drawOrderHeaderBar(pdf *gopdf.GoPdf, x0, y float64, label, date string, accent *[3]uint8) error {
 	labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2]
 	totalWidth := labelWidth + pdfColWidths[3] + pdfColWidths[4]
 
-	pdf.SetFillColor(headerYellow[0], headerYellow[1], headerYellow[2])
-	pdf.RectFromUpperLeftWithStyle(x0, y, totalWidth, pdfHeaderRowHeight, "FD")
+	style := "D"
+	if accent != nil {
+		pdf.SetFillColor(accent[0], accent[1], accent[2])
+		style = "FD"
+	}
+	pdf.RectFromUpperLeftWithStyle(x0, y, totalWidth, pdfHeaderRowHeight, style)
 
 	if err := pdf.SetFont("Nunito", "B", pdfHeaderFontSize); err != nil {
 		return fmt.Errorf("set font: %w", err)
@@ -558,11 +678,11 @@ func drawOrderHeaderBar(pdf *gopdf.GoPdf, x0, y float64, label, date string) err
 	return pdf.CellWithOption(&gopdf.Rect{W: totalWidth - pdfCellPadX, H: pdfHeaderRowHeight}, date, gopdf.CellOption{Align: gopdf.Right | gopdf.Middle, Border: 0})
 }
 
-func drawOrderColumnHeaderRow(pdf *gopdf.GoPdf, x0, y float64) error {
+func drawOrderColumnHeaderRow(pdf *gopdf.GoPdf, x0, y float64, accent *[3]uint8) error {
 	headers := []string{"Qty", "Item", "Unit", "Rate", "Amount"}
 	aligns := []int{gopdf.Center, gopdf.Left, gopdf.Center, gopdf.Right, gopdf.Right}
 	for i, h := range headers {
-		if err := drawOrderCell(pdf, pdfColX(i, x0), y, pdfColWidths[i], pdfHeaderRowHeight, h, aligns[i], true, &headerYellow); err != nil {
+		if err := drawOrderCell(pdf, pdfColX(i, x0), y, pdfColWidths[i], pdfHeaderRowHeight, h, aligns[i], true, accent); err != nil {
 			return err
 		}
 	}

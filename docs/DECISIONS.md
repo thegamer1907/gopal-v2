@@ -1020,3 +1020,33 @@ have to re-litigate.
 - **Title changed**: the dialog's title dropped "for {customerName}" (now just
   "Rate history — {itemName}") since Customer is a filter now, not a fixed subject — a
   visible, deliberate wording change alongside the new columns/filters, not an oversight.
+
+### 2026-10-13 — Print Delivered Orders: delivery number for sort/title, shared drawOrderBlock
+- **Decision (numbering):** the new `/reports` "Print Delivered Orders" PDF sorts its
+  tables and labels each one "Order #N" using the order's **delivery number**, not its
+  internal id. Confirmed directly with the client when the request was ambiguous ("print
+  in sequence, 28 then 29 then 30") — delivery numbers are assigned in exact delivery
+  order already (`MarkSalesOrderDelivered`'s `MAX(delivery_number)+1`), so they're the
+  natural match for "sequence," whereas order ids can have gaps relative to a
+  delivered-only subset and aren't guaranteed to run as cleanly.
+- **Decision (shared drawing code):** `internal/reports/order_export.go`'s `WriteOrderPDF`
+  was split so its table-drawing body is a reusable `drawOrderBlock(pdf, x0, y, title,
+  header, rows, deductions, accent)` — `WriteOrderPDF` now just calls it once at the page
+  margin (`title: ""`, `accent: &headerYellow`), byte-identical output to before. The new
+  `WriteDeliveredOrdersPDF` calls the same function once per order, with `accent: nil` (no
+  fill, per the client's explicit "we don't need to color it") and a horizontally-centered
+  `x0`, packing tables down the page and starting a new page before any table that
+  wouldn't fully fit — verified end-to-end with a 20-order test PDF (via `pypdf`, not
+  shipped): strict sequential ordering across 4 pages, 5 tables/page, correct deduction/net
+  Total rendering, and a precisely centered `x0` (523pt table on a 595pt A4 page → 36pt
+  margins either side, confirmed via `gopdf.PageSizeA4.W`).
+- **Decision (shared data shaping):** extracted `SavedOrders.tsx`'s private
+  `toExportHeader`/`toExportRowsAndDeductions` into one exported `toOrderExportData` in
+  `lib/salesOrder.ts` — the new report needs the identical header/rows/deductions shaping
+  for potentially many orders, and this file is already the single source of truth for
+  order-export presentation logic (`buildOrderExportGroups`, `customerShareLabel`).
+- **Not done:** tables are never intentionally split across a page break — the only
+  exception is the pre-existing single-huge-order fallback inside `drawOrderBlock` (a
+  mid-table page break if one order alone is taller than a full page), which was already
+  `WriteOrderPDF`'s behavior and is kept purely as a safety net, not a feature of this
+  report.

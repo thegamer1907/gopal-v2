@@ -258,22 +258,6 @@ export namespace reports {
 	        this.value = source["value"];
 	    }
 	}
-	export class OrderExportHeader {
-	    orderId: number;
-	    customerLabel: string;
-	    date: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new OrderExportHeader(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.orderId = source["orderId"];
-	        this.customerLabel = source["customerLabel"];
-	        this.date = source["date"];
-	    }
-	}
 	export class OrderExportRow {
 	    itemName: string;
 	    packSize: number;
@@ -294,6 +278,61 @@ export namespace reports {
 	        this.finalAmount = source["finalAmount"];
 	    }
 	}
+	export class OrderExportHeader {
+	    orderId: number;
+	    customerLabel: string;
+	    date: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OrderExportHeader(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.orderId = source["orderId"];
+	        this.customerLabel = source["customerLabel"];
+	        this.date = source["date"];
+	    }
+	}
+	export class DeliveredOrdersPrintEntry {
+	    deliveryNo: number;
+	    header: OrderExportHeader;
+	    rows: OrderExportRow[];
+	    deductions: OrderExportDeduction[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DeliveredOrdersPrintEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.deliveryNo = source["deliveryNo"];
+	        this.header = this.convertValues(source["header"], OrderExportHeader);
+	        this.rows = this.convertValues(source["rows"], OrderExportRow);
+	        this.deductions = this.convertValues(source["deductions"], OrderExportDeduction);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
 	export class OrderReportRow {
 	    date: string;
 	    customerName: string;

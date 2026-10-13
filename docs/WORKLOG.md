@@ -6,6 +6,45 @@ reads the top entry first.
 
 ---
 
+## 2026-10-13 — New report: Print Delivered Orders (A4 PDF, multiple orders per page)
+**Did:**
+- Client ask: a new `/reports` card — every delivered order in a date range, printed as
+  one PDF, one table per order in the same format as the existing per-order Excel/PDF
+  export (Qty/Item/Unit/Rate/Amount, gross Total, Less/Add deductions, net Total), but
+  A4-sized with multiple tables packed per page, each headed "Order #N" in bold/larger
+  text, uncolored (no yellow), and center-aligned. Confirmed with the client: N is the
+  **delivery number**, and tables sort by it ascending.
+- Backend: split `WriteOrderPDF`'s drawing body into a reusable `drawOrderBlock(pdf, x0,
+  y, title, header, rows, deductions, accent)` (`internal/reports/order_export.go`) —
+  `WriteOrderPDF` now just calls it once (empty title, yellow accent, unchanged output).
+  New `DeliveredOrdersPrintEntry` type + `WriteDeliveredOrdersPDF`, which calls
+  `drawOrderBlock` once per order with `accent: nil` and a horizontally-centered `x0`,
+  packing tables per page via a height-estimating helper kept in lockstep with the real
+  draw, and starting a new page before any table that wouldn't fully fit (never splitting
+  a table, never reordering the sequence). New `app.go` binding
+  `ExportDeliveredOrdersPDF`; regenerated Wails bindings.
+- Extracted `SavedOrders.tsx`'s private `toExportHeader`/`toExportRowsAndDeductions` into
+  one exported `toOrderExportData` in `lib/salesOrder.ts` (the new report needs the same
+  shaping for many orders at once) — pure dedup, no behavior change to the existing
+  per-order Download Excel/PDF.
+- New "Print Delivered Orders" card in `Reports.tsx`: `DateRangeFilter` + a "Download PDF"
+  button (no Excel option, per the ask), same state/data-flow shape as the other three
+  cards. Filters `orders` to `delivered && inRange(...)`, sorts by delivery number.
+- Verified: `go build`/`go vet`/`go test ./...` and `npm run build` clean. Generated sample
+  PDFs via a temporary (not committed) Go test + inspected with `pypdf`: single-order PDF
+  unchanged from before the refactor; a 20-order test PDF produced 4 pages of 5 tables
+  each, strictly sequential "Order #1" through "Order #20" across pages, a deduction/net
+  Total rendered correctly on order #5, and the table's computed `x0` (36pt) exactly
+  centers the 523pt-wide table on the 595pt A4 page. Confirmed live in `wails dev` that
+  the new card renders against the real DB ("2 orders ready to print," matching the real
+  delivered-order count) — didn't click Download PDF itself, since the native Save dialog
+  it opens can't be driven/observed via browser automation (same limitation noted in
+  earlier sessions).
+
+**Next steps:** none outstanding from this session.
+
+---
+
 ## 2026-10-13 — Generalize Rate History: City/Customer filters, three entry points
 **Did:**
 - Client ask: turn the Add Order info button's per-customer rate history popup into one
