@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // salesFixture is the minimal master data a sales order needs: one customer and two items.
@@ -194,11 +195,12 @@ func TestMarkSalesOrderDeliveredMissingOrder(t *testing.T) {
 func TestUpdateSalesOrderRefusesDeliveredOrder(t *testing.T) {
 	f := seedSales(t)
 	order := f.addOrder(t, "01-Oct-26")
-	if _, err := MarkSalesOrderDelivered(f.conn, order.ID); err != nil {
+	marked, err := MarkSalesOrderDelivered(f.conn, order.ID)
+	if err != nil {
 		t.Fatalf("mark: %v", err)
 	}
 
-	_, err := UpdateSalesOrder(f.conn, SalesOrder{
+	_, err = UpdateSalesOrder(f.conn, SalesOrder{
 		ID:         order.ID,
 		CustomerID: f.customerID,
 		Date:       "09-Oct-26",
@@ -212,8 +214,10 @@ func TestUpdateSalesOrderRefusesDeliveredOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSalesOrder: %v", err)
 	}
-	if got.Date != "01-Oct-26" {
-		t.Fatalf("date should be untouched, got %q", got.Date)
+	// MarkSalesOrderDelivered already overwrote the date to today — the refused
+	// UpdateSalesOrder call's "09-Oct-26" must not have landed on top of that.
+	if got.Date != marked.Date {
+		t.Fatalf("date should be untouched, got %q, want %q", got.Date, marked.Date)
 	}
 	if len(got.Items) != 2 {
 		t.Fatalf("lines should be untouched (rollback), got %d", len(got.Items))
@@ -238,12 +242,18 @@ func TestUpdateDeliveredSalesOrderQtyAndRate(t *testing.T) {
 	if _, err := MarkSalesOrderDelivered(f.conn, order.ID); err != nil {
 		t.Fatalf("mark: %v", err)
 	}
+	// MarkSalesOrderDelivered overwrites the date to today — read it back so this test,
+	// which is only about qty/rate, doesn't incidentally also change the date.
+	baseline, err := GetSalesOrder(f.conn, order.ID)
+	if err != nil {
+		t.Fatalf("baseline GetSalesOrder: %v", err)
+	}
 	idsBefore := f.lineIDs(t, order.ID)
 
 	updated, err := UpdateDeliveredSalesOrder(f.conn, SalesOrder{
 		ID:         order.ID,
 		CustomerID: f.customerID,
-		Date:       "01-Oct-26",
+		Date:       baseline.Date,
 		Items: []SalesOrderItem{
 			{ItemID: f.itemA, Rate: 11.5, Qty: 7},
 			{ItemID: f.itemB, Rate: 25, Qty: 4},
@@ -271,6 +281,56 @@ func TestUpdateDeliveredSalesOrderQtyAndRate(t *testing.T) {
 	}
 }
 
+// TestMarkSalesOrderDeliveredSetsDateToToday checks the new delivery-date behaviour: the
+// order's date is overwritten to the day it's marked delivered, not left at the day it
+// was placed.
+func TestMarkSalesOrderDeliveredSetsDateToToday(t *testing.T) {
+	f := seedSales(t)
+	order := f.addOrder(t, "01-Oct-20") // far enough in the past that "today" can't collide
+	marked, err := MarkSalesOrderDelivered(f.conn, order.ID)
+	if err != nil {
+		t.Fatalf("mark: %v", err)
+	}
+	want := time.Now().Format("02-Jan-06")
+	if marked.Date != want {
+		t.Fatalf("date should become today (%s), got %q", want, marked.Date)
+	}
+}
+
+// TestUpdateDeliveredSalesOrderDate checks that a delivered order's date (e.g. one
+// MarkSalesOrderDelivered set incorrectly) can be corrected afterwards.
+func TestUpdateDeliveredSalesOrderDate(t *testing.T) {
+	f := seedSales(t)
+	order := f.addOrder(t, "01-Oct-26")
+	if _, err := MarkSalesOrderDelivered(f.conn, order.ID); err != nil {
+		t.Fatalf("mark: %v", err)
+	}
+
+	updated, err := UpdateDeliveredSalesOrder(f.conn, SalesOrder{
+		ID:         order.ID,
+		CustomerID: f.customerID,
+		Date:       "15-Oct-26",
+		Items: []SalesOrderItem{
+			{ItemID: f.itemA, Rate: 10, Qty: 5},
+			{ItemID: f.itemB, Rate: 20, Qty: 3},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateDeliveredSalesOrder: %v", err)
+	}
+	if updated.Date != "15-Oct-26" {
+		t.Fatalf("date not applied, got %q", updated.Date)
+	}
+
+	reopened, err := GetSalesOrder(f.conn, order.ID)
+	if err != nil {
+		t.Fatalf("GetSalesOrder: %v", err)
+	}
+	if reopened.Date != "15-Oct-26" {
+		t.Fatalf("date change didn't persist, got %q", reopened.Date)
+	}
+}
+
 func (f salesFixture) lineIDs(t *testing.T, orderID int64) []int64 {
 	t.Helper()
 	rows, err := f.conn.Query(`SELECT id FROM sales_order_items WHERE order_id = ? ORDER BY id`, orderID)
@@ -289,15 +349,15 @@ func (f salesFixture) lineIDs(t *testing.T, orderID int64) []int64 {
 	return ids
 }
 
-// TestUpdateDeliveredSalesOrderRejections pins every frozen field: each case changes one
-// thing off a valid baseline and must be refused, leaving the order exactly as it was.
+// TestUpdateDeliveredSalesOrderRejections pins every frozen field (date is excluded — it's
+// now an allowed edit, see TestUpdateDeliveredSalesOrderDate): each case changes one thing
+// off a valid baseline and must be refused, leaving the order exactly as it was.
 func TestUpdateDeliveredSalesOrderRejections(t *testing.T) {
 	cases := []struct {
 		name  string
 		mutate func(f salesFixture, o *SalesOrder)
 	}{
 		{"changed customer", func(f salesFixture, o *SalesOrder) { o.CustomerID = f.otherCustomer }},
-		{"changed date", func(f salesFixture, o *SalesOrder) { o.Date = "09-Oct-26" }},
 		{"line appended", func(f salesFixture, o *SalesOrder) {
 			o.Items = append(o.Items, SalesOrderItem{ItemID: f.itemA, Rate: 1, Qty: 1})
 		}},
@@ -327,7 +387,7 @@ func TestUpdateDeliveredSalesOrderRejections(t *testing.T) {
 			payload := SalesOrder{
 				ID:         order.ID,
 				CustomerID: f.customerID,
-				Date:       "01-Oct-26",
+				Date:       baseline.Date,
 				Items: []SalesOrderItem{
 					{ItemID: f.itemA, Rate: 10, Qty: 5},
 					{ItemID: f.itemB, Rate: 20, Qty: 3},

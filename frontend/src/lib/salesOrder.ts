@@ -2,6 +2,8 @@
 // View/Edit Orders derive it from the same raw fields here, so the formula lives in
 // exactly one place, mirroring lib/purchaseBill.ts.
 
+import {displayDate} from '@/lib/date';
+
 export interface OrderLineCalcInput {
     rate: number;
     qty: number;
@@ -26,6 +28,20 @@ export function customerShareLabel(order: {
     customerCity: string;
 }): string {
     return [order.customerNickName || order.customerName, order.customerCity].filter(Boolean).join(' - ');
+}
+
+// orderExportFilename builds the default filename for the order's Excel/PDF export:
+// "{3-digit padded number} {nickname} {date}.{ext}" — the delivery number once delivered
+// (what the customer actually received), the order number otherwise. Windows forbids
+// \/:*?"<>| in filenames, so they're stripped from the free-text nickname.
+export function orderExportFilename(
+    order: {id: number; deliveryNo: number; delivered: boolean; customerNickName: string; customerName: string; date: string},
+    ext: string,
+): string {
+    const number = order.delivered ? order.deliveryNo : order.id;
+    const padded = String(number).padStart(3, '0');
+    const nickname = (order.customerNickName || order.customerName).replace(/[\\/:*?"<>|]/g, '');
+    return `${padded} ${nickname} ${displayDate(order.date)}.${ext}`;
 }
 
 // effectivePackSize is the pack size that actually applies to a line — its custom

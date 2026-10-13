@@ -106,7 +106,7 @@ export function AddOrder() {
     const [customer, setCustomer] = useState<db.Customer | null>(null);
     const [date, setDate] = useState(todayDate());
     const [dateOpen, setDateOpen] = useState(false);
-    // 0 until delivered; a delivered order is frozen apart from Qty and Rate.
+    // 0 until delivered; a delivered order is frozen apart from Qty, Rate, and Date.
     const [deliveryNo, setDeliveryNo] = useState(0);
     const delivered = deliveryNo > 0;
     const [confirmDeliver, setConfirmDeliver] = useState(false);
@@ -375,8 +375,9 @@ export function AddOrder() {
 
         try {
             if (editId != null) {
-                // Edit mode. A delivered order is frozen apart from Qty and Rate, so it goes
-                // through the narrow update path; everything else is a complete overwrite.
+                // Edit mode. A delivered order is frozen apart from Qty, Rate, and Date, so
+                // it goes through the narrow update path; everything else is a complete
+                // overwrite.
                 if (delivered) {
                     await UpdateDeliveredSalesOrder(order as db.SalesOrder);
                 } else {
@@ -425,7 +426,7 @@ export function AddOrder() {
                     </div>
                     {delivered ? (
                         <p className="text-sm text-muted-foreground">
-                            Delivered — only Qty and Rate can be changed.
+                            Delivered — only Qty, Rate, and Date can be changed.
                         </p>
                     ) : (
                         <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDeliver(true)}>
@@ -460,13 +461,11 @@ export function AddOrder() {
                                     className="pr-9"
                                     value={date}
                                     onChange={(e) => setDate(e.target.value)}
-                                    disabled={delivered}
                                 />
                                 <Popover open={dateOpen} onOpenChange={setDateOpen}>
                                     <PopoverTrigger
                                         type="button"
                                         aria-label="Pick a date"
-                                        disabled={delivered}
                                         className={cn(
                                             buttonVariants({variant: 'ghost', size: 'icon'}),
                                             'absolute right-1 top-1 size-7 text-muted-foreground',

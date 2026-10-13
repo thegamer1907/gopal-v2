@@ -63,6 +63,7 @@ import {
     calcOrderLine,
     customerShareLabel,
     effectivePackSize,
+    orderExportFilename,
     OrderLineCalc,
 } from '@/lib/salesOrder';
 
@@ -182,122 +183,122 @@ export function SavedOrders() {
         return <p className="text-sm text-destructive">{error}</p>;
     }
 
-    if (selected) {
-        return (
-            <OrderDetail
-                order={selected}
-                onBack={() => setSelectedId(null)}
-                onEdit={() => navigate(`/orders/${selected.id}/edit`)}
-                onDelete={() => deleteOrder(selected.id)}
-            />
-        );
-    }
-
     return (
-        <div className="space-y-4">
-            {orders.length === 0 ? (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                        <ClipboardList className="size-8 text-muted-foreground"/>
-                        <p className="text-sm text-muted-foreground">No orders saved yet.</p>
-                    </CardContent>
-                </Card>
+        <>
+            {selected ? (
+                <OrderDetail
+                    order={selected}
+                    onBack={() => setSelectedId(null)}
+                    onEdit={() => navigate(`/orders/${selected.id}/edit`)}
+                    onDelete={() => deleteOrder(selected.id)}
+                    onMarkDelivered={() => setConfirmDeliver(selected)}
+                />
             ) : (
-                <>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="relative w-64">
-                                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
-                                <Input
-                                    className="pl-8"
-                                    placeholder="Search customer…"
-                                    autoComplete="off"
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Switch
-                                    id="show-delivered"
-                                    checked={showDelivered}
-                                    onCheckedChange={setShowDelivered}
-                                />
-                                <Label htmlFor="show-delivered" className="font-normal text-muted-foreground">
-                                    Delivered only
-                                </Label>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                                {sorted.length} order{sorted.length === 1 ? '' : 's'}
-                            </div>
-                        </div>
-                        <DateRangeFilter value={range} onChange={setRange}/>
-                    </div>
-
+                <div className="space-y-4">
+                {orders.length === 0 ? (
                     <Card>
-                        <CardContent className="p-0">
-                            {sorted.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-muted-foreground">
-                                    <Search className="size-8 opacity-40"/>
-                                    <p className="text-sm">No orders match the current filters.</p>
-                                </div>
-                            ) : (
-                                <Table>
-                                    <TableHeader>
-                                        {/* The filter is exclusive, so every visible row has the
-                                            same status: no Status column. Delivered rows carry
-                                            their number instead; pending rows get the mark action. */}
-                                        <TableRow>
-                                            {showDelivered && (
-                                                <SortableHeader label="Delivery #" sortKey="deliveryNo" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
-                                            )}
-                                            <SortableHeader label="Customer" sortKey="customer" activeKey={sortKey} dir={sortDir} onSort={toggle} className={showDelivered ? undefined : 'pl-4'}/>
-                                            <SortableHeader label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
-                                            <SortableHeader label="Qty" sortKey="qty" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
-                                            <SortableHeader label="Final Amount" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
-                                            {!showDelivered && <TableHead className="w-10 pr-4"/>}
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {sorted.map((order) => (
-                                            <TableRow
-                                                key={order.id}
-                                                onClick={() => setSelectedId(order.id)}
-                                                className="cursor-pointer"
-                                            >
-                                                {showDelivered && (
-                                                    <TableCell className="pl-4 tabular-nums font-medium">#{order.deliveryNo}</TableCell>
-                                                )}
-                                                <TableCell className={cn('font-medium', !showDelivered && 'pl-4')}>{order.customerName}</TableCell>
-                                                <TableCell className="tabular-nums text-muted-foreground">{displayDate(order.date)}</TableCell>
-                                                <TableCell className="text-right tabular-nums text-muted-foreground">{fmtQty(totalQtyOf(order))}</TableCell>
-                                                <TableCell className={cn('text-right tabular-nums font-medium', showDelivered && 'pr-4')}>{fmt(finalAmountOf(order))}</TableCell>
-                                                {!showDelivered && (
-                                                    <TableCell className="pr-4 text-right">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="size-8"
-                                                            aria-label="Mark delivered"
-                                                            title="Mark delivered"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setConfirmDeliver(order);
-                                                            }}
-                                                        >
-                                                            <CheckCircle2 className="size-4"/>
-                                                        </Button>
-                                                    </TableCell>
-                                                )}
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            )}
+                        <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                            <ClipboardList className="size-8 text-muted-foreground"/>
+                            <p className="text-sm text-muted-foreground">No orders saved yet.</p>
                         </CardContent>
                     </Card>
-                </>
-            )}
+                ) : (
+                    <>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="relative w-64">
+                                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
+                                    <Input
+                                        className="pl-8"
+                                        placeholder="Search customer…"
+                                        autoComplete="off"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Switch
+                                        id="show-delivered"
+                                        checked={showDelivered}
+                                        onCheckedChange={setShowDelivered}
+                                    />
+                                    <Label htmlFor="show-delivered" className="font-normal text-muted-foreground">
+                                        Delivered only
+                                    </Label>
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                    {sorted.length} order{sorted.length === 1 ? '' : 's'}
+                                </div>
+                            </div>
+                            <DateRangeFilter value={range} onChange={setRange}/>
+                        </div>
 
+                        <Card>
+                            <CardContent className="p-0">
+                                {sorted.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-muted-foreground">
+                                        <Search className="size-8 opacity-40"/>
+                                        <p className="text-sm">No orders match the current filters.</p>
+                                    </div>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            {/* The filter is exclusive, so every visible row has the
+                                                same status: no Status column. Delivered rows carry
+                                                their number instead; pending rows get the mark action. */}
+                                            <TableRow>
+                                                {showDelivered && (
+                                                    <SortableHeader label="Delivery #" sortKey="deliveryNo" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
+                                                )}
+                                                <SortableHeader label="Customer" sortKey="customer" activeKey={sortKey} dir={sortDir} onSort={toggle} className={showDelivered ? undefined : 'pl-4'}/>
+                                                <SortableHeader label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
+                                                <SortableHeader label="Qty" sortKey="qty" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
+                                                <SortableHeader label="Final Amount" sortKey="amount" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
+                                                {!showDelivered && <TableHead className="w-10 pr-4"/>}
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {sorted.map((order) => (
+                                                <TableRow
+                                                    key={order.id}
+                                                    onClick={() => setSelectedId(order.id)}
+                                                    className="cursor-pointer"
+                                                >
+                                                    {showDelivered && (
+                                                        <TableCell className="pl-4 tabular-nums font-medium">#{order.deliveryNo}</TableCell>
+                                                    )}
+                                                    <TableCell className={cn('font-medium', !showDelivered && 'pl-4')}>{order.customerName}</TableCell>
+                                                    <TableCell className="tabular-nums text-muted-foreground">{displayDate(order.date)}</TableCell>
+                                                    <TableCell className="text-right tabular-nums text-muted-foreground">{fmtQty(totalQtyOf(order))}</TableCell>
+                                                    <TableCell className={cn('text-right tabular-nums font-medium', showDelivered && 'pr-4')}>{fmt(finalAmountOf(order))}</TableCell>
+                                                    {!showDelivered && (
+                                                        <TableCell className="pr-4 text-right">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="size-8"
+                                                                aria-label="Mark delivered"
+                                                                title="Mark delivered"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setConfirmDeliver(order);
+                                                                }}
+                                                            >
+                                                                <CheckCircle2 className="size-4"/>
+                                                            </Button>
+                                                        </TableCell>
+                                                    )}
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
+                </div>
+            )}
             <MarkDeliveredDialog
                 open={confirmDeliver !== null}
                 onOpenChange={(open) => !open && setConfirmDeliver(null)}
@@ -305,7 +306,7 @@ export function SavedOrders() {
                 customerName={confirmDeliver?.customerName ?? ''}
                 onConfirm={() => confirmDeliver && markDelivered(confirmDeliver.id)}
             />
-        </div>
+        </>
     );
 }
 
@@ -318,11 +319,13 @@ function OrderDetail({
     onBack,
     onEdit,
     onDelete,
+    onMarkDelivered,
 }: {
     order: db.SalesOrder;
     onBack: () => void;
     onEdit: () => void;
     onDelete: () => void;
+    onMarkDelivered: () => void;
 }) {
     const [confirmDelete, setConfirmDelete] = useState(false);
     // Only one export/share action can run at a time; all three share one feedback line
@@ -430,7 +433,7 @@ function OrderDetail({
         setError('');
         try {
             const {rows, deductions} = toExportRowsAndDeductions();
-            const path = await ExportOrderExcel(toExportHeader(), rows, deductions, `Order-${order.id}.xlsx`);
+            const path = await ExportOrderExcel(toExportHeader(), rows, deductions, orderExportFilename(order, 'xlsx'));
             if (path) setNotice(`Saved to ${path}`);
         } catch (e: any) {
             setError(String(e));
@@ -445,7 +448,7 @@ function OrderDetail({
         setError('');
         try {
             const {rows, deductions} = toExportRowsAndDeductions();
-            const path = await ExportOrderPDF(toExportHeader(), rows, deductions, `Order-${order.id}.pdf`);
+            const path = await ExportOrderPDF(toExportHeader(), rows, deductions, orderExportFilename(order, 'pdf'));
             if (path) setNotice(`Saved to ${path}`);
         } catch (e: any) {
             setError(String(e));
@@ -474,6 +477,12 @@ function OrderDetail({
                         <FileText className="size-4"/>
                         {busy === 'pdf' ? 'Preparing…' : 'Download PDF'}
                     </Button>
+                    {!order.delivered && (
+                        <Button variant="outline" size="sm" onClick={onMarkDelivered} disabled={busy !== null}>
+                            <CheckCircle2 className="size-4"/>
+                            Mark delivered
+                        </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={onEdit} disabled={busy !== null}>
                         <Pencil className="size-4"/>
                         Edit order

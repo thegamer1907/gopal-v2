@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // SalesOrder is a customer order header plus its line items — first piece of the Order
@@ -101,7 +102,7 @@ func UpdateSalesOrder(conn *sql.DB, order SalesOrder) (SalesOrder, error) {
 	}
 	if deliveryNo > 0 {
 		return SalesOrder{}, fmt.Errorf(
-			"sales order %d is delivered (delivery no. %d): only qty and rate can be changed",
+			"sales order %d is delivered (delivery no. %d): only qty, rate, and date can be changed",
 			order.ID, deliveryNo,
 		)
 	}
@@ -140,7 +141,10 @@ func DeleteSalesOrder(conn *sql.DB, id int64) error {
 }
 
 // MarkSalesOrderDelivered irreversibly marks an order delivered, assigning it the next
-// sequential delivery number, and returns the updated order.
+// sequential delivery number, and returns the updated order. It also overwrites the
+// order's `date` to today — the date it was actually delivered, not the day it was
+// originally placed, since that's what Stock Report/Order Report/Rate History etc. all
+// treat `date` as meaning from here on (see DECISIONS.md).
 //
 // One statement on purpose: the connection pool is not limited to a single connection, so a
 // separate "read the max, then write it" pair could land on different connections, and a
@@ -157,9 +161,10 @@ func MarkSalesOrderDelivered(conn *sql.DB, id int64) (SalesOrder, error) {
 	res, err := conn.Exec(
 		`UPDATE sales_orders
 			SET delivery_number = (SELECT COALESCE(MAX(delivery_number), 0) + 1 FROM sales_orders),
-			    delivered = 1
+			    delivered = 1,
+			    date = ?
 			WHERE id = ? AND delivery_number = 0`,
-		id,
+		time.Now().Format("02-Jan-06"), id,
 	)
 	if err != nil {
 		return SalesOrder{}, fmt.Errorf("mark order %d delivered: %w", id, err)
@@ -179,10 +184,11 @@ func MarkSalesOrderDelivered(conn *sql.DB, id int64) (SalesOrder, error) {
 }
 
 // UpdateDeliveredSalesOrder is the only write path for a delivered order: it updates qty
-// and rate on the existing lines and nothing else. Customer, date, line count, each line's
-// item and each line's custom pack size are all frozen, and a mismatch is an error rather
-// than a silent partial write — a delivered order has already gone out, so its shape must
-// keep matching what the customer received.
+// and rate on the existing lines, and the order's date (e.g. correcting the delivery date
+// MarkSalesOrderDelivered set), and nothing else. Customer, line count, each line's item
+// and each line's custom pack size are all frozen, and a mismatch is an error rather than a
+// silent partial write — a delivered order has already gone out, so its shape must keep
+// matching what the customer received.
 //
 // Lines are matched positionally against the stored rows read back in `id` order, which is
 // the same order every read hands to the caller. The row ids stay inside this package: the
@@ -214,7 +220,9 @@ func UpdateDeliveredSalesOrder(conn *sql.DB, order SalesOrder) (SalesOrder, erro
 		return SalesOrder{}, fmt.Errorf("the customer of a delivered order can't be changed")
 	}
 	if order.Date != storedDate {
-		return SalesOrder{}, fmt.Errorf("the date of a delivered order can't be changed")
+		if _, err := tx.Exec(`UPDATE sales_orders SET date = ? WHERE id = ?`, order.Date, order.ID); err != nil {
+			return SalesOrder{}, fmt.Errorf("update order %d date: %w", order.ID, err)
+		}
 	}
 
 	type storedLine struct {

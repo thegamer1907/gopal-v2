@@ -163,7 +163,8 @@ func (a *App) UpdateSalesOrder(order db.SalesOrder) (db.SalesOrder, error) {
 	return db.UpdateSalesOrder(a.db, order)
 }
 
-// UpdateDeliveredSalesOrder updates only qty and rate on a delivered order's existing lines.
+// UpdateDeliveredSalesOrder updates qty and rate on a delivered order's existing lines,
+// plus its date; everything else about a delivered order is frozen.
 func (a *App) UpdateDeliveredSalesOrder(order db.SalesOrder) (db.SalesOrder, error) {
 	return db.UpdateDeliveredSalesOrder(a.db, order)
 }
