@@ -7,6 +7,20 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
+_Shipped (2026-10-13): **Print Delivered Orders** — a new `/reports` card that prints
+every delivered order in a chosen date range as one A4 PDF, sorted by delivery number.
+Reuses the existing per-order export's table format (Qty/Item/Unit/Rate/Amount, gross
+Total, Less/Add deductions, net Total) but uncolored, horizontally centered, each table
+headed "Order #N" (the delivery number), with multiple tables packed per page and a table
+never split across a page break. PDF only, no Excel option. See DECISIONS._
+
+_Shipped (2026-10-12/13): order export filenames now default to `{delivery no. or order
+id, 3-digit padded} {nickname} {date}.{ext}` instead of `Order-{id}`; and marking an order
+delivered now also overwrites its `date` to the actual delivery day, with Date joining
+Qty/Rate as editable afterwards (previously frozen). See DECISIONS for the Stock
+Report/Order Report "as of a past date" consequence this was weighed against before
+shipping._
+
 _Shipped (2026-10-13): generalized Rate History — the Add Order info button's dialog is
 now a reusable, City/Customer-filterable view of an item's full sales history across every
 customer (City · Customer · Date · Rate, both filters defaulting to "All"), not just the
@@ -19,9 +33,22 @@ _Shipped (2026-10-12): single-instance behavior — launching the `.exe` while i
 running brings the existing window to the front instead of opening a second instance, via
 Wails' built-in `SingleInstanceLock` (see DECISIONS)._
 
-_Shipped in **v0.9.0** (2026-10-07): two more Reports cards — **Stock Report** (every item
-with positive stock as of a chosen date, default today — items at zero or negative stock
-are excluded; Company/Item/Pack Size/HSN/Stock columns, no Totals row) and **Order Report** (a line-item register of sales orders — one row per order
+_Shipped (2026-10-12): the three `/reports` Excel exports now center-align their
+Date/Bill No./HSN/Pack Size/quantity/GST % columns (header, data, and totals rows) instead
+of Excel's default left/right alignment — money and free-text columns unchanged. See
+DECISIONS._
+
+_Shipped (2026-10-12): a "Mark delivered" button was added to the order detail
+(read-only) view, alongside the existing `/orders` list-row and edit-page buttons — all
+three share the same `MarkDeliveredDialog` confirmation._
+
+_Shipped (2026-10-12): Stock Report now excludes items with zero or negative stock as of
+the chosen date, instead of listing every item._
+
+_Shipped in **v0.9.0** (2026-10-07): two more Reports cards — **Stock Report** (every
+item's stock as of a chosen date, default today; Company/Item/Pack Size/HSN/Stock
+columns, no Totals row — later narrowed to positive-stock-only, see the 2026-10-12 entry
+above) and **Order Report** (a line-item register of sales orders — one row per order
 line — filterable by a date range and a tri-state delivery status All/Delivered
 only/Pending only; Date/Customer/City/Item/Pack Size/GST %/HSN/Qty/Rate/Final
 Amount/Delivered?/Delivery # columns — Pack Size and Qty are whole numbers, matching the
