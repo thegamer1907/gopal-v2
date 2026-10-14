@@ -7,6 +7,12 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
+_Shipped (2026-10-13): **Stock Report: more columns.** "Stock" is renamed **Quantity**, and
+five columns are added — GST %, Final Rate, Billing Rate, P&L, GST Value — giving Company ·
+Item · Pack Size · HSN · GST % · Quantity · Final Rate · Billing Rate · P&L · GST Value.
+Rates come from each item's latest purchase bill on/before the as-of date. A bold Totals
+row sums Quantity, P&L and GST Value. See DECISIONS._
+
 _Shipped (2026-10-13): **Delivered-orders selection by delivery number**, a new
 **Export Delivered Orders (Excel zip)** report, and PDF tweaks. Print Delivered Orders and
 the new Excel-zip card both choose orders By date or By delivery no. (From/To

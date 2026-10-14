@@ -6,6 +6,32 @@ reads the top entry first.
 
 ---
 
+## 2026-10-13 — Stock Report: Quantity + GST %, rates, P&L, GST Value
+**Did:**
+- Renamed Stock → Quantity; added GST %, Final Rate, Billing Rate, P&L, GST Value (order:
+  Company · Item · Pack Size · HSN · GST % · Quantity · Final Rate · Billing Rate · P&L ·
+  GST Value). `computeStockRows` (`Reports.tsx`) now tracks each item's latest purchase line
+  ≤ the as-of date and feeds it to `calcLine`; `stock_report.go` has the new
+  fields/columns/styles; bindings regenerated; new `stock_report_test.go`.
+- Formulas: P&L = packSize × qty × finalRate; GST Value = qty × billingRate (literal, per
+  the client — see DECISIONS).
+- Verified live in `wails dev`: intercepted the Download call in the page to read the exact
+  rows sent. At as-of 13-Oct-26 all 92 rows matched an independent recompute from raw bills
+  (48 of those items have multiple bills); at 12-Jul-26, 76 rows matched, with 42 items
+  correctly using an older bill than their latest.
+- Follow-up: added a bold Totals row (Quantity, P&L, GST Value); GST % now a real `0%` cell — `writeStockTotals`; Go test
+  checks it. Live: page still produces 92 rows at 13-Oct-26 (P&L sum ≈ 2,08,93,583.90,
+  GST Value sum ≈ 1,98,53,517.04 from the same rows) — compare against a real download.
+- Follow-up: Stock Report column widths now fit the data (`stockColWidths`; other reports
+  unchanged). Real-data expectation: Company 32, Item 31, Quantity 13, Final Rate 15,
+  Billing Rate 17, P&L 16, GST Value 16.
+- Not verified: the downloaded .xlsx opened in Excel (native Save dialog can't be driven);
+  covered by a Go test that reads the written workbook back. Nothing committed.
+
+**Next steps:** user to open one real Stock Report download for a visual check.
+
+---
+
 ## 2026-10-13 — Delivered orders: delivery-no. selection, Excel zip, PDF tweaks
 **Did:**
 - New shared `DeliveredOrderSelector` (By date | By delivery no.) + `DeliveryNoCombobox`
@@ -19,8 +45,12 @@ reads the top entry first.
   column widths now threaded as a `cols` param (single-order PDF passes the old defaults).
 - Tests: `order_export_zip_test.go` (zip members/dedupe, fitted widths, PDF writes).
   `go build/vet/test` and `npm run build` clean; PDF text verified with `pypdf`.
-- Not verified: no browser run of the new UI and no visual render of the PDF (no
-  `pdftoppm`), and the native Save dialog can't be driven by automation.
+- Verified live in `wails dev` (browser at :34115): both cards render; delivery-no.
+  dropdown lists real numbers; unknown number → red + Download disabled; blank From with
+  To=1 → "1 order ready to print"; From 2 / To 1 → "End is before start" + disabled.
+- Not verified: the Excel card's own selector (same component, not clicked), the Download
+  buttons (native Save dialog can't be driven), and a visual render of the PDF (no
+  `pdftoppm`).
 
 **Next steps:** user to click through By delivery no. mode and both Download buttons.
 

@@ -454,7 +454,12 @@ export namespace reports {
 	    itemName: string;
 	    packSize: number;
 	    hsn: number;
-	    stock: number;
+	    gstPercent: number;
+	    quantity: number;
+	    finalRate: number;
+	    billingRate: number;
+	    profitLoss: number;
+	    gstValue: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new StockReportRow(source);
@@ -466,7 +471,12 @@ export namespace reports {
 	        this.itemName = source["itemName"];
 	        this.packSize = source["packSize"];
 	        this.hsn = source["hsn"];
-	        this.stock = source["stock"];
+	        this.gstPercent = source["gstPercent"];
+	        this.quantity = source["quantity"];
+	        this.finalRate = source["finalRate"];
+	        this.billingRate = source["billingRate"];
+	        this.profitLoss = source["profitLoss"];
+	        this.gstValue = source["gstValue"];
 	    }
 	}
 

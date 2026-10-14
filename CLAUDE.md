@@ -22,7 +22,21 @@ Then skim `docs/DECISIONS.md` and `docs/DATA_MODEL.md` as the task requires.
 - **Change the schema** → update `docs/DATA_MODEL.md` and keep it matching the Go migrations.
 - **Decide UI/UX** → update `docs/UI.md`.
 - **End of session** → prepend a new entry to `docs/WORKLOG.md` (did / decisions / next
-  steps), then `git commit` with a clear message.
+  steps). **Do not commit** — see the rules below.
+- **After every change, sweep the docs** — don't wait to be asked: `FEATURES.md`
+  (status), `DECISIONS.md` (any decision), `UI.md` (any UI/UX), `DATA_MODEL.md` (any
+  schema/migration), `WORKLOG.md` (what was done + next steps). Update every one that
+  applies, and say in the reply which docs you touched (and which you skipped, and why).
+
+### Working rules (from the user — these override anything above)
+- **Never `git commit` (or push/tag) unless the user explicitly says to** — e.g. "commit
+  this" after they've seen it working. Finishing a task, or a session, is not permission.
+  Leave changes uncommitted and say so.
+- **Always test every change in the running app** using the Claude-in-Chrome extension:
+  start `wails dev`, then drive the UI at `http://localhost:34115` and confirm the change
+  actually works before reporting it done. Unit tests/builds alone don't count. Report
+  honestly what was and wasn't exercised (e.g. the native Save dialog can't be driven by
+  browser automation, so file downloads need a manual check).
 
 Claude memory (`~/.claude/.../memory/`) is **secondary**: it's machine-local and does NOT
 travel to Windows. Use it for working preferences and pointers only — the `docs/` files

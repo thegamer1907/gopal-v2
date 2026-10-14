@@ -1066,3 +1066,26 @@ have to re-litigate.
 - **Alternatives:** AND-ing date + number ranges (rejected: more UI, not asked for);
   per-table Item widths (rejected: tables on one page would misalign).
 
+### 2026-10-13 — Stock Report: Quantity rename + rate/P&L/GST Value columns
+- **Decision:** "Stock" column → **Quantity** (still a quantity column for formatting
+  purposes). New columns **GST %** (item master), **Final Rate**, **Billing Rate**, **P&L**,
+  **GST Value**. Final/Billing Rate come from the item's **latest purchase-bill line dated on
+  or before the as-of date** (greatest date; tie → highest bill id; last line of that bill if
+  the item repeats), computed with the shared `calcLine` — never stored.
+  **P&L = Pack Size × Quantity × Final Rate.** **GST Value = Quantity × Billing Rate**,
+  *literally as the client specified* — note this is the taxable value of the stock, not
+  GST amount (that would also multiply by GST %/100). I flagged this and the user chose the
+  literal formula; don't "correct" it without asking.
+- **Why:** client ask. Computed in the frontend with the rest of the as-of-date math
+  (see the 2026-10-07 date-math decision).
+- **Alternatives:** Qty × Billing Rate × GST%/100 for GST Value (offered, declined).
+- **Totals row (same day, follow-up):** the Stock Report gets a bold **Totals** row summing
+  **Quantity, P&L and GST Value** (placed under the data, outside the autofilter so sorting
+  can't move it); rates/pack sizes stay un-totaled. GST % is written as a fraction under a
+  real `0%` format, matching Purchase Summary/Order Report. This supersedes the older "no
+  Totals row" note in the 2026-10-07 Stock Report entries.
+- **Column widths (same day):** the Stock Report's columns are sized to their data
+  (`stockColWidths`: max of header+3 for the autofilter arrow, every data cell as Excel
+  renders it, and the bold Totals cell, +2 padding) instead of the fixed 14/22 the other
+  reports use. Scoped to the Stock Report per the ask; the other reports are unchanged.
+

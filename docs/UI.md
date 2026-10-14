@@ -409,9 +409,19 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
     (dates can't be filtered in SQL; see DECISIONS). Calls `ExportStockReport(rows, asOfDate,
     filename)`; filename is `Stock Report (as of dd-mmm-yy).xlsx`.
   - **The workbook:** a merged, bold, centered title row ("Stock Report — as of dd-mmm-yy")
-    above the header (so header is row 2, data from row 3); Pack Size/HSN/Stock are plain
-    whole-number cells (`0`); header frozen, autofilter on the header row only. No Totals row
-    (summing stock across different items/pack sizes isn't meaningful).
+    above the header (so header is row 2, data from row 3). Columns (2026-10-13): **Company ·
+    Item · Pack Size · HSN · GST % · Quantity · Final Rate · Billing Rate · P&L · GST Value**
+    ("Quantity" was "Stock"). Pack Size/HSN/Quantity are plain whole-number cells (`0`), GST %
+    a real Excel percentage (`0%`, stored as a fraction like the other reports), the rate/P&L/GST Value columns `#,##0.00`; header frozen, autofilter on the
+    header row only. A bold **Totals** row sits directly under the data (outside the
+    autofilter range) summing **Quantity, P&L and GST Value**; rates/pack sizes aren't totaled.
+    **Column widths are fitted to the data** (2026-10-13, client ask): each column is as wide
+    as its longest header (+ filter-arrow room), value or bold Totals cell, +2 padding —
+    estimated in `stockColWidths` since Excel can't auto-fit on write. Stock Report only; the
+    other reports keep their fixed 14/22 widths.
+  - **New columns' data:** Final/Billing Rate come from the item's **latest purchase-bill
+    line on or before the as-of date** (via `calcLine`); **P&L** = Pack Size × Quantity ×
+    Final Rate; **GST Value** = Quantity × Billing Rate. See DECISIONS.
 
 - **Order Report card:** icon + title/description, a **delivery-status** `Select` (All
   orders / Delivered only / Pending only — a new three-way control; the existing

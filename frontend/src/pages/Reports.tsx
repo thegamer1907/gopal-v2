@@ -116,12 +116,20 @@ function computeStockRows(
     if (!cutoff) return [];
     const cutoffEnd = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate(), 23, 59, 59, 999);
 
+    // Per item: total purchased, plus its LATEST purchase-bill line on/before the cutoff
+    // (greatest date, then highest bill id; within a bill, the last line for that item) —
+    // that line's rates drive the Final/Billing Rate columns.
     const purchasedByItem = new Map<number, number>();
+    const latestLine = new Map<number, {date: Date; billId: number; line: db.PurchaseBillItem}>();
     for (const bill of bills) {
         const d = parseDate(bill.date);
         if (!d || d > cutoffEnd) continue;
         for (const it of bill.items) {
             purchasedByItem.set(it.itemId, (purchasedByItem.get(it.itemId) ?? 0) + it.taxQty + it.dQty);
+            const prev = latestLine.get(it.itemId);
+            if (!prev || d > prev.date || (d.getTime() === prev.date.getTime() && bill.id >= prev.billId)) {
+                latestLine.set(it.itemId, {date: d, billId: bill.id, line: it});
+            }
         }
     }
 
@@ -137,18 +145,34 @@ function computeStockRows(
     return items
         .map((item) => ({
             item,
-            stock: (purchasedByItem.get(item.id) ?? 0) - (soldByItem.get(item.id) ?? 0),
+            quantity: (purchasedByItem.get(item.id) ?? 0) - (soldByItem.get(item.id) ?? 0),
         }))
-        .filter(({stock}) => stock > 0)
-        .map(({item, stock}) =>
-            reports.StockReportRow.createFrom({
+        .filter(({quantity}) => quantity > 0)
+        .map(({item, quantity}) => {
+            const latest = latestLine.get(item.id)?.line;
+            const {finalRate, billingRate} = latest
+                ? calcLine({
+                      taxQty: latest.taxQty,
+                      taxValue: latest.taxValue,
+                      dQty: latest.dQty,
+                      dValue: latest.dValue,
+                      gstPercent: latest.gstPercent,
+                      packSize: latest.itemPackSize,
+                  })
+                : {finalRate: 0, billingRate: 0};
+            return reports.StockReportRow.createFrom({
                 companyName: item.companyName,
                 itemName: item.name,
                 packSize: item.packSize,
                 hsn: item.hsn,
-                stock,
-            }),
-        );
+                gstPercent: item.gstPercent,
+                quantity,
+                finalRate,
+                billingRate,
+                profitLoss: item.packSize * quantity * finalRate,
+                gstValue: quantity * billingRate,
+            });
+        });
 }
 
 function stockFilenameFor(asOfDate: string): string {
