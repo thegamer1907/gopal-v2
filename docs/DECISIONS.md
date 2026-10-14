@@ -1050,3 +1050,19 @@ have to re-litigate.
   mid-table page break if one order alone is taller than a full page), which was already
   `WriteOrderPDF`'s behavior and is kept purely as a safety net, not a feature of this
   report.
+
+### 2026-10-13 — Delivered-order selection by delivery no.; Excel zip; fitted PDF Item column
+- **Decision:** (1) Print Delivered Orders and the new Export Delivered Orders (Excel)
+  card select orders via a mode toggle — **By date** *or* **By delivery no.** — one at a
+  time, not AND-ed. Delivery-no. From/To are type-or-pick comboboxes; **blank = open-ended**
+  (From blank = first delivery no., To blank = last); a typed number that doesn't exist is
+  a red error and disables Download. (2) The per-order Excel export bundles into one **zip**
+  because the native save dialog picks a single path; each member is produced by the same
+  layout code as the order view's Excel (`buildOrderExcel`) and named by `orderExportFilename`.
+  (3) Delivered-orders PDF: title is `#N`; the Item column is sized once per PDF to the
+  widest item name (never narrower than the merged header bar / deduction labels need,
+  never wider than the old 260pt); tables stay page-centered. Single-order PDF unchanged.
+- **Why:** client asks. A shared selector keeps both cards selecting identically.
+- **Alternatives:** AND-ing date + number ranges (rejected: more UI, not asked for);
+  per-table Item widths (rejected: tables on one page would misalign).
+

@@ -54,6 +54,10 @@ export function DownloadAndInstallUpdate(arg1, arg2) {
   return window['go']['main']['App']['DownloadAndInstallUpdate'](arg1, arg2);
 }
 
+export function ExportDeliveredOrdersExcelZip(arg1, arg2) {
+  return window['go']['main']['App']['ExportDeliveredOrdersExcelZip'](arg1, arg2);
+}
+
 export function ExportDeliveredOrdersPDF(arg1, arg2) {
   return window['go']['main']['App']['ExportDeliveredOrdersPDF'](arg1, arg2);
 }

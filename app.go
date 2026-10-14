@@ -469,6 +469,30 @@ func (a *App) ExportDeliveredOrdersPDF(entries []reports.DeliveredOrdersPrintEnt
 	return path, nil
 }
 
+// ExportDeliveredOrdersExcelZip prompts for a save location and writes one .xlsx per given
+// delivered order (each identical to the order view's Excel export, named by the caller)
+// into a single .zip — the native save dialog can only pick one path, so a zip is how
+// many files are delivered at once. Returns the chosen path, or "" if cancelled.
+func (a *App) ExportDeliveredOrdersExcelZip(entries []reports.DeliveredOrderExcelEntry, defaultFilename string) (string, error) {
+	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:           "Export Delivered Orders (Excel)",
+		DefaultFilename: defaultFilename,
+		Filters: []wruntime.FileFilter{
+			{DisplayName: "Zip Archive (*.zip)", Pattern: "*.zip"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := reports.WriteOrderExcelsZip(path, entries); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // --- Self-update (Settings → Updates) ---
 
 // GetAppVersion returns the running build's version — "dev" outside a tagged release

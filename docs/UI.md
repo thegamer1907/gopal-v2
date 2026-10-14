@@ -480,3 +480,19 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
 
 ## Open decisions
 _None blocking._
+
+- **Delivered-order selector (2026-10-13, shared by Print Delivered Orders and Export
+  Delivered Orders (Excel)):** `DeliveredOrderSelector` — a "By date | By delivery no."
+  toggle (default By date). Date mode = `DateRangeFilter`. Delivery-no. mode = two
+  `DeliveryNoCombobox`es (From / To): dropdown lists *every* delivery number (scrollable)
+  and narrows as you type; **blank = open-ended** (blank From = from #1, blank To = through
+  the last); typing a number that doesn't exist turns the field red with "No such delivery
+  number", "End is before start" flags To < From, and Download is disabled until valid.
+  Selection logic lives in `lib/deliveredOrders.ts`.
+- **Export Delivered Orders (Excel) card:** icon `Archive`, same selector, "N Excel files
+  ready to export", **Download ZIP**. One `.xlsx` per delivered order — built by the very
+  same `WriteOrderExcel` layout as the order view — named with `orderExportFilename`
+  (`{3-digit delivery no.} {nickname} {dd-mmm-yy}.xlsx`), bundled into one zip.
+- **Delivered Orders PDF changes (2026-10-13):** table titles now read `#N` (no "Order"
+  word); the Item column is fitted to the widest item name in that PDF (header bar and
+  deduction labels still fit), tables remain page-centered so the left margin grows.

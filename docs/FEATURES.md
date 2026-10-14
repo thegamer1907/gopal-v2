@@ -7,6 +7,13 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
+_Shipped (2026-10-13): **Delivered-orders selection by delivery number**, a new
+**Export Delivered Orders (Excel zip)** report, and PDF tweaks. Print Delivered Orders and
+the new Excel-zip card both choose orders By date or By delivery no. (From/To
+type-or-pick comboboxes, blank = open-ended, unknown number = red error). The zip holds
+one order-view-identical `.xlsx` per delivered order with the usual filename. PDF titles
+are now `#N` and the Item column is fitted to the longest item name. See DECISIONS._
+
 _Shipped (2026-10-13): **Print Delivered Orders** — a new `/reports` card that prints
 every delivered order in a chosen date range as one A4 PDF, sorted by delivery number.
 Reuses the existing per-order export's table format (Qty/Item/Unit/Rate/Amount, gross

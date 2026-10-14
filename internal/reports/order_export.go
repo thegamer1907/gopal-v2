@@ -1,8 +1,12 @@
 package reports
 
 import (
+	"archive/zip"
 	_ "embed" // required by //go:embed even though we embed into []byte, not embed.FS
 	"fmt"
+	"math"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -62,56 +66,137 @@ const orderSheetName = "Order"
 // deductions is non-empty — one "Less"/"Add" line per custom-pack-size line followed by
 // a final net "Total" row.
 func WriteOrderExcel(path string, header OrderExportHeader, rows []OrderExportRow, deductions []OrderExportDeduction) error {
-	f := excelize.NewFile()
+	f, err := buildOrderExcel(header, rows, deductions)
+	if err != nil {
+		return err
+	}
 	defer f.Close()
 
+	if err := f.SaveAs(path); err != nil {
+		return fmt.Errorf("save %q: %w", path, err)
+	}
+	return nil
+}
+
+// buildOrderExcel lays out one order's workbook in memory, shared by WriteOrderExcel
+// (saves to a path) and WriteOrderExcelsZip (writes into a zip entry). The caller owns
+// closing the returned file.
+func buildOrderExcel(header OrderExportHeader, rows []OrderExportRow, deductions []OrderExportDeduction) (*excelize.File, error) {
+	f := excelize.NewFile()
+	ok := false
+	defer func() {
+		if !ok {
+			f.Close()
+		}
+	}()
+
 	if _, err := f.NewSheet(orderSheetName); err != nil {
-		return fmt.Errorf("create sheet: %w", err)
+		return nil, fmt.Errorf("create sheet: %w", err)
 	}
 	if err := f.DeleteSheet("Sheet1"); err != nil {
-		return fmt.Errorf("delete default sheet: %w", err)
+		return nil, fmt.Errorf("delete default sheet: %w", err)
 	}
 	idx, err := f.GetSheetIndex(orderSheetName)
 	if err != nil {
-		return fmt.Errorf("sheet index: %w", err)
+		return nil, fmt.Errorf("sheet index: %w", err)
 	}
 	f.SetActiveSheet(idx)
 
 	if err := writeOrderHeaderBar(f, header); err != nil {
-		return err
+		return nil, err
 	}
 	if err := writeOrderColumnHeaders(f); err != nil {
-		return err
+		return nil, err
 	}
 	totalsRow, err := writeOrderRows(f, rows)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	grossAmount, err := writeOrderTotals(f, rows, totalsRow)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(deductions) > 0 {
 		nextRow, err := writeOrderDeductions(f, deductions, totalsRow+1)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		var deductionTotal float64
 		for _, d := range deductions {
 			deductionTotal += d.Value
 		}
 		if err := writeOrderNetTotal(f, grossAmount-deductionTotal, nextRow); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if err := finishOrderLayout(f); err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := f.SaveAs(path); err != nil {
-		return fmt.Errorf("save %q: %w", path, err)
+	ok = true
+	return f, nil
+}
+
+// DeliveredOrderExcelEntry is one order's workbook for the zip export: the same
+// header/rows/deductions WriteOrderExcel takes, plus the member filename inside the zip
+// (built by the caller via orderExportFilename, so it matches single-order exports).
+type DeliveredOrderExcelEntry struct {
+	Filename   string                 `json:"filename"`
+	Header     OrderExportHeader      `json:"header"`
+	Rows       []OrderExportRow       `json:"rows"`
+	Deductions []OrderExportDeduction `json:"deductions"`
+}
+
+// WriteOrderExcelsZip writes one .xlsx per entry — each byte-for-byte what WriteOrderExcel
+// would produce — into a single zip at path. Duplicate filenames get " (2)", " (3)", …
+// before the extension so no member silently overwrites another.
+func WriteOrderExcelsZip(path string, entries []DeliveredOrderExcelEntry) (err error) {
+	out, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("create %q: %w", path, err)
+	}
+	defer func() {
+		if cerr := out.Close(); err == nil && cerr != nil {
+			err = fmt.Errorf("close %q: %w", path, cerr)
+		}
+	}()
+
+	zw := zip.NewWriter(out)
+	used := map[string]bool{}
+	for _, e := range entries {
+		name := uniqueZipName(e.Filename, used)
+		f, err := buildOrderExcel(e.Header, e.Rows, e.Deductions)
+		if err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		buf, err := f.WriteToBuffer()
+		f.Close()
+		if err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		w, err := zw.Create(name)
+		if err != nil {
+			return fmt.Errorf("zip entry %q: %w", name, err)
+		}
+		if _, err := w.Write(buf.Bytes()); err != nil {
+			return fmt.Errorf("zip entry %q: %w", name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return fmt.Errorf("write zip %q: %w", path, err)
 	}
 	return nil
+}
+
+func uniqueZipName(name string, used map[string]bool) string {
+	candidate := name
+	ext := filepath.Ext(name)
+	base := strings.TrimSuffix(name, ext)
+	for n := 2; used[strings.ToLower(candidate)]; n++ {
+		candidate = fmt.Sprintf("%s (%d)%s", base, n, ext)
+	}
+	used[strings.ToLower(candidate)] = true
+	return candidate
 }
 
 // orderCellStyle builds a style combining a black border on all four sides (this
@@ -440,7 +525,7 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 	pdf.SetStrokeColor(0, 0, 0)
 	pdf.SetLineWidth(0.75)
 
-	if _, err := drawOrderBlock(&pdf, pdfMarginPt, pdfMarginPt, "", header, rows, deductions, &headerYellow); err != nil {
+	if _, err := drawOrderBlock(&pdf, pdfColWidths, pdfMarginPt, pdfMarginPt, "", header, rows, deductions, &headerYellow); err != nil {
 		return err
 	}
 
@@ -458,12 +543,12 @@ func WriteOrderPDF(path string, header OrderExportHeader, rows []OrderExportRow,
 // plain (uncolored, border-only) table; WriteOrderPDF passes &headerYellow to keep its
 // output exactly as before this function existed. Returns the y position immediately
 // below the block, for the caller to continue from (e.g. the next order's title).
-func drawOrderBlock(pdf *gopdf.GoPdf, x0, y float64, title string, header OrderExportHeader, rows []OrderExportRow, deductions []OrderExportDeduction, accent *[3]uint8) (float64, error) {
+func drawOrderBlock(pdf *gopdf.GoPdf, cols []float64, x0, y float64, title string, header OrderExportHeader, rows []OrderExportRow, deductions []OrderExportDeduction, accent *[3]uint8) (float64, error) {
 	if title != "" {
 		if err := pdf.SetFont("Nunito", "B", pdfTitleFontSize); err != nil {
 			return 0, fmt.Errorf("set font: %w", err)
 		}
-		tableWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3] + pdfColWidths[4]
+		tableWidth := cols[0] + cols[1] + cols[2] + cols[3] + cols[4]
 		pdf.SetXY(x0, y)
 		if err := pdf.CellWithOption(&gopdf.Rect{W: tableWidth, H: pdfTitleHeight}, title, gopdf.CellOption{Align: gopdf.Left | gopdf.Middle, Border: 0}); err != nil {
 			return 0, err
@@ -471,12 +556,12 @@ func drawOrderBlock(pdf *gopdf.GoPdf, x0, y float64, title string, header OrderE
 		y += pdfTitleHeight
 	}
 
-	if err := drawOrderHeaderBar(pdf, x0, y, header.CustomerLabel, header.Date, accent); err != nil {
+	if err := drawOrderHeaderBar(pdf, cols, x0, y, header.CustomerLabel, header.Date, accent); err != nil {
 		return 0, err
 	}
 	y += pdfHeaderRowHeight
 
-	if err := drawOrderColumnHeaderRow(pdf, x0, y, accent); err != nil {
+	if err := drawOrderColumnHeaderRow(pdf, cols, x0, y, accent); err != nil {
 		return 0, err
 	}
 	y += pdfHeaderRowHeight
@@ -487,14 +572,14 @@ func drawOrderBlock(pdf *gopdf.GoPdf, x0, y float64, title string, header OrderE
 		if y+pdfRowHeight > gopdf.PageSizeA4.H-pdf.MarginBottom() {
 			pdf.AddPage()
 			y = pdf.MarginTop()
-			if err := drawOrderColumnHeaderRow(pdf, x0, y, accent); err != nil {
+			if err := drawOrderColumnHeaderRow(pdf, cols, x0, y, accent); err != nil {
 				return 0, err
 			}
 			y += pdfHeaderRowHeight
 		}
 		cells := []string{fmtOrderQty(r.Qty), r.ItemName, fmtOrderQty(r.PackSize), fmtOrderMoney(r.Rate), fmtOrderMoney(r.FinalAmount)}
 		for i, c := range cells {
-			if err := drawOrderCell(pdf, pdfColX(i, x0), y, pdfColWidths[i], pdfRowHeight, c, aligns[i], false, nil); err != nil {
+			if err := drawOrderCell(pdf, pdfColX(cols, i, x0), y, cols[i], pdfRowHeight, c, aligns[i], false, nil); err != nil {
 				return 0, err
 			}
 		}
@@ -507,7 +592,7 @@ func drawOrderBlock(pdf *gopdf.GoPdf, x0, y float64, title string, header OrderE
 		pdf.AddPage()
 		y = pdf.MarginTop()
 	}
-	if err := drawOrderTotalRow(pdf, x0, y, fmtOrderQty(totalQty), totalAmount, false, accent); err != nil {
+	if err := drawOrderTotalRow(pdf, cols, x0, y, fmtOrderQty(totalQty), totalAmount, false, accent); err != nil {
 		return 0, err
 	}
 	y += pdfRowHeight
@@ -519,16 +604,12 @@ func drawOrderBlock(pdf *gopdf.GoPdf, x0, y float64, title string, header OrderE
 				pdf.AddPage()
 				y = pdf.MarginTop()
 			}
-			verb, units, value := "Less", d.Units, d.Value
-			if units < 0 {
-				verb, units, value = "Add", -units, -value
-			}
-			label := fmt.Sprintf("%s: %s — %s", verb, fmtOrderQty(units), d.ItemName)
-			labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
+			label, value := deductionLabelAndValue(d)
+			labelWidth := cols[0] + cols[1] + cols[2] + cols[3]
 			if err := drawOrderCell(pdf, x0, y, labelWidth, pdfRowHeight, label, gopdf.Right, false, nil); err != nil {
 				return 0, err
 			}
-			if err := drawOrderCell(pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(value), gopdf.Right, false, nil); err != nil {
+			if err := drawOrderCell(pdf, pdfColX(cols, 4, x0), y, cols[4], pdfRowHeight, fmtOrderMoney(value), gopdf.Right, false, nil); err != nil {
 				return 0, err
 			}
 			deductionTotal += d.Value
@@ -539,13 +620,24 @@ func drawOrderBlock(pdf *gopdf.GoPdf, x0, y float64, title string, header OrderE
 			pdf.AddPage()
 			y = pdf.MarginTop()
 		}
-		if err := drawOrderTotalRow(pdf, x0, y, "", totalAmount-deductionTotal, true, accent); err != nil {
+		if err := drawOrderTotalRow(pdf, cols, x0, y, "", totalAmount-deductionTotal, true, accent); err != nil {
 			return 0, err
 		}
 		y += pdfRowHeight
 	}
 
 	return y, nil
+}
+
+// deductionLabelAndValue returns a deduction line's printed label ("Less: 5 — Item" or,
+// for a surplus, "Add: …") and its signed amount, shared by the drawing code and the
+// column-width measurement so the two can never disagree.
+func deductionLabelAndValue(d OrderExportDeduction) (string, float64) {
+	verb, units, value := "Less", d.Units, d.Value
+	if units < 0 {
+		verb, units, value = "Add", -units, -value
+	}
+	return fmt.Sprintf("%s: %s — %s", verb, fmtOrderQty(units), d.ItemName), value
 }
 
 // DeliveredOrdersPrintEntry is one order's data for the Print Delivered Orders report —
@@ -573,6 +665,61 @@ func estimateOrderBlockHeight(rows []OrderExportRow, deductions []OrderExportDed
 	return h
 }
 
+// fitDeliveredOrdersCols returns pdfColWidths with the Item column shrunk to the widest
+// text it must hold across every entry (item names and the "Item" header), so all tables
+// in one PDF share a single, narrower width. The merged customer/date header bar and the
+// merged "Less:/Add: …" deduction labels span other columns plus Item, so Item is never
+// narrower than what those need either. Fonts must already be loaded on pdf.
+func fitDeliveredOrdersCols(pdf *gopdf.GoPdf, entries []DeliveredOrdersPrintEntry) ([]float64, error) {
+	measure := func(style string, size float64, text string) (float64, error) {
+		if err := pdf.SetFont("Nunito", style, size); err != nil {
+			return 0, fmt.Errorf("set font: %w", err)
+		}
+		return pdf.MeasureTextWidth(text)
+	}
+
+	cols := append([]float64(nil), pdfColWidths...)
+	need, err := measure("B", pdfFontSize, "Item")
+	if err != nil {
+		return nil, err
+	}
+	// Merged spans, each needing text width + padding on both sides, minus the other
+	// columns they already cover; slack of 1pt keeps text off the border's anti-aliasing.
+	const slack = 1.0
+	headerNeed, deductionNeed := 0.0, 0.0
+	for _, e := range entries {
+		for _, r := range e.Rows {
+			w, err := measure("", pdfFontSize, r.ItemName)
+			if err != nil {
+				return nil, err
+			}
+			need = math.Max(need, w)
+		}
+		lw, err := measure("B", pdfHeaderFontSize, e.Header.CustomerLabel)
+		if err != nil {
+			return nil, err
+		}
+		dw, err := measure("B", pdfHeaderFontSize, e.Header.Date)
+		if err != nil {
+			return nil, err
+		}
+		headerNeed = math.Max(headerNeed, lw+dw+4*pdfCellPadX)
+		for _, d := range e.Deductions {
+			label, _ := deductionLabelAndValue(d)
+			w, err := measure("", pdfFontSize, label)
+			if err != nil {
+				return nil, err
+			}
+			deductionNeed = math.Max(deductionNeed, w+2*pdfCellPadX)
+		}
+	}
+	item := need + 2*pdfCellPadX + slack
+	item = math.Max(item, headerNeed-(cols[0]+cols[2]+cols[3]+cols[4]))
+	item = math.Max(item, deductionNeed-(cols[0]+cols[2]+cols[3]))
+	cols[1] = math.Min(math.Ceil(item), pdfColWidths[1]) // never wider than before
+	return cols, nil
+}
+
 // WriteDeliveredOrdersPDF writes every entry (already sorted by delivery number by the
 // caller) as a sequence of plain, center-aligned tables onto A4 pages — packing as many
 // as fit vertically per page, starting a new page before any table that wouldn't fully
@@ -598,7 +745,11 @@ func WriteDeliveredOrdersPDF(path string, entries []DeliveredOrdersPrintEntry) e
 	pdf.SetStrokeColor(0, 0, 0)
 	pdf.SetLineWidth(0.75)
 
-	tableWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3] + pdfColWidths[4]
+	cols, err := fitDeliveredOrdersCols(&pdf, entries)
+	if err != nil {
+		return err
+	}
+	tableWidth := cols[0] + cols[1] + cols[2] + cols[3] + cols[4]
 	x0 := (gopdf.PageSizeA4.W - tableWidth) / 2
 
 	y := pdf.MarginTop()
@@ -615,8 +766,8 @@ func WriteDeliveredOrdersPDF(path string, entries []DeliveredOrdersPrintEntry) e
 			y += gap
 		}
 
-		title := fmt.Sprintf("Order #%d", e.DeliveryNo)
-		newY, err := drawOrderBlock(&pdf, x0, y, title, e.Header, e.Rows, e.Deductions, nil)
+		title := fmt.Sprintf("#%d", e.DeliveryNo)
+		newY, err := drawOrderBlock(&pdf, cols, x0, y, title, e.Header, e.Rows, e.Deductions, nil)
 		if err != nil {
 			return err
 		}
@@ -634,31 +785,31 @@ func WriteDeliveredOrdersPDF(path string, entries []DeliveredOrdersPrintEntry) e
 // on its own and "Total" merges across the Item/Unit/Rate cells. When mergeQty is true
 // (the final net total, whose qty is already blank), "Total" merges across all four of
 // Qty/Item/Unit/Rate instead.
-func drawOrderTotalRow(pdf *gopdf.GoPdf, x0, y float64, qty string, amount float64, mergeQty bool, accent *[3]uint8) error {
+func drawOrderTotalRow(pdf *gopdf.GoPdf, cols []float64, x0, y float64, qty string, amount float64, mergeQty bool, accent *[3]uint8) error {
 	if mergeQty {
-		labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
-		if err := drawOrderCell(pdf, pdfColX(0, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, accent); err != nil {
+		labelWidth := cols[0] + cols[1] + cols[2] + cols[3]
+		if err := drawOrderCell(pdf, pdfColX(cols, 0, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, accent); err != nil {
 			return err
 		}
 	} else {
-		if err := drawOrderCell(pdf, pdfColX(0, x0), y, pdfColWidths[0], pdfRowHeight, qty, gopdf.Center, true, accent); err != nil {
+		if err := drawOrderCell(pdf, pdfColX(cols, 0, x0), y, cols[0], pdfRowHeight, qty, gopdf.Center, true, accent); err != nil {
 			return err
 		}
-		labelWidth := pdfColWidths[1] + pdfColWidths[2] + pdfColWidths[3]
-		if err := drawOrderCell(pdf, pdfColX(1, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, accent); err != nil {
+		labelWidth := cols[1] + cols[2] + cols[3]
+		if err := drawOrderCell(pdf, pdfColX(cols, 1, x0), y, labelWidth, pdfRowHeight, "Total", gopdf.Right, true, accent); err != nil {
 			return err
 		}
 	}
-	return drawOrderCell(pdf, pdfColX(4, x0), y, pdfColWidths[4], pdfRowHeight, fmtOrderMoney(amount), gopdf.Right, true, accent)
+	return drawOrderCell(pdf, pdfColX(cols, 4, x0), y, cols[4], pdfRowHeight, fmtOrderMoney(amount), gopdf.Right, true, accent)
 }
 
 // drawOrderHeaderBar draws the customer-label/date header as a single bordered rect (no
 // dividing line down the middle, unlike two separately-bordered cells) with the label
 // left-aligned and the date right-aligned inside it, at pdfHeaderFontSize. accent is nil
 // for a plain (border-only, unfilled) bar.
-func drawOrderHeaderBar(pdf *gopdf.GoPdf, x0, y float64, label, date string, accent *[3]uint8) error {
-	labelWidth := pdfColWidths[0] + pdfColWidths[1] + pdfColWidths[2]
-	totalWidth := labelWidth + pdfColWidths[3] + pdfColWidths[4]
+func drawOrderHeaderBar(pdf *gopdf.GoPdf, cols []float64, x0, y float64, label, date string, accent *[3]uint8) error {
+	labelWidth := cols[0] + cols[1] + cols[2]
+	totalWidth := labelWidth + cols[3] + cols[4]
 
 	style := "D"
 	if accent != nil {
@@ -678,11 +829,11 @@ func drawOrderHeaderBar(pdf *gopdf.GoPdf, x0, y float64, label, date string, acc
 	return pdf.CellWithOption(&gopdf.Rect{W: totalWidth - pdfCellPadX, H: pdfHeaderRowHeight}, date, gopdf.CellOption{Align: gopdf.Right | gopdf.Middle, Border: 0})
 }
 
-func drawOrderColumnHeaderRow(pdf *gopdf.GoPdf, x0, y float64, accent *[3]uint8) error {
+func drawOrderColumnHeaderRow(pdf *gopdf.GoPdf, cols []float64, x0, y float64, accent *[3]uint8) error {
 	headers := []string{"Qty", "Item", "Unit", "Rate", "Amount"}
 	aligns := []int{gopdf.Center, gopdf.Left, gopdf.Center, gopdf.Right, gopdf.Right}
 	for i, h := range headers {
-		if err := drawOrderCell(pdf, pdfColX(i, x0), y, pdfColWidths[i], pdfHeaderRowHeight, h, aligns[i], true, accent); err != nil {
+		if err := drawOrderCell(pdf, pdfColX(cols, i, x0), y, cols[i], pdfHeaderRowHeight, h, aligns[i], true, accent); err != nil {
 			return err
 		}
 	}
@@ -716,10 +867,10 @@ func drawOrderCell(pdf *gopdf.GoPdf, x, y, w, h float64, text string, align int,
 	return pdf.CellWithOption(&gopdf.Rect{W: w - 2*pdfCellPadX, H: h}, text, gopdf.CellOption{Align: align | gopdf.Middle, Border: 0})
 }
 
-func pdfColX(i int, startX float64) float64 {
+func pdfColX(cols []float64, i int, startX float64) float64 {
 	x := startX
 	for j := 0; j < i; j++ {
-		x += pdfColWidths[j]
+		x += cols[j]
 	}
 	return x
 }

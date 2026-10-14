@@ -6,6 +6,26 @@ reads the top entry first.
 
 ---
 
+## 2026-10-13 — Delivered orders: delivery-no. selection, Excel zip, PDF tweaks
+**Did:**
+- New shared `DeliveredOrderSelector` (By date | By delivery no.) + `DeliveryNoCombobox`
+  (type-or-pick, blank = open-ended, red error on unknown number / End < Start) and
+  `lib/deliveredOrders.ts` (selection logic, filename label). Used by Print Delivered
+  Orders and a new **Export Delivered Orders (Excel)** card.
+- Backend: `buildOrderExcel` split out of `WriteOrderExcel`; new `WriteOrderExcelsZip`
+  (+ `DeliveredOrderExcelEntry`, duplicate-name dedupe) and `App.ExportDeliveredOrdersExcelZip`;
+  bindings regenerated.
+- PDF: title `Order #N` → `#N`; Item column fitted per PDF (`fitDeliveredOrdersCols`);
+  column widths now threaded as a `cols` param (single-order PDF passes the old defaults).
+- Tests: `order_export_zip_test.go` (zip members/dedupe, fitted widths, PDF writes).
+  `go build/vet/test` and `npm run build` clean; PDF text verified with `pypdf`.
+- Not verified: no browser run of the new UI and no visual render of the PDF (no
+  `pdftoppm`), and the native Save dialog can't be driven by automation.
+
+**Next steps:** user to click through By delivery no. mode and both Download buttons.
+
+---
+
 ## 2026-10-13 — New report: Print Delivered Orders (A4 PDF, multiple orders per page)
 **Did:**
 - Client ask: a new `/reports` card — every delivered order in a date range, printed as

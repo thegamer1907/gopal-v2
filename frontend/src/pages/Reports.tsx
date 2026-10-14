@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from 'react';
-import {FileSpreadsheet, Package, ClipboardList, Calendar as CalendarIcon, Printer} from 'lucide-react';
+import {FileSpreadsheet, Package, ClipboardList, Calendar as CalendarIcon, Printer, Archive} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
 import {
     ListPurchaseBills,
@@ -9,6 +9,7 @@ import {
     ExportStockReport,
     ExportOrderReport,
     ExportDeliveredOrdersPDF,
+    ExportDeliveredOrdersExcelZip,
 } from '../../wailsjs/go/main/App';
 import {db, reports} from '../../wailsjs/go/models';
 import {Button, buttonVariants} from '@/components/ui/button';
@@ -18,9 +19,19 @@ import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {Calendar} from '@/components/ui/calendar';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {DateRangeFilter} from '@/components/DateRangeFilter';
+import {DeliveredOrderSelector} from '@/components/DeliveredOrderSelector';
+import {
+    deliveryNumbers,
+    emptySelection,
+    inDateRange,
+    selectDeliveredOrders,
+    selectionLabel,
+    selectionValid,
+    type DeliveredSelection,
+} from '@/lib/deliveredOrders';
 import {parseDate, formatDate, displayDate, todayDate} from '@/lib/date';
 import {calcLine, fmt} from '@/lib/purchaseBill';
-import {calcOrderLine, effectivePackSize, toOrderExportData} from '@/lib/salesOrder';
+import {calcOrderLine, effectivePackSize, orderExportFilename, toOrderExportData} from '@/lib/salesOrder';
 import {cn} from '@/lib/utils';
 
 // Reports (/reports) — a grid of downloadable reports, one Card per report. A future
@@ -33,16 +44,7 @@ import {cn} from '@/lib/utils';
 // @/lib/date's parseDate — purchase_bills.date/sales_orders.date are free-text strings,
 // never safely comparable in SQL (see docs/DECISIONS.md).
 
-function inRange(x: {date: string}, range: DateRange | undefined): boolean {
-    const from = range?.from;
-    const to = range?.to;
-    if (!from && !to) return true;
-    const d = parseDate(x.date);
-    if (!d) return false;
-    if (from && d < from) return false;
-    if (to && d > new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999)) return false;
-    return true;
-}
+const inRange = inDateRange;
 
 function toRows(bills: db.PurchaseBill[]): reports.PurchaseSummaryRow[] {
     const rows: reports.PurchaseSummaryRow[] = [];
@@ -210,13 +212,12 @@ function orderFilenameFor(range: DateRange | undefined, filter: DeliveryFilter):
 
 // --- Print Delivered Orders ---
 
-function deliveredOrdersFilenameFor(range: DateRange | undefined): string {
-    if (range?.from) {
-        const from = formatDate(range.from);
-        const to = range.to ? formatDate(range.to) : from;
-        return `Delivered Orders (${from} to ${to}).pdf`;
-    }
-    return `Delivered Orders (All).pdf`;
+function deliveredOrdersFilenameFor(sel: DeliveredSelection): string {
+    return `Delivered Orders (${selectionLabel(sel)}).pdf`;
+}
+
+function deliveredOrdersZipFilenameFor(sel: DeliveredSelection): string {
+    return `Delivered Orders Excel (${selectionLabel(sel)}).zip`;
 }
 
 export function Reports() {
@@ -317,17 +318,16 @@ export function Reports() {
     }
 
     // --- Print Delivered Orders state ---
-    const [printRange, setPrintRange] = useState<DateRange | undefined>(undefined);
+    const [printSel, setPrintSel] = useState<DeliveredSelection>(emptySelection);
     const [printBusy, setPrintBusy] = useState(false);
     const [printSaved, setPrintSaved] = useState('');
     const [printError, setPrintError] = useState('');
 
+    const deliveryNos = useMemo(() => deliveryNumbers(orders), [orders]);
+    const printValid = selectionValid(printSel, deliveryNos);
     const deliveredOrders = useMemo(
-        () =>
-            orders
-                .filter((o) => o.delivered && inRange(o, printRange))
-                .sort((a, b) => a.deliveryNo - b.deliveryNo),
-        [orders, printRange],
+        () => selectDeliveredOrders(orders, printSel, deliveryNos),
+        [orders, printSel, deliveryNos],
     );
     const printEntries = useMemo(
         () =>
@@ -343,12 +343,47 @@ export function Reports() {
         setPrintError('');
         setPrintBusy(true);
         try {
-            const path = await ExportDeliveredOrdersPDF(printEntries, deliveredOrdersFilenameFor(printRange));
+            const path = await ExportDeliveredOrdersPDF(printEntries, deliveredOrdersFilenameFor(printSel));
             if (path) setPrintSaved(`Saved to ${path}`);
         } catch (e: any) {
             setPrintError(String(e));
         } finally {
             setPrintBusy(false);
+        }
+    }
+
+    // --- Export Delivered Orders (Excel zip) state ---
+    const [zipSel, setZipSel] = useState<DeliveredSelection>(emptySelection);
+    const [zipBusy, setZipBusy] = useState(false);
+    const [zipSaved, setZipSaved] = useState('');
+    const [zipError, setZipError] = useState('');
+
+    const zipValid = selectionValid(zipSel, deliveryNos);
+    const zipOrders = useMemo(
+        () => selectDeliveredOrders(orders, zipSel, deliveryNos),
+        [orders, zipSel, deliveryNos],
+    );
+
+    async function downloadDeliveredZip() {
+        setZipSaved('');
+        setZipError('');
+        setZipBusy(true);
+        try {
+            const entries = zipOrders.map((o) => {
+                const {header, rows, deductions} = toOrderExportData(o);
+                return reports.DeliveredOrderExcelEntry.createFrom({
+                    filename: orderExportFilename(o, 'xlsx'),
+                    header,
+                    rows,
+                    deductions,
+                });
+            });
+            const path = await ExportDeliveredOrdersExcelZip(entries, deliveredOrdersZipFilenameFor(zipSel));
+            if (path) setZipSaved(`Saved to ${path}`);
+        } catch (e: any) {
+            setZipError(String(e));
+        } finally {
+            setZipBusy(false);
         }
     }
 
@@ -497,22 +532,54 @@ export function Reports() {
                         <CardDescription>Every delivered order, one printable table per order, as a single PDF.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <DateRangeFilter value={printRange} onChange={setPrintRange}/>
+                        <DeliveredOrderSelector value={printSel} onChange={setPrintSel} options={deliveryNos}/>
 
                         <p className="text-sm text-muted-foreground">
                             {loading
                                 ? 'Loading…'
-                                : deliveredOrders.length === 0
-                                  ? 'No delivered orders in this range.'
+                                : !printValid
+                                  ? 'Fix the delivery numbers above.'
+                                  : deliveredOrders.length === 0
+                                    ? 'No delivered orders match.'
                                   : `${deliveredOrders.length} order${deliveredOrders.length === 1 ? '' : 's'} ready to print`}
                         </p>
 
-                        <Button onClick={downloadDeliveredOrders} disabled={printBusy || loading || deliveredOrders.length === 0}>
+                        <Button onClick={downloadDeliveredOrders} disabled={printBusy || loading || !printValid || deliveredOrders.length === 0}>
                             {printBusy ? 'Preparing…' : 'Download PDF'}
                         </Button>
 
                         {printSaved && <p className="text-sm text-emerald-600">{printSaved}</p>}
                         {printError && <p className="text-sm text-destructive">{printError}</p>}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center gap-2">
+                            <Archive className="size-5 text-muted-foreground"/>
+                            <CardTitle>Export Delivered Orders (Excel)</CardTitle>
+                        </div>
+                        <CardDescription>One Excel file per delivered order, bundled into a single zip.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <DeliveredOrderSelector value={zipSel} onChange={setZipSel} options={deliveryNos}/>
+
+                        <p className="text-sm text-muted-foreground">
+                            {loading
+                                ? 'Loading…'
+                                : !zipValid
+                                  ? 'Fix the delivery numbers above.'
+                                  : zipOrders.length === 0
+                                    ? 'No delivered orders match.'
+                                    : `${zipOrders.length} Excel file${zipOrders.length === 1 ? '' : 's'} ready to export`}
+                        </p>
+
+                        <Button onClick={downloadDeliveredZip} disabled={zipBusy || loading || !zipValid || zipOrders.length === 0}>
+                            {zipBusy ? 'Preparing…' : 'Download ZIP'}
+                        </Button>
+
+                        {zipSaved && <p className="text-sm text-emerald-600">{zipSaved}</p>}
+                        {zipError && <p className="text-sm text-destructive">{zipError}</p>}
                     </CardContent>
                 </Card>
             </div>
