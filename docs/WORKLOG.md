@@ -6,6 +6,20 @@ reads the top entry first.
 
 ---
 
+## 2026-10-14 — Reports page → expanding list rows
+**Did:** client dislikes the card grid. Offered 3 layouts; user chose expanding rows.
+`Reports.tsx`: local `ReportRow`, `openId` state, Card bodies moved verbatim (no logic
+changes). `tsc` clean. Verified live in `wails dev`: 5 collapsed rows on load, one-open-at-
+a-time, every panel's preview counts match the old cards (229 lines/28 bills; 92 items;
+39 lines/30 orders; 2; 2), Download buttons enabled, Order Report filter ("Delivered only")
+survives collapse/reopen. Not verified: native Save dialogs/downloads (manual), keyboard
+Enter/Space (native button, not driven). Not committed.
+
+**Next steps:** user to eyeball the new layout; commit/tag when asked (the Rate History
+fix is committed locally as cbc80d1 but not pushed or released).
+
+---
+
 ## 2026-10-14 — Rate History dialog scrolling
 **Did:** dialog had no max height, so long histories ran off-screen. Capped at 85vh with a
 scrolling, sticky-header table (`RateHistoryDialog.tsx`, `ui/table.tsx` `containerClassName`).

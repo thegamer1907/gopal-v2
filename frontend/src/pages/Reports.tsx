@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
-import {FileSpreadsheet, Package, ClipboardList, Calendar as CalendarIcon, Printer, Archive} from 'lucide-react';
+import type {ReactNode} from 'react';
+import {FileSpreadsheet, Package, ClipboardList, Calendar as CalendarIcon, Printer, Archive, ChevronRight} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
 import {
     ListPurchaseBills,
@@ -13,7 +14,6 @@ import {
 } from '../../wailsjs/go/main/App';
 import {db, reports} from '../../wailsjs/go/models';
 import {Button, buttonVariants} from '@/components/ui/button';
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {Calendar} from '@/components/ui/calendar';
@@ -34,8 +34,9 @@ import {calcLine, fmt} from '@/lib/purchaseBill';
 import {calcOrderLine, effectivePackSize, orderExportFilename, toOrderExportData} from '@/lib/salesOrder';
 import {cn} from '@/lib/utils';
 
-// Reports (/reports) — a grid of downloadable reports, one Card per report. A future
-// report is just another card. See docs/UI.md.
+// Reports (/reports) — a list of downloadable reports, one row per report; clicking a row
+// expands its options inline (one open at a time). A future report is just another
+// ReportRow. See docs/UI.md.
 //
 // Report math is never re-derived here: every row is built from the same calcLine/
 // calcOrderLine formulas the Add/View Bill and Add/View Order screens use, then handed
@@ -244,7 +245,38 @@ function deliveredOrdersZipFilenameFor(sel: DeliveredSelection): string {
     return `Delivered Orders Excel (${selectionLabel(sel)}).zip`;
 }
 
+// One report line: a full-width button (icon, title, description, chevron) that reveals
+// the report's options beneath it. Native <button>, not a Radix asChild trigger (React-18
+// ref footgun — see CLAUDE.md).
+function ReportRow({icon, title, description, open, onToggle, children}: {
+    icon: ReactNode;
+    title: string;
+    description: string;
+    open: boolean;
+    onToggle: () => void;
+    children: ReactNode;
+}) {
+    return (
+        <div>
+            <button
+                type="button"
+                aria-expanded={open}
+                onClick={onToggle}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+            >
+                {icon}
+                <span className="font-medium">{title}</span>
+                <span className="hidden truncate text-sm text-muted-foreground sm:inline">{description}</span>
+                <ChevronRight className={cn('ml-auto size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')}/>
+            </button>
+            {open && <div className="space-y-4 border-t bg-muted/30 px-4 py-4">{children}</div>}
+        </div>
+    );
+}
+
 export function Reports() {
+    const [openId, setOpenId] = useState<string | null>(null);
+    const toggle = (id: string) => setOpenId((cur) => (cur === id ? null : id));
     const [bills, setBills] = useState<db.PurchaseBill[]>([]);
     const [items, setItems] = useState<db.Item[]>([]);
     const [orders, setOrders] = useState<db.SalesOrder[]>([]);
@@ -416,196 +448,181 @@ export function Reports() {
 
             {loadError && <p className="text-sm text-destructive">{loadError}</p>}
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <FileSpreadsheet className="size-5 text-muted-foreground"/>
-                            <CardTitle>Purchase Summary</CardTitle>
-                        </div>
-                        <CardDescription>Every purchase bill line, with GST and totals.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <DateRangeFilter value={range} onChange={setRange}/>
+            <div className="divide-y overflow-hidden rounded-lg border">
+                <ReportRow
+                    icon={<FileSpreadsheet className="size-5 text-muted-foreground"/>}
+                    title="Purchase Summary"
+                    description="Every purchase bill line, with GST and totals."
+                    open={openId === 'purchase'}
+                    onToggle={() => toggle('purchase')}
+                >
+                    <DateRangeFilter value={range} onChange={setRange}/>
 
-                        <p className="text-sm text-muted-foreground">
-                            {loading
-                                ? 'Loading…'
-                                : rows.length === 0
-                                  ? 'No purchase bills in this range.'
-                                  : `${rows.length} line${rows.length === 1 ? '' : 's'} across ${filteredBills.length} bill${filteredBills.length === 1 ? '' : 's'} · ${fmt(totalValue)}`}
-                        </p>
+                    <p className="text-sm text-muted-foreground">
+                        {loading
+                            ? 'Loading…'
+                            : rows.length === 0
+                              ? 'No purchase bills in this range.'
+                              : `${rows.length} line${rows.length === 1 ? '' : 's'} across ${filteredBills.length} bill${filteredBills.length === 1 ? '' : 's'} · ${fmt(totalValue)}`}
+                    </p>
 
-                        <Button onClick={download} disabled={busy || loading || rows.length === 0}>
-                            {busy ? 'Preparing…' : 'Download Excel'}
-                        </Button>
+                    <Button onClick={download} disabled={busy || loading || rows.length === 0}>
+                        {busy ? 'Preparing…' : 'Download Excel'}
+                    </Button>
 
-                        {saved && <p className="text-sm text-emerald-600">{saved}</p>}
-                        {error && <p className="text-sm text-destructive">{error}</p>}
-                    </CardContent>
-                </Card>
+                    {saved && <p className="text-sm text-emerald-600">{saved}</p>}
+                    {error && <p className="text-sm text-destructive">{error}</p>}
+                </ReportRow>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Package className="size-5 text-muted-foreground"/>
-                            <CardTitle>Stock Report</CardTitle>
-                        </div>
-                        <CardDescription>Every item's stock as of a chosen date.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="relative w-[180px]">
-                            <Input
-                                aria-label="As of date"
-                                placeholder="dd-mmm-yy"
-                                autoComplete="off"
-                                className="pr-9"
-                                value={asOfDate}
-                                onChange={(e) => setAsOfDate(e.target.value)}
-                            />
-                            <Popover open={asOfOpen} onOpenChange={setAsOfOpen}>
-                                <PopoverTrigger
-                                    type="button"
-                                    aria-label="Pick a date"
-                                    className={cn(
-                                        buttonVariants({variant: 'ghost', size: 'icon'}),
-                                        'absolute right-1 top-1 size-7 text-muted-foreground',
-                                    )}
-                                >
-                                    <CalendarIcon className="size-4"/>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="end">
-                                    <Calendar
-                                        mode="single"
-                                        selected={parsedAsOf}
-                                        defaultMonth={parsedAsOf}
-                                        onSelect={(d) => {
-                                            if (d) {
-                                                setAsOfDate(formatDate(d));
-                                                setAsOfOpen(false);
-                                            }
-                                        }}
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
+                <ReportRow
+                    icon={<Package className="size-5 text-muted-foreground"/>}
+                    title="Stock Report"
+                    description="Every item's stock as of a chosen date."
+                    open={openId === 'stock'}
+                    onToggle={() => toggle('stock')}
+                >
+                    <div className="relative w-[180px]">
+                        <Input
+                            aria-label="As of date"
+                            placeholder="dd-mmm-yy"
+                            autoComplete="off"
+                            className="pr-9"
+                            value={asOfDate}
+                            onChange={(e) => setAsOfDate(e.target.value)}
+                        />
+                        <Popover open={asOfOpen} onOpenChange={setAsOfOpen}>
+                            <PopoverTrigger
+                                type="button"
+                                aria-label="Pick a date"
+                                className={cn(
+                                    buttonVariants({variant: 'ghost', size: 'icon'}),
+                                    'absolute right-1 top-1 size-7 text-muted-foreground',
+                                )}
+                            >
+                                <CalendarIcon className="size-4"/>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                    mode="single"
+                                    selected={parsedAsOf}
+                                    defaultMonth={parsedAsOf}
+                                    onSelect={(d) => {
+                                        if (d) {
+                                            setAsOfDate(formatDate(d));
+                                            setAsOfOpen(false);
+                                        }
+                                    }}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
 
-                        <p className="text-sm text-muted-foreground">
-                            {loading
-                                ? 'Loading…'
-                                : !parsedAsOf
-                                  ? 'Enter a valid date.'
-                                  : `${stockRows.length} item${stockRows.length === 1 ? '' : 's'} · stock as of ${asOfDate}`}
-                        </p>
+                    <p className="text-sm text-muted-foreground">
+                        {loading
+                            ? 'Loading…'
+                            : !parsedAsOf
+                              ? 'Enter a valid date.'
+                              : `${stockRows.length} item${stockRows.length === 1 ? '' : 's'} · stock as of ${asOfDate}`}
+                    </p>
 
-                        <Button onClick={downloadStock} disabled={stockBusy || loading || !parsedAsOf || stockRows.length === 0}>
-                            {stockBusy ? 'Preparing…' : 'Download Excel'}
-                        </Button>
+                    <Button onClick={downloadStock} disabled={stockBusy || loading || !parsedAsOf || stockRows.length === 0}>
+                        {stockBusy ? 'Preparing…' : 'Download Excel'}
+                    </Button>
 
-                        {stockSaved && <p className="text-sm text-emerald-600">{stockSaved}</p>}
-                        {stockError && <p className="text-sm text-destructive">{stockError}</p>}
-                    </CardContent>
-                </Card>
+                    {stockSaved && <p className="text-sm text-emerald-600">{stockSaved}</p>}
+                    {stockError && <p className="text-sm text-destructive">{stockError}</p>}
+                </ReportRow>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <ClipboardList className="size-5 text-muted-foreground"/>
-                            <CardTitle>Order Report</CardTitle>
-                        </div>
-                        <CardDescription>Every sales order line, filterable by delivery status.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Select value={deliveryFilter} onValueChange={(v) => setDeliveryFilter(v as DeliveryFilter)}>
-                                <SelectTrigger size="sm" className="w-[150px]">
-                                    <SelectValue/>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All orders</SelectItem>
-                                    <SelectItem value="delivered">Delivered only</SelectItem>
-                                    <SelectItem value="pending">Pending only</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <DateRangeFilter value={orderRange} onChange={setOrderRange}/>
-                        </div>
+                <ReportRow
+                    icon={<ClipboardList className="size-5 text-muted-foreground"/>}
+                    title="Order Report"
+                    description="Every sales order line, filterable by delivery status."
+                    open={openId === 'orders'}
+                    onToggle={() => toggle('orders')}
+                >
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Select value={deliveryFilter} onValueChange={(v) => setDeliveryFilter(v as DeliveryFilter)}>
+                            <SelectTrigger size="sm" className="w-[150px]">
+                                <SelectValue/>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All orders</SelectItem>
+                                <SelectItem value="delivered">Delivered only</SelectItem>
+                                <SelectItem value="pending">Pending only</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <DateRangeFilter value={orderRange} onChange={setOrderRange}/>
+                    </div>
 
-                        <p className="text-sm text-muted-foreground">
-                            {loading
-                                ? 'Loading…'
-                                : orderRows.length === 0
-                                  ? 'No orders match this filter.'
-                                  : `${orderRows.length} line${orderRows.length === 1 ? '' : 's'} across ${filteredOrders.length} order${filteredOrders.length === 1 ? '' : 's'} · ${fmt(orderTotalValue)}`}
-                        </p>
+                    <p className="text-sm text-muted-foreground">
+                        {loading
+                            ? 'Loading…'
+                            : orderRows.length === 0
+                              ? 'No orders match this filter.'
+                              : `${orderRows.length} line${orderRows.length === 1 ? '' : 's'} across ${filteredOrders.length} order${filteredOrders.length === 1 ? '' : 's'} · ${fmt(orderTotalValue)}`}
+                    </p>
 
-                        <Button onClick={downloadOrderReport} disabled={orderBusy || loading || orderRows.length === 0}>
-                            {orderBusy ? 'Preparing…' : 'Download Excel'}
-                        </Button>
+                    <Button onClick={downloadOrderReport} disabled={orderBusy || loading || orderRows.length === 0}>
+                        {orderBusy ? 'Preparing…' : 'Download Excel'}
+                    </Button>
 
-                        {orderSaved && <p className="text-sm text-emerald-600">{orderSaved}</p>}
-                        {orderError && <p className="text-sm text-destructive">{orderError}</p>}
-                    </CardContent>
-                </Card>
+                    {orderSaved && <p className="text-sm text-emerald-600">{orderSaved}</p>}
+                    {orderError && <p className="text-sm text-destructive">{orderError}</p>}
+                </ReportRow>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Printer className="size-5 text-muted-foreground"/>
-                            <CardTitle>Print Delivered Orders</CardTitle>
-                        </div>
-                        <CardDescription>Every delivered order, one printable table per order, as a single PDF.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <DeliveredOrderSelector value={printSel} onChange={setPrintSel} options={deliveryNos}/>
+                <ReportRow
+                    icon={<Printer className="size-5 text-muted-foreground"/>}
+                    title="Print Delivered Orders"
+                    description="Every delivered order, one printable table per order, as a single PDF."
+                    open={openId === 'print'}
+                    onToggle={() => toggle('print')}
+                >
+                    <DeliveredOrderSelector value={printSel} onChange={setPrintSel} options={deliveryNos}/>
 
-                        <p className="text-sm text-muted-foreground">
-                            {loading
-                                ? 'Loading…'
-                                : !printValid
-                                  ? 'Fix the delivery numbers above.'
-                                  : deliveredOrders.length === 0
-                                    ? 'No delivered orders match.'
-                                  : `${deliveredOrders.length} order${deliveredOrders.length === 1 ? '' : 's'} ready to print`}
-                        </p>
+                    <p className="text-sm text-muted-foreground">
+                        {loading
+                            ? 'Loading…'
+                            : !printValid
+                              ? 'Fix the delivery numbers above.'
+                              : deliveredOrders.length === 0
+                                ? 'No delivered orders match.'
+                              : `${deliveredOrders.length} order${deliveredOrders.length === 1 ? '' : 's'} ready to print`}
+                    </p>
 
-                        <Button onClick={downloadDeliveredOrders} disabled={printBusy || loading || !printValid || deliveredOrders.length === 0}>
-                            {printBusy ? 'Preparing…' : 'Download PDF'}
-                        </Button>
+                    <Button onClick={downloadDeliveredOrders} disabled={printBusy || loading || !printValid || deliveredOrders.length === 0}>
+                        {printBusy ? 'Preparing…' : 'Download PDF'}
+                    </Button>
 
-                        {printSaved && <p className="text-sm text-emerald-600">{printSaved}</p>}
-                        {printError && <p className="text-sm text-destructive">{printError}</p>}
-                    </CardContent>
-                </Card>
+                    {printSaved && <p className="text-sm text-emerald-600">{printSaved}</p>}
+                    {printError && <p className="text-sm text-destructive">{printError}</p>}
+                </ReportRow>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Archive className="size-5 text-muted-foreground"/>
-                            <CardTitle>Export Delivered Orders (Excel)</CardTitle>
-                        </div>
-                        <CardDescription>One Excel file per delivered order, bundled into a single zip.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <DeliveredOrderSelector value={zipSel} onChange={setZipSel} options={deliveryNos}/>
+                <ReportRow
+                    icon={<Archive className="size-5 text-muted-foreground"/>}
+                    title="Export Delivered Orders (Excel)"
+                    description="One Excel file per delivered order, bundled into a single zip."
+                    open={openId === 'zip'}
+                    onToggle={() => toggle('zip')}
+                >
+                    <DeliveredOrderSelector value={zipSel} onChange={setZipSel} options={deliveryNos}/>
 
-                        <p className="text-sm text-muted-foreground">
-                            {loading
-                                ? 'Loading…'
-                                : !zipValid
-                                  ? 'Fix the delivery numbers above.'
-                                  : zipOrders.length === 0
-                                    ? 'No delivered orders match.'
-                                    : `${zipOrders.length} Excel file${zipOrders.length === 1 ? '' : 's'} ready to export`}
-                        </p>
+                    <p className="text-sm text-muted-foreground">
+                        {loading
+                            ? 'Loading…'
+                            : !zipValid
+                              ? 'Fix the delivery numbers above.'
+                              : zipOrders.length === 0
+                                ? 'No delivered orders match.'
+                                : `${zipOrders.length} Excel file${zipOrders.length === 1 ? '' : 's'} ready to export`}
+                    </p>
 
-                        <Button onClick={downloadDeliveredZip} disabled={zipBusy || loading || !zipValid || zipOrders.length === 0}>
-                            {zipBusy ? 'Preparing…' : 'Download ZIP'}
-                        </Button>
+                    <Button onClick={downloadDeliveredZip} disabled={zipBusy || loading || !zipValid || zipOrders.length === 0}>
+                        {zipBusy ? 'Preparing…' : 'Download ZIP'}
+                    </Button>
 
-                        {zipSaved && <p className="text-sm text-emerald-600">{zipSaved}</p>}
-                        {zipError && <p className="text-sm text-destructive">{zipError}</p>}
-                    </CardContent>
-                </Card>
+                    {zipSaved && <p className="text-sm text-emerald-600">{zipSaved}</p>}
+                    {zipError && <p className="text-sm text-destructive">{zipError}</p>}
+                </ReportRow>
             </div>
         </div>
     );

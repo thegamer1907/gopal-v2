@@ -367,11 +367,17 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   instead of `UpdateCustomer`) — same 9-field form and Name+City requirement either way.
 
 ### Reports (`/reports`) — top-nav "Reports"
-- `src/pages/Reports.tsx`. A **card grid** (`grid gap-4 sm:grid-cols-2 lg:grid-cols-3`) — one
-  `Card` per downloadable report: Purchase Summary, Stock Report, Order Report, Print
-  Delivered Orders. A future report is just another card, no layout rework needed. All
-  four share one `useEffect` on mount (`ListPurchaseBills`/`ListItems`/`ListSalesOrders`,
-  loaded once) but keep separate `busy`/`saved`/`error` state per card.
+- `src/pages/Reports.tsx`. An **expanding-row list** (2026-10-14; replaced the earlier card
+  grid at the client's request) — one line per report inside a single `divide-y rounded-lg
+  border` container: icon + title + short description + chevron. Clicking a row expands that
+  report's options inline beneath it (**one open at a time**; all collapsed on load; click
+  again to collapse). The row is a native `<button aria-expanded>` (local `ReportRow`
+  component, not Radix `asChild`). Reports: Purchase Summary, Stock Report, Order Report,
+  Print Delivered Orders, Export Delivered Orders (Excel). A future report is just another
+  `ReportRow`. All share one `useEffect` on mount (`ListPurchaseBills`/`ListItems`/
+  `ListSalesOrders`, loaded once) but keep separate `busy`/`saved`/`error` state per report
+  — held in `Reports()`, so filters/messages survive collapsing and reopening a row.
+  (Below, "card" = that report's expanded options panel.)
 - **Purchase Summary card:** icon + title/description, a **`DateRangeFilter`** (empty = "all
   bills", same semantics as the View/Edit Bills filter — no separate "download all" toggle), a
   live preview line ("N lines across M bills · ₹total", recomputed as the range changes), and a

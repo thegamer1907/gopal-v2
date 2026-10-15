@@ -316,6 +316,14 @@ have to re-litigate.
   (single-purpose page, list+detail panel) were considered for the Reports page and rejected in
   favor of the card grid for extensibility.
 
+### 2026-10-14 — Reports page: expanding list rows instead of cards
+- **Decision:** replace the card grid with a one-line-per-report list; clicking a row
+  expands its options inline (one open at a time). Local `ReportRow` with a native button.
+- **Why:** client feedback — he dislikes the card UI and wants "click the report line to
+  get its options". Pure presentation change; report logic/state untouched.
+- **Alternatives rejected:** left list + right detail panel (more layout work, little gain
+  at this report count); rows that open a dialog (extra click/popup per report).
+
 ### 2026-10-14 — Self-update relaunch must wait for the old process (single-instance lock)
 - **Decision:** the updater now starts the new exe with `--relaunch`; `main()` sleeps 3s
   before `wails.Run` when it sees that flag. Download also uses a 10-min `http.Client`

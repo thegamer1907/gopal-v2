@@ -7,6 +7,8 @@ spec (what it does, key behaviors). Move items between sections as work progress
 ---
 
 ## Shipped
+
+_Built (2026-10-14, uncommitted): **Reports page as an expanding list** — one line per report, click to expand its options inline (one open at a time), replacing the card grid per client feedback. See UI.md / DECISIONS.md._
 _Shipped (2026-10-13): **Stock Report: more columns.** "Stock" is renamed **Quantity**, and
 five columns are added — GST %, Final Rate, Billing Rate, P&L, GST Value — giving Company ·
 Item · Pack Size · HSN · GST % · Quantity · Final Rate · Billing Rate · P&L · GST Value.
