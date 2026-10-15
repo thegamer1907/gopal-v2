@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -516,7 +517,10 @@ func (a *App) DownloadAndInstallUpdate(downloadURL, checksumHex string) error {
 		return fmt.Errorf("updates are only supported on Windows builds")
 	}
 
-	resp, err := http.Get(downloadURL)
+	// Bounded so a stalled connection surfaces as an error instead of an endless
+	// "Downloading…" spinner.
+	client := &http.Client{Timeout: 10 * time.Minute}
+	resp, err := client.Get(downloadURL)
 	if err != nil {
 		return fmt.Errorf("download update: %w", err)
 	}
@@ -540,7 +544,10 @@ func (a *App) DownloadAndInstallUpdate(downloadURL, checksumHex string) error {
 		return err
 	}
 
-	if err := exec.Command(exePath).Start(); err != nil {
+	// The relaunch flag makes the new process wait for this one to exit before it
+	// claims the single-instance lock (see main.go) — otherwise it would see us still
+	// running, hand off to us and exit, and we'd then Quit: the app vanishes.
+	if err := exec.Command(exePath, relaunchFlag).Start(); err != nil {
 		return fmt.Errorf("update installed, but failed to relaunch automatically — please start the app again: %w", err)
 	}
 	wruntime.Quit(a.ctx)

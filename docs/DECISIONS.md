@@ -316,6 +316,17 @@ have to re-litigate.
   (single-purpose page, list+detail panel) were considered for the Reports page and rejected in
   favor of the card grid for extensibility.
 
+### 2026-10-14 — Self-update relaunch must wait for the old process (single-instance lock)
+- **Decision:** the updater now starts the new exe with `--relaunch`; `main()` sleeps 3s
+  before `wails.Run` when it sees that flag. Download also uses a 10-min `http.Client`
+  timeout instead of `http.Get`.
+- **Why:** `SingleInstanceLock` was added after the updater. The old process relaunched the
+  exe *then* quit, so the new one saw the old still running, forwarded to it and exited —
+  and the old then quit: the client saw the app hang on "Downloading and installing…" and
+  close/never come back. Found by code reading; **not reproduced** (Windows-only path).
+- **Alternatives:** a detached `cmd /c ping … & start` helper (needs Windows-only
+  SysProcAttr build tags); a fixed sleep is simpler and portable.
+
 ### 2026-09-20 — In-app self-update: minio/selfupdate, ldflags version, checksum-verified
 - **Decision:** Add a manual **"Check for Updates"** button (Settings → Updates), not a
   background/startup auto-check — the app ships as a single portable `.exe` (no

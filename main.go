@@ -2,6 +2,8 @@ package main
 
 import (
 	"embed"
+	"os"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -18,7 +20,20 @@ var assets embed.FS
 // never report an update as available (see internal/updater).
 var version = "dev"
 
+// relaunchFlag is passed by the self-updater to the new process it starts (app.go).
+const relaunchFlag = "--relaunch"
+
 func main() {
+	// Started by the updater while the old process is still shutting down: give it time
+	// to exit and release the single-instance lock, or this process would defer to it
+	// and quit, leaving no app running.
+	for _, arg := range os.Args[1:] {
+		if arg == relaunchFlag {
+			time.Sleep(3 * time.Second)
+			break
+		}
+	}
+
 	// Create an instance of the app structure
 	app := NewApp()
 

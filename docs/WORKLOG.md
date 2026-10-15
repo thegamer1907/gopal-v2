@@ -6,6 +6,18 @@ reads the top entry first.
 
 ---
 
+## 2026-10-14 — Self-update hang: relaunch vs single-instance lock
+**Did:** reviewed the update path. Root cause (by reading, not reproduced): relaunch raced
+the `SingleInstanceLock`. Fix: `--relaunch` flag + 3s wait in `main.go`, 10-min download
+timeout in `app.go` (see DECISIONS). Builds/vets clean. Not exercised in the app — Windows
+only. Nothing committed.
+
+**Next steps:** cut a release, but note clients already on the *old* build run the old
+updater code, so their update to this version may still hang — they may need one manual
+download of the new exe; later updates should then work. Then verify on Windows.
+
+---
+
 ## 2026-10-13 — Stock Report: Quantity + GST %, rates, P&L, GST Value
 **Did:**
 - Renamed Stock → Quantity; added GST %, Final Rate, Billing Rate, P&L, GST Value (order:
