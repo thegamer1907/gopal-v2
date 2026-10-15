@@ -245,7 +245,7 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
   highlighted. Launches **maximised**; **Logout** quits (confirm). Routing via
   `react-router-dom` (`HashRouter`). (Replaced the original collapsible left sidebar per
   client feedback.)
-- **Dashboard (placeholder)** — landing page; centered "Hare Krishna". Real content TBD.
+- **Dashboard** — landing page: "Hare Krishna" greeting + a **"Customers who haven't ordered lately"** card (built 2026-10-14, uncommitted): each customer's latest order, oldest first, top 10 — name, last-order date, days ago, order value; a row opens that order (`/orders/:id`). Other KPIs still TBD.
 - **Company master** — `companies` (surrogate `id` PK + unique `name`). Companies page under
   *Masters*; picked/created inline on the bill via `CompanyCombobox` + `NewCompanyDialog`.
 - **Item master (company-scoped)** — `items` has `id` PK + **`company_id` FK**, unique
@@ -279,7 +279,7 @@ items-belong-to-company, View/Edit Bills (edit/delete), Settings/DB management, 
 _None._
 
 ## Planned
-- **Dashboard content** — decide the real KPIs / lists.
+- **Dashboard content** — more KPIs / lists beyond the lapsed-customers card.
 - **As-billed snapshots** — optionally store GST%/name on the bill line so historical bills
   don't shift when the master changes.
 - **Auto-check for updates on launch** — a silent background check (today's Check for

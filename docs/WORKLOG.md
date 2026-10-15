@@ -6,6 +6,31 @@ reads the top entry first.
 
 ---
 
+## 2026-10-14 — Dashboard rows: only the last was clickable (WebKit)
+**Did:** client report — only row 3 clickable. Cause: stretched-`::after` link on `<tr>`
+(WebKit ignores `position:relative` on rows → overlays all covered the table). Replaced with
+row `onClick` navigate + normal `<Link>` (see UI.md). Verified in Chrome that each row's
+cell click opens its own order and the link adds one history entry. **Not verified in the
+desktop webview itself** — the original bug is WebKit-only, so the user should re-check there.
+Not committed.
+
+---
+
+## 2026-10-14 — Dashboard: customers who haven't ordered lately
+**Did:** new Dashboard card (see DECISIONS). Order detail made routable (`/orders/:id`);
+`finalAmountOf`/`lineCalc` moved to `lib/salesOrder.ts`; new `lib/lapsedCustomers.ts`. `tsc`
+clean. Verified live in `wails dev`: card rows (3 customers) match an independent
+recompute from raw orders (date, days, value, order id); row click → `#/orders/5` detail
+with the same total; Back → list; list row click, delivered-order deep link (#3), edit and
+new routes still work; unknown id → list. Not tested: only 3 customers in dev DB so the
+top-10 cut-off and tie-breaking weren't exercised; browser Back from detail to Dashboard
+not driven. Not committed.
+
+**Next steps:** user review; commit, push (also `cbc80d1`, `8303364`) and tag next release
+when asked.
+
+---
+
 ## 2026-10-14 — Reports page → expanding list rows
 **Did:** client dislikes the card grid. Offered 3 layouts; user chose expanding rows.
 `Reports.tsx`: local `ReportRow`, `openId` state, Card bodies moved verbatim (no logic

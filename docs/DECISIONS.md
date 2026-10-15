@@ -316,6 +316,17 @@ have to re-litigate.
   (single-purpose page, list+detail panel) were considered for the Reports page and rejected in
   favor of the card grid for extensibility.
 
+### 2026-10-14 — Dashboard: lapsed-customers card; order detail becomes a route
+- **Decision:** Dashboard shows each customer's latest order, oldest first, **top 10, no
+  day cut-off** ("for now"); name, date, days ago, value; row → order detail. Customers with
+  no orders are omitted (no order to show/link). Value is the ex-GST Final Amount, same as
+  View/Edit Orders (`finalAmountOf` moved to `lib/salesOrder.ts`, shared). "Days" = whole
+  calendar days from today's date to the order's date.
+- **Order detail is now routable** (`/orders/:id`; SavedOrders reads `useParams`) — it was
+  local state, which a dashboard link couldn't target. Frontend-only; no Go/schema change.
+- **Open for the client:** a cut-off (e.g. only ≥30 days) and whether pending orders should
+  count as "ordered" were assumed (yes, all orders count).
+
 ### 2026-10-14 — Reports page: expanding list rows instead of cards
 - **Decision:** replace the card grid with a one-line-per-report list; clicking a row
   expands its options inline (one open at a time). Local `ReportRow` with a native button.

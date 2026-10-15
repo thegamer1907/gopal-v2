@@ -109,9 +109,17 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   asking; see DECISIONS.md.
 
 ## Screens
-### Dashboard (`/`) — placeholder
-- Landing page. Currently a single centered "Hare Krishna". Real content (KPIs / recent
-  activity) to be defined.
+### Dashboard (`/`)
+- Centered "Hare Krishna" greeting, then one `Card`, **"Customers who haven't ordered
+  lately"** (2026-10-14): table Customer (`customerShareLabel` — nickname||name - city) ·
+  Last order (`dd-mmm-yy`) · Days ago · Order value (`fmt`). Each customer's *latest* order
+  (`@/lib/lapsedCustomers`, max parsed date, ties → higher id), **oldest first, top 10**, no
+  day threshold; customers who never ordered are not listed. The whole row is clickable
+  (`onClick` → `navigate`) and the name is a real `<Link>` to `/orders/:id` for keyboard use.
+  **Don't use a `::after`-stretched link on a `<tr>`**: WebKit (the desktop webview) doesn't
+  make `<tr>` a positioning container, so every row's overlay covered the whole table and only
+  the last row worked (Chrome hides this). Value = ex-GST Final Amount
+  (`finalAmountOf`, shared with View/Edit Orders). More KPIs TBD.
 
 ### Add Purchase Bill (`/purchase-bills/new`) — top-nav "Add Purchase Bill"
 - **Header card** — Company name, Bill number, Date. **Company** is a `CompanyCombobox`
@@ -275,7 +283,8 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   company to default to, `defaultCompany` is `null` — the user must pick one for a
   brand-new item, same dialog Add Purchase Bill uses.
 
-### View/Edit Orders (`/orders`) — top-nav "View/Edit Orders" (third piece of the Order Book)
+### View/Edit Orders (`/orders`, `/orders/:id`) — top-nav "View/Edit Orders" (third piece of the Order Book)
+- **Open order is in the URL** (2026-10-14): `/orders/:id` shows that order's detail (any status), `/orders` the list; row click / Back / delete just `navigate`. Lets the Dashboard deep-link. Unknown id → list.
 - `src/pages/SavedOrders.tsx`. A near-verbatim structural copy of `SavedBills.tsx`:
   **list → detail**, single page. Loads all orders via `ListSalesOrders` on mount
   (`refresh()` reused after a delete).

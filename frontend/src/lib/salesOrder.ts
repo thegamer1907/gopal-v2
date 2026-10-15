@@ -2,7 +2,7 @@
 // View/Edit Orders derive it from the same raw fields here, so the formula lives in
 // exactly one place, mirroring lib/purchaseBill.ts.
 
-import {reports} from '../../wailsjs/go/models';
+import {db, reports} from '../../wailsjs/go/models';
 import {displayDate} from '@/lib/date';
 
 export interface OrderLineCalcInput {
@@ -52,6 +52,16 @@ export function orderExportFilename(
 export function effectivePackSize(it: {itemPackSize: number; customPackSize: number}): number {
     return it.customPackSize || it.itemPackSize;
 }
+
+// lineCalc / finalAmountOf — the on-screen amount of one line / a whole order (ex-GST
+// Final Amount = rate × qty × effective pack size). Shared by View/Edit Orders and the
+// Dashboard so the formula is only ever fed from here.
+export function lineCalc(it: db.SalesOrderItem): OrderLineCalc {
+    return calcOrderLine({rate: it.rate, qty: it.qty, packSize: effectivePackSize(it)});
+}
+
+export const finalAmountOf = (order: db.SalesOrder): number =>
+    order.items.reduce((sum, it) => sum + lineCalc(it).finalAmount, 0);
 
 export interface OrderExportGroup {
     itemName: string;

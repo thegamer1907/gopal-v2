@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {useNavigate, useParams} from 'react-router-dom';
 import {toBlob} from 'html-to-image';
 import {ArrowLeft, CheckCircle2, ClipboardList, FileSpreadsheet, FileText, ImageDown, Info, Pencil, Search, Trash2} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
@@ -61,24 +61,19 @@ import {parseDate, displayDate} from '@/lib/date';
 import {cn} from '@/lib/utils';
 import {fmt, fmtQty} from '@/lib/purchaseBill';
 import {
-    calcOrderLine,
     effectivePackSize,
+    finalAmountOf,
+    lineCalc,
     orderExportFilename,
     toOrderExportData,
-    OrderLineCalc,
 } from '@/lib/salesOrder';
 
 // View/Edit Orders — a list of every saved order that opens a read-only detail, from
 // which the order can be edited (full overwrite) or deleted. Mirrors View/Edit Bills
 // (SavedBills.tsx). No order-number column — that field doesn't exist for orders.
 
-function lineCalc(it: db.SalesOrderItem): OrderLineCalc {
-    return calcOrderLine({rate: it.rate, qty: it.qty, packSize: effectivePackSize(it)});
-}
-
-// Per-order summaries used by the list columns/sort.
-const finalAmountOf = (order: db.SalesOrder): number =>
-    order.items.reduce((sum, it) => sum + lineCalc(it).finalAmount, 0);
+// Per-order summaries used by the list columns/sort (finalAmountOf/lineCalc live in
+// @/lib/salesOrder, shared with the Dashboard).
 const totalQtyOf = (order: db.SalesOrder): number =>
     order.items.reduce((sum, it) => sum + it.qty, 0);
 
@@ -103,7 +98,11 @@ function DeliveredBadge({order}: {order: db.SalesOrder}) {
 export function SavedOrders() {
     const navigate = useNavigate();
     const [orders, setOrders] = useState<db.SalesOrder[]>([]);
-    const [selectedId, setSelectedId] = useState<number | null>(null);
+    // The open order lives in the URL (/orders/:id) so other pages (the Dashboard) can
+    // link straight to an order's detail; /orders alone is the list.
+    const {id: idParam} = useParams();
+    const selectedId = idParam !== undefined && Number.isFinite(Number(idParam)) ? Number(idParam) : null;
+    const setSelectedId = (id: number | null) => navigate(id === null ? '/orders' : `/orders/${id}`);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
