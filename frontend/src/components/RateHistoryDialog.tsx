@@ -78,7 +78,7 @@ export function RateHistoryDialog({open, onOpenChange, itemName, history, initia
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="flex max-h-[85vh] flex-col">
                 <DialogHeader>
                     <DialogTitle>Rate history — {itemName}</DialogTitle>
                     <DialogDescription>Every past order for this item, filterable by city and customer.</DialogDescription>
@@ -122,8 +122,8 @@ export function RateHistoryDialog({open, onOpenChange, itemName, history, initia
                                 <p className="text-sm">No orders match the selected filters.</p>
                             </div>
                         ) : (
-                            <Table>
-                                <TableHeader>
+                            <Table containerClassName="min-h-0 flex-1 overflow-y-auto">
+                                <TableHeader className="sticky top-0 z-10 bg-background">
                                     <TableRow>
                                         <TableHead>City</TableHead>
                                         <TableHead>Customer</TableHead>

@@ -506,3 +506,9 @@ _None blocking._
 - **Delivered Orders PDF changes (2026-10-13):** table titles now read `#N` (no "Order"
   word); the Item column is fitted to the widest item name in that PDF (header bar and
   deduction labels still fit), tables remain page-centered so the left margin grows.
+
+- **Rate History dialog scrolls (2026-10-14):** `RateHistoryDialog` is capped at
+  `max-h-[85vh]`; title + City/Customer filters stay fixed, the table body scrolls and the
+  column header is sticky. `Table` gained an optional `containerClassName` so the dialog can
+  make the table's own container the scroller (its default `overflow-x-auto` wrapper would
+  otherwise break `sticky`).

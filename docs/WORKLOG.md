@@ -6,6 +6,18 @@ reads the top entry first.
 
 ---
 
+## 2026-10-14 — Rate History dialog scrolling
+**Did:** dialog had no max height, so long histories ran off-screen. Capped at 85vh with a
+scrolling, sticky-header table (`RateHistoryDialog.tsx`, `ui/table.tsx` `containerClassName`).
+Verified in `wails dev`: injected 40 extra rows into the open dialog — it stayed inside the
+viewport, rows scrolled, header and filters stayed pinned. Then seeded the dev DB with 25 undelivered
+test orders (ids 6–30, Eclair - 32 PB, rate 10–34, via `AddSalesOrder`) and re-verified with real
+rows (28 rows, scrolls, header pinned). Delete those orders in View/Edit Orders if unwanted. Not committed; not yet released (v0.12.0 predates this).
+
+**Next steps:** commit/tag when the user says so.
+
+---
+
 ## 2026-10-14 — Self-update hang: relaunch vs single-instance lock
 **Did:** reviewed the update path. Root cause (by reading, not reproduced): relaunch raced
 the `SingleInstanceLock`. Fix: `--relaunch` flag + 3s wait in `main.go`, 10-min download
