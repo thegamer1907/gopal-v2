@@ -6,6 +6,23 @@ reads the top entry first.
 
 ---
 
+## 2026-10-29 — Docs sync after v0.13.0 release
+**Did:** checked git: working tree clean, `main` == `origin/main`, everything pushed and tagged
+(`v0.12.0` = `1af1ecf` self-update fix; `v0.13.0` = `a1fb1d6`, which includes Rate History
+scroll `cbc80d1`, Reports expanding rows `8303364`, Dashboard lapsed-customers card +
+`/orders/:id` + row-click fix). Marked those FEATURES.md entries as shipped (they still said
+"uncommitted"). No code changes; older worklog entries below keep their "not committed"
+wording as a historical record of that moment.
+
+**Still open:** re-check Dashboard row clicks in the real desktop webview (WebKit-only bug);
+verify the self-update on Windows (clients on pre-v0.12.0 builds may need one manual exe
+download); dev DB still holds 25 test orders (ids 6–30, Eclair - 32 PB) to delete if unwanted.
+
+**Next steps:** nothing in progress. Pick from Planned in FEATURES.md (more Dashboard KPIs,
+as-billed snapshots, auto-check for updates, order number) or new client feedback.
+
+---
+
 ## 2026-10-14 — Dashboard rows: only the last was clickable (WebKit)
 **Did:** client report — only row 3 clickable. Cause: stretched-`::after` link on `<tr>`
 (WebKit ignores `position:relative` on rows → overlays all covered the table). Replaced with
