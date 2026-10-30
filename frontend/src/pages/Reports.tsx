@@ -134,22 +134,32 @@ function computeStockRows(
         }
     }
 
-    const soldByItem = new Map<number, number>();
+    // Main Quantity counts delivered orders only; the last column also counts undelivered
+    // ones (a delivered order's date is its delivery date, so the cutoff applies as-is).
+    const soldAllByItem = new Map<number, number>();
+    const soldDeliveredByItem = new Map<number, number>();
     for (const order of orders) {
         const d = parseDate(order.date);
         if (!d || d > cutoffEnd) continue;
         for (const it of order.items) {
-            soldByItem.set(it.itemId, (soldByItem.get(it.itemId) ?? 0) + it.qty);
+            soldAllByItem.set(it.itemId, (soldAllByItem.get(it.itemId) ?? 0) + it.qty);
+            if (order.delivered) {
+                soldDeliveredByItem.set(it.itemId, (soldDeliveredByItem.get(it.itemId) ?? 0) + it.qty);
+            }
         }
     }
 
     return items
-        .map((item) => ({
-            item,
-            quantity: (purchasedByItem.get(item.id) ?? 0) - (soldByItem.get(item.id) ?? 0),
-        }))
-        .filter(({quantity}) => quantity > 0)
-        .map(({item, quantity}) => {
+        .map((item) => {
+            const purchased = purchasedByItem.get(item.id) ?? 0;
+            return {
+                item,
+                quantity: purchased - (soldDeliveredByItem.get(item.id) ?? 0),
+                quantityInclUndelivered: purchased - (soldAllByItem.get(item.id) ?? 0),
+            };
+        })
+        .filter(({quantity, quantityInclUndelivered}) => quantity !== 0 || quantityInclUndelivered !== 0)
+        .map(({item, quantity, quantityInclUndelivered}) => {
             const latest = latestLine.get(item.id)?.line;
             const {finalRate, billingRate} = latest
                 ? calcLine({
@@ -168,6 +178,7 @@ function computeStockRows(
                 hsn: item.hsn,
                 gstPercent: item.gstPercent,
                 quantity,
+                quantityInclUndelivered,
                 finalRate,
                 billingRate,
                 profitLoss: item.packSize * quantity * finalRate,

@@ -43,6 +43,7 @@ export function Items() {
     const [packSize, setPackSize] = useState('');
     const [gstPercent, setGstPercent] = useState('');
     const [hsn, setHsn] = useState('');
+    const [taxName, setTaxName] = useState('');
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<db.Item | null>(null);
@@ -57,7 +58,7 @@ export function Items() {
     const isValid = company !== null && fields.every((v) => v.trim() !== '');
     // Dirty (warn before leaving) once any item field has content (company alone
     // isn't "unsaved work").
-    const isDirty = fields.some((v) => v.trim() !== '');
+    const isDirty = [...fields, taxName].some((v) => v.trim() !== '');
 
     useEffect(() => {
         setDirty(isDirty);
@@ -99,6 +100,7 @@ export function Items() {
             packSize: (it) => it.packSize,
             gstPercent: (it) => it.gstPercent,
             hsn: (it) => it.hsn,
+            taxName: (it) => it.taxName,
             stock: (it) => it.stock,
         },
         {key: 'company', dir: 'asc'},
@@ -107,12 +109,13 @@ export function Items() {
     async function add() {
         if (!isValid || !company) return;
         try {
-            await AddItem(company.id, name.trim(), parseFloat(packSize) || 0, parseFloat(gstPercent) || 0, parseInt(hsn, 10) || 0);
+            await AddItem(company.id, name.trim(), parseFloat(packSize) || 0, parseFloat(gstPercent) || 0, parseInt(hsn, 10) || 0, taxName.trim());
             // Keep the company selected for quick consecutive adds; clear the rest.
             setName('');
             setPackSize('');
             setGstPercent('');
             setHsn('');
+            setTaxName('');
             await refresh();
         } catch (e: any) {
             setError(String(e));
@@ -175,6 +178,16 @@ export function Items() {
                                 autoComplete="off"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid flex-1 gap-2 min-w-40">
+                            <Label htmlFor="taxName">Tax Name</Label>
+                            <Input
+                                id="taxName"
+                                placeholder="Optional"
+                                autoComplete="off"
+                                value={taxName}
+                                onChange={(e) => setTaxName(e.target.value)}
                             />
                         </div>
                         <div className="grid gap-2 w-32">
@@ -248,6 +261,7 @@ export function Items() {
                                 <TableRow>
                                     <SortableHeader label="Company" sortKey="company" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
                                     <SortableHeader label="Item" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
+                                    <SortableHeader label="Tax Name" sortKey="taxName" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                     <SortableHeader label="Pack Size" sortKey="packSize" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                     <SortableHeader label="GST %" sortKey="gstPercent" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <SortableHeader label="HSN" sortKey="hsn" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
@@ -260,6 +274,7 @@ export function Items() {
                                     <TableRow key={it.id}>
                                         <TableCell className="pl-4 text-muted-foreground">{it.companyName}</TableCell>
                                         <TableCell className="font-medium">{it.name}</TableCell>
+                                        <TableCell className="text-muted-foreground">{it.taxName}</TableCell>
                                         <TableCell>{it.packSize}</TableCell>
                                         <TableCell className="text-right tabular-nums">{it.gstPercent}</TableCell>
                                         <TableCell>{it.hsn}</TableCell>

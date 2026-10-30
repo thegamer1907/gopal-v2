@@ -72,7 +72,7 @@ export const ShareableOrderImage = forwardRef<HTMLDivElement, {order: db.SalesOr
                             return (
                                 <tr key={i}>
                                     <td colSpan={4} style={{...cell, textAlign: 'right'}}>
-                                        {isAdd ? 'Add' : 'Less'}: {fmtQty(units)} — {d.itemName}
+                                        {isAdd ? 'Add' : 'Less'}: {fmtQty(units)} × {d.itemName}
                                     </td>
                                     <td style={{...cell, textAlign: 'right'}}>{fmt(value)}</td>
                                 </tr>

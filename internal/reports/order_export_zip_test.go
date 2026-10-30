@@ -109,3 +109,14 @@ func newTestPDF(t *testing.T) *gopdf.GoPdf {
 	}
 	return pdf
 }
+
+func TestDeductionLabelUsesTimesSign(t *testing.T) {
+	label, value := deductionLabelAndValue(OrderExportDeduction{ItemName: "Eclair - 32 PB", Units: 5, Value: 50})
+	if label != "Less: 5 × Eclair - 32 PB" || value != 50 {
+		t.Errorf("less = %q, %v", label, value)
+	}
+	label, value = deductionLabelAndValue(OrderExportDeduction{ItemName: "Eclair - 32 PB", Units: -2, Value: -20})
+	if label != "Add: 2 × Eclair - 32 PB" || value != 20 {
+		t.Errorf("add = %q, %v", label, value)
+	}
+}

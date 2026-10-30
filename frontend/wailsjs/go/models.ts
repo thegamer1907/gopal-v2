@@ -52,6 +52,7 @@ export namespace db {
 	    packSize: number;
 	    gstPercent: number;
 	    hsn: number;
+	    taxName: string;
 	    stock: number;
 	
 	    static createFrom(source: any = {}) {
@@ -67,6 +68,7 @@ export namespace db {
 	        this.packSize = source["packSize"];
 	        this.gstPercent = source["gstPercent"];
 	        this.hsn = source["hsn"];
+	        this.taxName = source["taxName"];
 	        this.stock = source["stock"];
 	    }
 	}
@@ -460,6 +462,7 @@ export namespace reports {
 	    billingRate: number;
 	    profitLoss: number;
 	    gstValue: number;
+	    quantityInclUndelivered: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new StockReportRow(source);
@@ -477,6 +480,7 @@ export namespace reports {
 	        this.billingRate = source["billingRate"];
 	        this.profitLoss = source["profitLoss"];
 	        this.gstValue = source["gstValue"];
+	        this.quantityInclUndelivered = source["quantityInclUndelivered"];
 	    }
 	}
 

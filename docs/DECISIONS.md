@@ -1119,3 +1119,42 @@ have to re-litigate.
   renders it, and the bold Totals cell, +2 padding) instead of the fixed 14/22 the other
   reports use. Scoped to the Stock Report per the ask; the other reports are unchanged.
 
+### 2026-10-29 — Stock Report: delivered-only Quantity, "Quantity incl. Undelivered", negatives shown
+- **Decision:** **Quantity** = purchased − **delivered** orders only. A new last column
+  **Quantity incl. Undelivered** holds the old figure (purchased − all orders, delivered or
+  not). Rows are hidden only when **both** quantities are 0; **negative** Quantity is now shown,
+  with Final Rate / Billing Rate / P&L / GST Value left **blank** (no value on negative stock)
+  and excluded from those Totals. Quantity and the new column's Totals sum every row.
+- **Why:** client ask — the pending-order-adjusted figure is secondary; the headline stock is
+  what has actually gone out. A delivered order's `date` is its delivery date, so the existing
+  as-of cutoff applies unchanged.
+- **Scope:** report only (`computeStockRows`, `stock_report.go`). Live item Stock on the Items
+  master / Add Order (`itemSelect`) still counts all orders — not changed, not asked.
+- **Alternatives:** hide when main Quantity is 0 (offered; user chose "both 0").
+
+### 2026-10-29 — Item nickname for order exports; Less/Add label uses "×"
+- **SUPERSEDED (same day) for the nickname part — see the "Tax Name" entry below.** The `×` label part still stands.
+- **Decision:** `items.nick_name` (optional, `''` = none; migration 12). When set, it replaces the
+  item name on the **order-detail** Copy Order Image, Excel and PDF only (`useNickname` flag on
+  `buildOrderExportGroups`/`toOrderExportData`, passed `true` only from `SavedOrders.tsx` and the
+  image component). Applies to grouped rows and Less/Add lines. **Not** used by Print Delivered
+  Orders / delivered-orders zip, on-screen views, or reports — user chose that narrower scope;
+  widening it is a one-line flag change per caller. Nickname is editable from the Items add form,
+  Items table column, New Item dialog (Add Order / Purchase Bill) and Edit Item dialog; optional,
+  so required-field rules are unchanged.
+- **Label:** the Less/Add deduction line was `Less: 5 — Item`; now `Less: 5 × Item` (all renderers,
+  incl. delivered-orders outputs, since the code is shared).
+- **Why:** client wants different item names on customer-facing outputs; the dash looked odd.
+- **Alternatives:** dropping the dash/colon entirely (offered, declined).
+
+### 2026-10-29 — Item nickname → "Tax Name" (info-only); export usage removed
+- **Decision:** the item nickname is no longer used in the order image/Excel/PDF — all of that wiring
+  (`useNickname`, `SalesOrderItem.ItemNickName`, the extra JOIN column) is removed; exports show the real
+  item name again. The field is renamed **Tax Name** (`items.tax_name`, Go `Item.TaxName`, JSON `taxName`),
+  optional, and for now just **holds information**: editable on the Items add form, New Item dialog (Add
+  Order / Purchase Bill) and Edit Item dialog, shown as a sortable column on the Items table. Nothing reads it.
+- **Migration:** 12 (added `nick_name`) stays; **13** `RENAME COLUMN nick_name TO tax_name`. Done as a new step
+  rather than editing 12 because 12 had already run on the dev DB.
+- **Why:** client reconsidered — they want a place to record the tax-facing name, not to change customer output.
+- **Kept:** `Less: 5 × Item` label change (separate ask).
+

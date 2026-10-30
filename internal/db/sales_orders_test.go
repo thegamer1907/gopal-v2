@@ -30,11 +30,11 @@ func seedSales(t *testing.T) salesFixture {
 	if err != nil {
 		t.Fatalf("AddCompany: %v", err)
 	}
-	itemA, err := AddItem(conn, company.ID, "widget", 20, 18, 3402)
+	itemA, err := AddItem(conn, company.ID, "widget", 20, 18, 3402, "")
 	if err != nil {
 		t.Fatalf("AddItem A: %v", err)
 	}
-	itemB, err := AddItem(conn, company.ID, "gizmo", 36, 12, 3403)
+	itemB, err := AddItem(conn, company.ID, "gizmo", 36, 12, 3403, "")
 	if err != nil {
 		t.Fatalf("AddItem B: %v", err)
 	}

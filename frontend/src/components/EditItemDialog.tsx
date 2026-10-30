@@ -32,6 +32,7 @@ export function EditItemDialog({open, onOpenChange, item, companies, onUpdated}:
     const [packSize, setPackSize] = useState('');
     const [gstPercent, setGstPercent] = useState('');
     const [hsn, setHsn] = useState('');
+    const [taxName, setTaxName] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -43,6 +44,7 @@ export function EditItemDialog({open, onOpenChange, item, companies, onUpdated}:
             setPackSize(String(item.packSize));
             setGstPercent(String(item.gstPercent));
             setHsn(String(item.hsn));
+            setTaxName(item.taxName);
             setError('');
         }
     }, [open, item, companies]);
@@ -63,6 +65,7 @@ export function EditItemDialog({open, onOpenChange, item, companies, onUpdated}:
                 parseFloat(packSize) || 0,
                 parseFloat(gstPercent) || 0,
                 parseInt(hsn, 10) || 0,
+                taxName.trim(),
             );
             onUpdated(updated);
             onOpenChange(false);
@@ -106,6 +109,16 @@ export function EditItemDialog({open, onOpenChange, item, companies, onUpdated}:
                             autoComplete="off"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="ei-tax">Tax Name <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <Input
+                            id="ei-tax"
+                            autoComplete="off"
+                            placeholder="Optional"
+                            value={taxName}
+                            onChange={(e) => setTaxName(e.target.value)}
                         />
                     </div>
                     <div className="grid grid-cols-3 gap-3">

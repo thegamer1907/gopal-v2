@@ -10,8 +10,8 @@ export function AddCustomer(arg1) {
   return window['go']['main']['App']['AddCustomer'](arg1);
 }
 
-export function AddItem(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['AddItem'](arg1, arg2, arg3, arg4, arg5);
+export function AddItem(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['AddItem'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function AddPurchaseBill(arg1) {
@@ -154,8 +154,8 @@ export function UpdateDeliveredSalesOrder(arg1) {
   return window['go']['main']['App']['UpdateDeliveredSalesOrder'](arg1);
 }
 
-export function UpdateItem(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['UpdateItem'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function UpdateItem(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['UpdateItem'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
 export function UpdatePurchaseBill(arg1) {

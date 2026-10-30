@@ -8,6 +8,8 @@ spec (what it does, key behaviors). Move items between sections as work progress
 
 ## Shipped
 
+_Built (2026-10-29, uncommitted): **Item Tax Name** — optional info-only per-item field (Items add form/table, New/Edit item dialogs); not used in any export (it started as an export nickname the same day and was repurposed). Also the Less/Add line now reads `Less: 5 × Item` (no dash). See DECISIONS._
+_Built (2026-10-29, uncommitted): **Stock Report: delivered-only Quantity** + new last column **Quantity incl. Undelivered**; negative stock now shown (no money values). See DECISIONS._
 _Shipped (2026-10-14, v0.12.0–v0.13.0): self-update relaunch fix, Rate History dialog scrolling, Dashboard row-click fix (WebKit)._
 _Shipped (2026-10-14, v0.13.0): **Reports page as an expanding list** — one line per report, click to expand its options inline (one open at a time), replacing the card grid per client feedback. See UI.md / DECISIONS.md._
 _Shipped (2026-10-13): **Stock Report: more columns.** "Stock" is renamed **Quantity**, and

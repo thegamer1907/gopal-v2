@@ -325,7 +325,7 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
     invalidate or resync.
 
 ### Items (`/items`) — item master
-- An untitled company-scoped add card (**Company, Item, Pack Size, GST %, HSN** + Add),
+- An untitled company-scoped add card (**Company, Item, Tax Name (optional), Pack Size, GST %, HSN** + Add; Tax Name is also a table column and a field in New/Edit Item dialogs — info-only, not used in any export),
   and a card whose header is just the search box and the item count, over the items table (Company / Item / Pack Size / GST % / HSN /
   **Stock** + **Actions**). Pack Size / GST % / HSN use `NumberInput` (no spinner); same
   in the on-the-fly `NewItemDialog`.

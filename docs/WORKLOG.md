@@ -6,6 +6,44 @@ reads the top entry first.
 
 ---
 
+## 2026-10-29 — Nickname → Tax Name (info-only); exports reverted
+**Did:** per DECISIONS 2026-10-29 (Tax Name). Removed all export usage of the item nickname; renamed the
+field to `tax_name` via migration 13 (applied to the dev DB; verified `items.tax_name` present, max
+migration 13). Forms/table relabelled **Tax Name**. `go vet`, `go test ./...`, `tsc` clean. **Not exercised
+in the UI** — Claude-in-Chrome tools still unavailable after `/chrome`. Not committed. The earlier entry
+below describes the superseded nickname design (the `×` label part is still live).
+
+**Next steps:** reconnect the Chrome extension and run the UI checks (Items add/edit, New Item dialog,
+Stock Report, order image/Excel/PDF), or the user checks by hand; then commit when asked.
+
+---
+
+## 2026-10-29 — Item nickname + Less/Add label
+**Did:** per DECISIONS 2026-10-29. Go: migration 12, `Item.NickName`, `AddItem`/`UpdateItem` signature,
+`SalesOrderItem.ItemNickName`, `×` label; frontend: nickname field in 3 forms + Items table column,
+`useNickname` flag in `lib/salesOrder.ts`. `go vet`, `go test ./...`, `tsc` clean; new tests for
+nickname round-trip/JOIN and the label. Migration 12 applied to the dev DB
+(`~/Downloads/inventory.db`, additive). **Not exercised in the UI** — Claude-in-Chrome tools
+unavailable again; image/Excel/PDF rendering unseen. Not committed.
+
+**Next steps:** user tries it: set a nickname on an item, open an order with it, Copy Image /
+Download Excel / PDF; check a custom-pack-size line reads `Less: N × …`. Then commit/tag on request.
+
+---
+
+## 2026-10-29 — Stock Report: delivered-only Quantity, new column, negatives
+**Did:** per DECISIONS 2026-10-29. `Reports.tsx` `computeStockRows` + `stock_report.go` (new
+11th column, blanks money cells on negative Quantity, Totals) + test. `go vet`, `go test
+./internal/reports`, `tsc` clean. **Not exercised in the running app** — the Claude-in-Chrome
+tools weren't available this session; `wails dev` started fine (localhost:34115). Native Save
+dialog also needs a manual check. Not committed.
+
+**Next steps:** user checks Reports → Stock Report (compare Quantity vs the last column after
+marking an order delivered; negative item shows blank money cells); then commit/tag when asked.
+Client mentioned more changes after this one — awaiting them.
+
+---
+
 ## 2026-10-29 — Docs sync after v0.13.0 release
 **Did:** checked git: working tree clean, `main` == `origin/main`, everything pushed and tagged
 (`v0.12.0` = `1af1ecf` self-update fix; `v0.13.0` = `a1fb1d6`, which includes Rate History

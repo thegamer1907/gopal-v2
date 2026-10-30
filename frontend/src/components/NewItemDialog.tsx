@@ -34,6 +34,7 @@ export function NewItemDialog({open, onOpenChange, initialName, companies, defau
     const [packSize, setPackSize] = useState('');
     const [gstPercent, setGstPercent] = useState('');
     const [hsn, setHsn] = useState('');
+    const [taxName, setTaxName] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -45,6 +46,7 @@ export function NewItemDialog({open, onOpenChange, initialName, companies, defau
             setPackSize('');
             setGstPercent('');
             setHsn('');
+            setTaxName('');
             setError('');
         }
     }, [open, initialName, defaultCompany]);
@@ -64,6 +66,7 @@ export function NewItemDialog({open, onOpenChange, initialName, companies, defau
                 parseFloat(packSize) || 0,
                 parseFloat(gstPercent) || 0,
                 parseInt(hsn, 10) || 0,
+                taxName.trim(),
             );
             onCreated(created);
             onOpenChange(false);
@@ -107,6 +110,16 @@ export function NewItemDialog({open, onOpenChange, initialName, companies, defau
                             autoComplete="off"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="ni-tax">Tax Name <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <Input
+                            id="ni-tax"
+                            autoComplete="off"
+                            placeholder="Optional"
+                            value={taxName}
+                            onChange={(e) => setTaxName(e.target.value)}
                         />
                     </div>
                     <div className="grid grid-cols-3 gap-3">

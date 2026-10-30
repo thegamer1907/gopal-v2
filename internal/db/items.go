@@ -16,15 +16,16 @@ type Item struct {
 	PackSize    float64 `json:"packSize"`    // numeric pack size, e.g. 100
 	GSTPercent  float64 `json:"gstPercent"`  // GST rate %, e.g. 18
 	HSN         int64   `json:"hsn"`         // HSN code (numeric)
+	TaxName     string  `json:"taxName"`     // optional info-only field; "" = none
 	Stock       float64 `json:"stock"`       // derived on read; see itemSelect. Not written.
 }
 
 // AddItem inserts a new item for a company and returns it with its assigned id.
 // (companyID, name, packSize) must be unique.
-func AddItem(conn *sql.DB, companyID int64, name string, packSize, gstPercent float64, hsn int64) (Item, error) {
+func AddItem(conn *sql.DB, companyID int64, name string, packSize, gstPercent float64, hsn int64, taxName string) (Item, error) {
 	res, err := conn.Exec(
-		`INSERT INTO items (company_id, name, pack_size, gst_percent, hsn) VALUES (?, ?, ?, ?, ?)`,
-		companyID, name, packSize, gstPercent, hsn,
+		`INSERT INTO items (company_id, name, pack_size, gst_percent, hsn, tax_name) VALUES (?, ?, ?, ?, ?, ?)`,
+		companyID, name, packSize, gstPercent, hsn, taxName,
 	)
 	if err != nil {
 		return Item{}, fmt.Errorf("insert item: %w", err)
@@ -33,19 +34,19 @@ func AddItem(conn *sql.DB, companyID int64, name string, packSize, gstPercent fl
 	if err != nil {
 		return Item{}, fmt.Errorf("item id: %w", err)
 	}
-	return Item{ID: id, CompanyID: companyID, Name: name, PackSize: packSize, GSTPercent: gstPercent, HSN: hsn}, nil
+	return Item{ID: id, CompanyID: companyID, Name: name, PackSize: packSize, GSTPercent: gstPercent, HSN: hsn, TaxName: taxName}, nil
 }
 
 // UpdateItem overwrites an item's editable fields (including its company) and
 // returns the updated record (company name is left empty; callers re-list to refresh).
-func UpdateItem(conn *sql.DB, id, companyID int64, name string, packSize, gstPercent float64, hsn int64) (Item, error) {
+func UpdateItem(conn *sql.DB, id, companyID int64, name string, packSize, gstPercent float64, hsn int64, taxName string) (Item, error) {
 	if _, err := conn.Exec(
-		`UPDATE items SET company_id = ?, name = ?, pack_size = ?, gst_percent = ?, hsn = ? WHERE id = ?`,
-		companyID, name, packSize, gstPercent, hsn, id,
+		`UPDATE items SET company_id = ?, name = ?, pack_size = ?, gst_percent = ?, hsn = ?, tax_name = ? WHERE id = ?`,
+		companyID, name, packSize, gstPercent, hsn, taxName, id,
 	); err != nil {
 		return Item{}, fmt.Errorf("update item: %w", err)
 	}
-	return Item{ID: id, CompanyID: companyID, Name: name, PackSize: packSize, GSTPercent: gstPercent, HSN: hsn}, nil
+	return Item{ID: id, CompanyID: companyID, Name: name, PackSize: packSize, GSTPercent: gstPercent, HSN: hsn, TaxName: taxName}, nil
 }
 
 // DeleteItem removes an item. It refuses (with a friendly error) when purchase bill
@@ -68,7 +69,7 @@ func DeleteItem(conn *sql.DB, id int64) error {
 // bill line) minus total sold (qty across every saved sales order line). Recomputed on
 // every read via correlated subqueries — fine at single-user/local scale, and avoids
 // keeping a separate figure in sync as bills/orders are added, edited, or deleted.
-const itemSelect = `SELECT i.id, i.company_id, c.name, i.name, i.pack_size, i.gst_percent, i.hsn,
+const itemSelect = `SELECT i.id, i.company_id, c.name, i.name, i.pack_size, i.gst_percent, i.hsn, i.tax_name,
 		COALESCE((SELECT SUM(pbi.tax_qty + pbi.d_qty) FROM purchase_bill_items pbi WHERE pbi.item_id = i.id), 0)
 		- COALESCE((SELECT SUM(soi.qty) FROM sales_order_items soi WHERE soi.item_id = i.id), 0) AS stock
 	FROM items i JOIN companies c ON c.id = i.company_id`
@@ -78,7 +79,7 @@ func scanItems(rows *sql.Rows) ([]Item, error) {
 	for rows.Next() {
 		var it Item
 		if err := rows.Scan(
-			&it.ID, &it.CompanyID, &it.CompanyName, &it.Name, &it.PackSize, &it.GSTPercent, &it.HSN, &it.Stock,
+			&it.ID, &it.CompanyID, &it.CompanyName, &it.Name, &it.PackSize, &it.GSTPercent, &it.HSN, &it.TaxName, &it.Stock,
 		); err != nil {
 			return nil, fmt.Errorf("scan item: %w", err)
 		}

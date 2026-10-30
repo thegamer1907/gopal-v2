@@ -8,7 +8,7 @@ export function AddCompany(arg1:string):Promise<db.Company>;
 
 export function AddCustomer(arg1:db.Customer):Promise<db.Customer>;
 
-export function AddItem(arg1:number,arg2:string,arg3:number,arg4:number,arg5:number):Promise<db.Item>;
+export function AddItem(arg1:number,arg2:string,arg3:number,arg4:number,arg5:number,arg6:string):Promise<db.Item>;
 
 export function AddPurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
 
@@ -80,7 +80,7 @@ export function UpdateCustomer(arg1:db.Customer):Promise<db.Customer>;
 
 export function UpdateDeliveredSalesOrder(arg1:db.SalesOrder):Promise<db.SalesOrder>;
 
-export function UpdateItem(arg1:number,arg2:number,arg3:string,arg4:number,arg5:number,arg6:number):Promise<db.Item>;
+export function UpdateItem(arg1:number,arg2:number,arg3:string,arg4:number,arg5:number,arg6:number,arg7:string):Promise<db.Item>;
 
 export function UpdatePurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
 

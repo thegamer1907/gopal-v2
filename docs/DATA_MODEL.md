@@ -56,6 +56,7 @@ company — the same item name can exist under different companies.
 | `pack_size` | REAL NOT NULL DEFAULT 0 | numeric pack size, e.g. 100 (label: **Pack Size**) |
 | `gst_percent` | REAL NOT NULL DEFAULT 0 | GST rate %, e.g. 18 (label: **GST %**) |
 | `hsn` | INTEGER NOT NULL DEFAULT 0 | HSN code, numeric (label: **HSN**) |
+| `tax_name` | TEXT NOT NULL DEFAULT '' | optional, info-only "Tax Name" (nothing reads it yet); `''` = none. Added as `nick_name` by migration 12, renamed by migration 13. Not part of the unique key |
 
 UNIQUE: `(company_id, name, pack_size)`. Foreign key: `(company_id)` → `companies(id)`.
 Created **after** `companies` (FK target).

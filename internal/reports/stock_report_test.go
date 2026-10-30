@@ -12,6 +12,12 @@ func TestWriteStockReportColumns(t *testing.T) {
 	rows := []StockReportRow{{
 		CompanyName: "Acme", ItemName: "Soap", PackSize: 10, HSN: 3401, GSTPercent: 18,
 		Quantity: 5, FinalRate: 12.5, BillingRate: 100, ProfitLoss: 625, GSTValue: 500,
+		QuantityInclUndelivered: 3,
+	}, {
+		// Negative delivered stock: shown, but money columns stay blank and out of Totals.
+		CompanyName: "Acme", ItemName: "Shampoo", PackSize: 5, HSN: 3305, GSTPercent: 12,
+		Quantity: -2, FinalRate: 9, BillingRate: 80, ProfitLoss: -90, GSTValue: -160,
+		QuantityInclUndelivered: -4,
 	}}
 	if err := WriteStockReport(path, "13-Oct-26", rows); err != nil {
 		t.Fatal(err)
@@ -22,7 +28,7 @@ func TestWriteStockReportColumns(t *testing.T) {
 	}
 	defer f.Close()
 
-	wantHeaders := []string{"Company", "Item", "Pack Size", "HSN", "GST %", "Quantity", "Final Rate", "Billing Rate", "P&L", "GST Value"}
+	wantHeaders := []string{"Company", "Item", "Pack Size", "HSN", "GST %", "Quantity", "Final Rate", "Billing Rate", "P&L", "GST Value", "Quantity incl. Undelivered"}
 	for i, h := range wantHeaders {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 2)
 		if got, _ := f.GetCellValue(stockSheetName, cell); got != h {
@@ -30,7 +36,7 @@ func TestWriteStockReportColumns(t *testing.T) {
 		}
 	}
 	// Totals row sits directly under the data and sums only P&L and GST Value.
-	for cell, want := range map[string]string{"B4": "Totals", "I4": "625.00", "J4": "500.00", "F4": "5"} {
+	for cell, want := range map[string]string{"B5": "Totals", "I5": "625.00", "J5": "500.00", "F5": "3", "K5": "-1"} {
 		if got, _ := f.GetCellValue(stockSheetName, cell); got != want {
 			t.Errorf("totals %s = %q, want %q", cell, got, want)
 		}
@@ -39,11 +45,18 @@ func TestWriteStockReportColumns(t *testing.T) {
 	if raw, _ := f.GetCellValue(stockSheetName, "E3", excelize.Options{RawCellValue: true}); raw != "0.18" {
 		t.Errorf("GST raw value = %q, want 0.18", raw)
 	}
-	wantRow := []string{"Acme", "Soap", "10", "3401", "18%", "5", "12.50", "100.00", "625.00", "500.00"}
+	wantRow := []string{"Acme", "Soap", "10", "3401", "18%", "5", "12.50", "100.00", "625.00", "500.00", "3"}
 	for i, v := range wantRow {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 3)
 		if got, _ := f.GetCellValue(stockSheetName, cell); got != v {
 			t.Errorf("cell %s = %q, want %q", cell, got, v)
+		}
+	}
+	wantNeg := []string{"Acme", "Shampoo", "5", "3305", "12%", "-2", "", "", "", "", "-4"}
+	for i, v := range wantNeg {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 4)
+		if got, _ := f.GetCellValue(stockSheetName, cell); got != v {
+			t.Errorf("negative row cell %s = %q, want %q", cell, got, v)
 		}
 	}
 }

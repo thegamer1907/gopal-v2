@@ -74,8 +74,8 @@ func (a *App) shutdown(ctx context.Context) {
 }
 
 // AddItem creates an item master record (for a company) and returns the stored record.
-func (a *App) AddItem(companyID int64, name string, packSize, gstPercent float64, hsn int64) (db.Item, error) {
-	return db.AddItem(a.db, companyID, name, packSize, gstPercent, hsn)
+func (a *App) AddItem(companyID int64, name string, packSize, gstPercent float64, hsn int64, taxName string) (db.Item, error) {
+	return db.AddItem(a.db, companyID, name, packSize, gstPercent, hsn, taxName)
 }
 
 // ListItems returns all inventory items (with their company name), ordered by company then item.
@@ -89,8 +89,8 @@ func (a *App) ListItemsByCompany(companyID int64) ([]db.Item, error) {
 }
 
 // UpdateItem overwrites an item's editable fields (including its company).
-func (a *App) UpdateItem(id, companyID int64, name string, packSize, gstPercent float64, hsn int64) (db.Item, error) {
-	return db.UpdateItem(a.db, id, companyID, name, packSize, gstPercent, hsn)
+func (a *App) UpdateItem(id, companyID int64, name string, packSize, gstPercent float64, hsn int64, taxName string) (db.Item, error) {
+	return db.UpdateItem(a.db, id, companyID, name, packSize, gstPercent, hsn, taxName)
 }
 
 // DeleteItem removes an item (refused if bill lines still reference it).

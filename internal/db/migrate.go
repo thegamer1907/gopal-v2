@@ -151,6 +151,18 @@ var migrations = []migration{
 		id:  11,
 		sql: backfillDeliveryNumbersSQL,
 	},
+	// Optional per-item name column (renamed to tax_name by migration 13). '' = none.
+	{
+		id:  12,
+		sql: `ALTER TABLE items ADD COLUMN nick_name TEXT NOT NULL DEFAULT '';`,
+	},
+	// Migration 12's column was renamed before release: it is an info-only "Tax Name", not a
+	// display nickname for exports. Kept as a separate step so databases that already ran 12
+	// (e.g. dev) and fresh ones both end up with `tax_name`.
+	{
+		id:  13,
+		sql: `ALTER TABLE items RENAME COLUMN nick_name TO tax_name;`,
+	},
 }
 
 // backfillDeliveryNumbersSQL numbers the already-delivered orders 1..N in id order. Keyed

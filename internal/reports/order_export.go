@@ -42,7 +42,7 @@ type OrderExportRow struct {
 	FinalAmount float64 `json:"finalAmount"`
 }
 
-// OrderExportDeduction is one "Less: N unit — Item Name" line (or "Add: ..." when
+// OrderExportDeduction is one "Less: N × Item Name" line (or "Add: ..." when
 // Units is negative — the actual pack size was larger than standard), fully computed
 // by the caller from a line whose custom pack size differed from the item's master
 // pack size. Never re-derived here — this package only lays it out.
@@ -414,7 +414,7 @@ func writeOrderDeductions(f *excelize.File, deductions []OrderExportDeduction, s
 		if units < 0 {
 			verb, units, value = "Add", -units, -value
 		}
-		label := fmt.Sprintf("%s: %s — %s", verb, fmtOrderQty(units), d.ItemName)
+		label := fmt.Sprintf("%s: %s × %s", verb, fmtOrderQty(units), d.ItemName)
 		labelCell := fmt.Sprintf("B%d", row)
 		lastCell := fmt.Sprintf("D%d", row)
 		if err := f.SetCellValue(orderSheetName, labelCell, label); err != nil {
@@ -629,7 +629,7 @@ func drawOrderBlock(pdf *gopdf.GoPdf, cols []float64, x0, y float64, title strin
 	return y, nil
 }
 
-// deductionLabelAndValue returns a deduction line's printed label ("Less: 5 — Item" or,
+// deductionLabelAndValue returns a deduction line's printed label ("Less: 5 × Item" or,
 // for a surplus, "Add: …") and its signed amount, shared by the drawing code and the
 // column-width measurement so the two can never disagree.
 func deductionLabelAndValue(d OrderExportDeduction) (string, float64) {
@@ -637,7 +637,7 @@ func deductionLabelAndValue(d OrderExportDeduction) (string, float64) {
 	if units < 0 {
 		verb, units, value = "Add", -units, -value
 	}
-	return fmt.Sprintf("%s: %s — %s", verb, fmtOrderQty(units), d.ItemName), value
+	return fmt.Sprintf("%s: %s × %s", verb, fmtOrderQty(units), d.ItemName), value
 }
 
 // DeliveredOrdersPrintEntry is one order's data for the Print Delivered Orders report —

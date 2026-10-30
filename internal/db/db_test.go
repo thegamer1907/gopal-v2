@@ -20,7 +20,7 @@ func TestItemsRoundTripAndPersistence(t *testing.T) {
 		t.Fatalf("AddCompany: %v", err)
 	}
 
-	added, err := AddItem(conn, company.ID, "widget", 100, 18, 3402)
+	added, err := AddItem(conn, company.ID, "widget", 100, 18, 3402, "")
 	if err != nil {
 		t.Fatalf("AddItem: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestMastersEditAndDelete(t *testing.T) {
 		t.Fatalf("UpdateCompany not applied: %+v", cos)
 	}
 
-	item, err := AddItem(conn, company.ID, "widget", 100, 18, 3402)
+	item, err := AddItem(conn, company.ID, "widget", 100, 18, 3402, "")
 	if err != nil {
 		t.Fatalf("AddItem: %v", err)
 	}
@@ -97,11 +97,11 @@ func TestMastersEditAndDelete(t *testing.T) {
 	}
 
 	// Update the item, then delete it; afterwards the company can be deleted.
-	if _, err := UpdateItem(conn, item.ID, company.ID, "gadget", 50, 12, 1111); err != nil {
+	if _, err := UpdateItem(conn, item.ID, company.ID, "gadget", 50, 12, 1111, "gad"); err != nil {
 		t.Fatalf("UpdateItem: %v", err)
 	}
 	items, _ := ListItems(conn)
-	if len(items) != 1 || items[0].Name != "gadget" || items[0].PackSize != 50 || items[0].GSTPercent != 12 || items[0].HSN != 1111 {
+	if len(items) != 1 || items[0].Name != "gadget" || items[0].PackSize != 50 || items[0].GSTPercent != 12 || items[0].HSN != 1111 || items[0].TaxName != "gad" {
 		t.Fatalf("UpdateItem not applied: %+v", items)
 	}
 

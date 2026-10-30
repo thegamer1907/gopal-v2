@@ -27,6 +27,10 @@ type StockReportRow struct {
 	BillingRate float64 `json:"billingRate"`
 	ProfitLoss  float64 `json:"profitLoss"`
 	GSTValue    float64 `json:"gstValue"`
+	// QuantityInclUndelivered is purchased minus every order (delivered or not); Quantity
+	// counts delivered orders only. When Quantity is negative the four money columns above
+	// are left blank (a value on negative stock would be meaningless).
+	QuantityInclUndelivered float64 `json:"quantityInclUndelivered"`
 }
 
 const stockSheetName = "Stock Report"
@@ -43,7 +47,8 @@ const (
 	colSRBillingRate
 	colSRProfitLoss
 	colSRGSTValue
-	colSRCount = colSRGSTValue
+	colSRQtyInclUndelivered
+	colSRCount = colSRQtyInclUndelivered
 )
 
 var stockHeaders = [colSRCount]string{
@@ -57,6 +62,8 @@ var stockHeaders = [colSRCount]string{
 	colSRBillingRate - 1: "Billing Rate",
 	colSRProfitLoss - 1:  "P&L",
 	colSRGSTValue - 1:    "GST Value",
+
+	colSRQtyInclUndelivered - 1: "Quantity incl. Undelivered",
 }
 
 // WriteStockReport writes rows to a new "Stock Report" workbook at path: a merged title
@@ -114,7 +121,7 @@ func applyStockColumnStyles(f *excelize.File) error {
 	if err != nil {
 		return fmt.Errorf("qty style: %w", err)
 	}
-	if err := applyColStyleOn(f, stockSheetName, []int{colSRPackSize, colSRHSN, colSRQuantity}, qtyStyle); err != nil {
+	if err := applyColStyleOn(f, stockSheetName, []int{colSRPackSize, colSRHSN, colSRQuantity, colSRQtyInclUndelivered}, qtyStyle); err != nil {
 		return err
 	}
 	// Written as a fraction (0.05) under a real Excel Percentage format, matching the
@@ -193,7 +200,7 @@ func writeStockHeader(f *excelize.File) error {
 	if err := f.SetCellStyle(stockSheetName, "A2", last, boldStyle); err != nil {
 		return err
 	}
-	return centerHeaderCells(f, stockSheetName, 2, []int{colSRPackSize, colSRHSN, colSRGSTPercent, colSRQuantity})
+	return centerHeaderCells(f, stockSheetName, 2, []int{colSRPackSize, colSRHSN, colSRGSTPercent, colSRQuantity, colSRQtyInclUndelivered})
 }
 
 // writeStockRows writes one row per item, starting at sheet row 3 (row 1 is the title,
@@ -208,12 +215,18 @@ func writeStockRows(f *excelize.File, rows []StockReportRow) (int, error) {
 		values[colSRHSN-1] = r.HSN
 		values[colSRGSTPercent-1] = r.GSTPercent / 100
 		values[colSRQuantity-1] = r.Quantity
-		values[colSRFinalRate-1] = r.FinalRate
-		values[colSRBillingRate-1] = r.BillingRate
-		values[colSRProfitLoss-1] = r.ProfitLoss
-		values[colSRGSTValue-1] = r.GSTValue
+		values[colSRQtyInclUndelivered-1] = r.QuantityInclUndelivered
+		if r.Quantity >= 0 {
+			values[colSRFinalRate-1] = r.FinalRate
+			values[colSRBillingRate-1] = r.BillingRate
+			values[colSRProfitLoss-1] = r.ProfitLoss
+			values[colSRGSTValue-1] = r.GSTValue
+		}
 
 		for c, v := range values {
+			if v == nil {
+				continue
+			}
 			cell, err := excelize.CoordinatesToCellName(c+1, row)
 			if err != nil {
 				return 0, err
@@ -233,11 +246,14 @@ func writeStockRows(f *excelize.File, rows []StockReportRow) (int, error) {
 // autofilter range, so sorting/filtering never moves it) summing Quantity, P&L and GST
 // Value. Rates and pack sizes aren't totaled.
 func writeStockTotals(f *excelize.File, rows []StockReportRow, totalsRow int) error {
-	var quantity, profitLoss, gstValue float64
+	var quantity, inclUndelivered, profitLoss, gstValue float64
 	for _, r := range rows {
 		quantity += r.Quantity
-		profitLoss += r.ProfitLoss
-		gstValue += r.GSTValue
+		inclUndelivered += r.QuantityInclUndelivered
+		if r.Quantity >= 0 {
+			profitLoss += r.ProfitLoss
+			gstValue += r.GSTValue
+		}
 	}
 
 	boldStyle, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}})
@@ -265,6 +281,9 @@ func writeStockTotals(f *excelize.File, rows []StockReportRow, totalsRow int) er
 		return fmt.Errorf("totals qty style: %w", err)
 	}
 	if err := setStockCell(f, colSRQuantity, totalsRow, quantity, boldQtyStyle); err != nil {
+		return err
+	}
+	if err := setStockCell(f, colSRQtyInclUndelivered, totalsRow, inclUndelivered, boldQtyStyle); err != nil {
 		return err
 	}
 
@@ -305,7 +324,7 @@ func stockColWidths(rows []StockReportRow) [colSRCount]float64 {
 		note(i+1, h, 3) // autofilter arrow
 	}
 
-	var quantity, profitLoss, gstValue float64
+	var quantity, inclUndelivered, profitLoss, gstValue float64
 	for _, r := range rows {
 		note(colSRCompany, r.CompanyName, 0)
 		note(colSRItem, r.ItemName, 0)
@@ -313,17 +332,23 @@ func stockColWidths(rows []StockReportRow) [colSRCount]float64 {
 		note(colSRHSN, strconv.FormatInt(r.HSN, 10), 0)
 		note(colSRGSTPercent, strconv.FormatFloat(r.GSTPercent, 'f', 0, 64)+"%", 0)
 		note(colSRQuantity, strconv.FormatFloat(r.Quantity, 'f', 0, 64), 0)
+		note(colSRQtyInclUndelivered, strconv.FormatFloat(r.QuantityInclUndelivered, 'f', 0, 64), 0)
+		quantity += r.Quantity
+		inclUndelivered += r.QuantityInclUndelivered
+		if r.Quantity < 0 {
+			continue // money cells are blank on negative stock
+		}
 		note(colSRFinalRate, formatThousands(r.FinalRate), 0)
 		note(colSRBillingRate, formatThousands(r.BillingRate), 0)
 		note(colSRProfitLoss, formatThousands(r.ProfitLoss), 0)
 		note(colSRGSTValue, formatThousands(r.GSTValue), 0)
-		quantity += r.Quantity
 		profitLoss += r.ProfitLoss
 		gstValue += r.GSTValue
 	}
 	// Totals row is bold (wider glyphs), so give it an extra character.
 	note(colSRItem, "Totals", 1)
 	note(colSRQuantity, strconv.FormatFloat(quantity, 'f', 0, 64), 1)
+	note(colSRQtyInclUndelivered, strconv.FormatFloat(inclUndelivered, 'f', 0, 64), 1)
 	note(colSRProfitLoss, formatThousands(profitLoss), 1)
 	note(colSRGSTValue, formatThousands(gstValue), 1)
 
