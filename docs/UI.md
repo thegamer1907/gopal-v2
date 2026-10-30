@@ -381,6 +381,18 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   instead of `UpdateCustomer`) — same 9-field form and Name+City requirement either way.
 
 ### Reports (`/reports`) — top-nav "Reports"
+- **View (2026-10-30):** Purchase Summary, Stock Report, Order Report and Print Delivered Orders each
+  have an outline **View** button beside Download (disabled on the same conditions). It swaps the
+  page for a full-page view — `← Back` (left), the report title + one-line summary (filter/range/
+  as-of date, counts), **Download Excel/PDF** (right) — held as `view` state in `Reports` so Back
+  restores every filter and open row. The three tables (`ReportTable`) show exactly the Excel's
+  columns and bold Totals row (definitions in `@/lib/reportColumns`, mirroring the Go writers;
+  sticky header + Totals, horizontal scroll). Print Delivered Orders shows the PDF inline in an
+  `<iframe>` via a Blob URL (`DeliveredOrdersPdfPreview`, Go `PreviewDeliveredOrdersPDF`). Export
+  Delivered Orders (zip) has no view. The green **"Saved to …"** line (and red error lines) under a
+  report's buttons is cleared by the **next click or keypress anywhere** (document-level capture
+  listener in `Reports`), so a stale message never lingers after Back / a filter change / another row;
+  a new download sets its own message after the save finishes.
 - `src/pages/Reports.tsx`. An **expanding-row list** (2026-10-14; replaced the earlier card
   grid at the client's request) — one line per report inside a single `divide-y rounded-lg
   border` container: icon + title + short description + chevron. Clicking a row expands that

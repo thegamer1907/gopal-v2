@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
-import {FileSpreadsheet, Package, ClipboardList, Calendar as CalendarIcon, Printer, Archive, ChevronRight} from 'lucide-react';
+import {FileSpreadsheet, Package, ClipboardList, Calendar as CalendarIcon, Printer, Archive, ChevronRight, Eye} from 'lucide-react';
 import type {DateRange} from 'react-day-picker';
 import {
     ListPurchaseBills,
@@ -20,6 +20,9 @@ import {Calendar} from '@/components/ui/calendar';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {DateRangeFilter} from '@/components/DateRangeFilter';
 import {DeliveredOrderSelector} from '@/components/DeliveredOrderSelector';
+import {DeliveredOrdersPdfPreview} from '@/components/DeliveredOrdersPdfPreview';
+import {ReportTable} from '@/components/ReportTable';
+import {ReportView} from '@/components/ReportView';
 import {
     deliveryNumbers,
     emptySelection,
@@ -32,6 +35,7 @@ import {
 import {parseDate, formatDate, displayDate, todayDate} from '@/lib/date';
 import {calcLine, fmt} from '@/lib/purchaseBill';
 import {computeStockRows} from '@/lib/stockReport';
+import {orderReportColumns, purchaseSummaryColumns, stockReportColumns} from '@/lib/reportColumns';
 import {calcOrderLine, effectivePackSize, orderExportFilename, toOrderExportData} from '@/lib/salesOrder';
 import {cn} from '@/lib/utils';
 
@@ -94,6 +98,12 @@ function toRows(bills: db.PurchaseBill[]): reports.PurchaseSummaryRow[] {
     return rows;
 }
 
+// "01-Oct-26 to 29-Oct-26" for a picked range, "All dates" when none.
+function rangeLabel(range: DateRange | undefined): string {
+    if (!range?.from) return 'All dates';
+    return `${formatDate(range.from)} to ${formatDate(range.to ?? range.from)}`;
+}
+
 function filenameFor(range: DateRange | undefined): string {
     if (range?.from) {
         const from = formatDate(range.from);
@@ -112,6 +122,12 @@ function stockFilenameFor(asOfDate: string): string {
 // --- Order Report ---
 
 type DeliveryFilter = 'all' | 'delivered' | 'pending';
+
+const deliveryFilterLabel: Record<DeliveryFilter, string> = {
+    all: 'All orders',
+    delivered: 'Delivered only',
+    pending: 'Pending only',
+};
 
 function matchesDelivery(order: db.SalesOrder, filter: DeliveryFilter): boolean {
     if (filter === 'all') return true;
@@ -206,6 +222,9 @@ function ReportRow({icon, title, description, open, onToggle, children}: {
 export function Reports() {
     const [openId, setOpenId] = useState<string | null>(null);
     const toggle = (id: string) => setOpenId((cur) => (cur === id ? null : id));
+    // On-screen view of one report (Reports → View). Keeping it as state means Back returns to
+    // the list with every filter / as-of date / open row exactly as it was.
+    const [view, setView] = useState<'purchase' | 'stock' | 'orders' | 'print' | null>(null);
     const [bills, setBills] = useState<db.PurchaseBill[]>([]);
     const [items, setItems] = useState<db.Item[]>([]);
     const [orders, setOrders] = useState<db.SalesOrder[]>([]);
@@ -372,6 +391,96 @@ export function Reports() {
         }
     }
 
+    // The green "Saved to …" (and red error) lines belong to the moment of the download: clear
+    // them on the next click or keypress anywhere — Back, a filter, another row, anything. A new
+    // download sets its own message after the save finishes, so it isn't wiped by its own click.
+    useEffect(() => {
+        const clearNotices = () => {
+            setSaved('');
+            setError('');
+            setStockSaved('');
+            setStockError('');
+            setOrderSaved('');
+            setOrderError('');
+            setPrintSaved('');
+            setPrintError('');
+            setZipSaved('');
+            setZipError('');
+        };
+        document.addEventListener('pointerdown', clearNotices, true);
+        document.addEventListener('keydown', clearNotices, true);
+        return () => {
+            document.removeEventListener('pointerdown', clearNotices, true);
+            document.removeEventListener('keydown', clearNotices, true);
+        };
+    }, []);
+
+    // On-screen views: same rows/totals as the Excel/PDF downloads (see @/lib/reportColumns).
+    if (view === 'purchase') {
+        return (
+            <ReportView
+                title="Purchase Summary"
+                summary={`${rangeLabel(range)} · ${rows.length} line${rows.length === 1 ? '' : 's'} across ${filteredBills.length} bill${filteredBills.length === 1 ? '' : 's'}`}
+                onBack={() => setView(null)}
+                downloadLabel="Download Excel"
+                onDownload={download}
+                downloading={busy}
+                notice={saved}
+                error={error}
+            >
+                <ReportTable columns={purchaseSummaryColumns} rows={rows}/>
+            </ReportView>
+        );
+    }
+    if (view === 'stock') {
+        return (
+            <ReportView
+                title={`Stock Report — as of ${asOfDate}`}
+                summary={`${stockRows.length} item${stockRows.length === 1 ? '' : 's'}`}
+                onBack={() => setView(null)}
+                downloadLabel="Download Excel"
+                onDownload={downloadStock}
+                downloading={stockBusy}
+                notice={stockSaved}
+                error={stockError}
+            >
+                <ReportTable columns={stockReportColumns} rows={stockRows}/>
+            </ReportView>
+        );
+    }
+    if (view === 'orders') {
+        return (
+            <ReportView
+                title="Order Report"
+                summary={`${deliveryFilterLabel[deliveryFilter]} · ${rangeLabel(orderRange)} · ${orderRows.length} line${orderRows.length === 1 ? '' : 's'} across ${filteredOrders.length} order${filteredOrders.length === 1 ? '' : 's'}`}
+                onBack={() => setView(null)}
+                downloadLabel="Download Excel"
+                onDownload={downloadOrderReport}
+                downloading={orderBusy}
+                notice={orderSaved}
+                error={orderError}
+            >
+                <ReportTable columns={orderReportColumns} rows={orderRows}/>
+            </ReportView>
+        );
+    }
+    if (view === 'print') {
+        return (
+            <ReportView
+                title="Delivered Orders"
+                summary={`${selectionLabel(printSel)} · ${deliveredOrders.length} order${deliveredOrders.length === 1 ? '' : 's'}`}
+                onBack={() => setView(null)}
+                downloadLabel="Download PDF"
+                onDownload={downloadDeliveredOrders}
+                downloading={printBusy}
+                notice={printSaved}
+                error={printError}
+            >
+                <DeliveredOrdersPdfPreview entries={printEntries}/>
+            </ReportView>
+        );
+    }
+
     return (
         <div className="space-y-4">
 
@@ -395,9 +504,15 @@ export function Reports() {
                               : `${rows.length} line${rows.length === 1 ? '' : 's'} across ${filteredBills.length} bill${filteredBills.length === 1 ? '' : 's'} · ${fmt(totalValue)}`}
                     </p>
 
-                    <Button onClick={download} disabled={busy || loading || rows.length === 0}>
-                        {busy ? 'Preparing…' : 'Download Excel'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => setView('purchase')} disabled={loading || rows.length === 0}>
+                            <Eye className="size-4"/>
+                            View
+                        </Button>
+                        <Button onClick={download} disabled={busy || loading || rows.length === 0}>
+                            {busy ? 'Preparing…' : 'Download Excel'}
+                        </Button>
+                    </div>
 
                     {saved && <p className="text-sm text-emerald-600">{saved}</p>}
                     {error && <p className="text-sm text-destructive">{error}</p>}
@@ -454,9 +569,15 @@ export function Reports() {
                               : `${stockRows.length} item${stockRows.length === 1 ? '' : 's'} · stock as of ${asOfDate}`}
                     </p>
 
-                    <Button onClick={downloadStock} disabled={stockBusy || loading || !parsedAsOf || stockRows.length === 0}>
-                        {stockBusy ? 'Preparing…' : 'Download Excel'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => setView('stock')} disabled={loading || !parsedAsOf || stockRows.length === 0}>
+                            <Eye className="size-4"/>
+                            View
+                        </Button>
+                        <Button onClick={downloadStock} disabled={stockBusy || loading || !parsedAsOf || stockRows.length === 0}>
+                            {stockBusy ? 'Preparing…' : 'Download Excel'}
+                        </Button>
+                    </div>
 
                     {stockSaved && <p className="text-sm text-emerald-600">{stockSaved}</p>}
                     {stockError && <p className="text-sm text-destructive">{stockError}</p>}
@@ -491,9 +612,15 @@ export function Reports() {
                               : `${orderRows.length} line${orderRows.length === 1 ? '' : 's'} across ${filteredOrders.length} order${filteredOrders.length === 1 ? '' : 's'} · ${fmt(orderTotalValue)}`}
                     </p>
 
-                    <Button onClick={downloadOrderReport} disabled={orderBusy || loading || orderRows.length === 0}>
-                        {orderBusy ? 'Preparing…' : 'Download Excel'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => setView('orders')} disabled={loading || orderRows.length === 0}>
+                            <Eye className="size-4"/>
+                            View
+                        </Button>
+                        <Button onClick={downloadOrderReport} disabled={orderBusy || loading || orderRows.length === 0}>
+                            {orderBusy ? 'Preparing…' : 'Download Excel'}
+                        </Button>
+                    </div>
 
                     {orderSaved && <p className="text-sm text-emerald-600">{orderSaved}</p>}
                     {orderError && <p className="text-sm text-destructive">{orderError}</p>}
@@ -518,9 +645,15 @@ export function Reports() {
                               : `${deliveredOrders.length} order${deliveredOrders.length === 1 ? '' : 's'} ready to print`}
                     </p>
 
-                    <Button onClick={downloadDeliveredOrders} disabled={printBusy || loading || !printValid || deliveredOrders.length === 0}>
-                        {printBusy ? 'Preparing…' : 'Download PDF'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => setView('print')} disabled={loading || !printValid || deliveredOrders.length === 0}>
+                            <Eye className="size-4"/>
+                            View
+                        </Button>
+                        <Button onClick={downloadDeliveredOrders} disabled={printBusy || loading || !printValid || deliveredOrders.length === 0}>
+                            {printBusy ? 'Preparing…' : 'Download PDF'}
+                        </Button>
+                    </div>
 
                     {printSaved && <p className="text-sm text-emerald-600">{printSaved}</p>}
                     {printError && <p className="text-sm text-destructive">{printError}</p>}

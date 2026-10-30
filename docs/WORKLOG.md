@@ -6,6 +6,28 @@ reads the top entry first.
 
 ---
 
+## 2026-10-30 — Reports: on-screen View
+**Did:** per DECISIONS 2026-10-30. New `lib/reportColumns.ts` (+ tests), `ReportTable`, `ReportView`,
+`DeliveredOrdersPdfPreview`; `Reports.tsx` gets a `view` state and View buttons; Go
+`reports.RenderDeliveredOrdersPDF` + `App.PreviewDeliveredOrdersPDF` (+ test). `go vet`, `go test ./...`,
+`npm test` (23), `tsc` clean. **Verified live in Chrome:** Purchase Summary view = 229 rows / 18 columns,
+Totals equal an independent sqlite sum (13,812 / 47,391 / 3,16,615); Stock view = 100 items, Eclair 1,194 /
+1,049, Totals 13,792 / 13,575 = purchased − delivered / − all; Order Report "Delivered only" view = the two
+delivered lines, Qty 20, 10,880.00; Back keeps filters; PDF preview renders both delivered orders.
+**Not verified:** the PDF iframe inside the actual desktop window (Windows WebView2 — fallback is to drop
+the preview), the native Save dialogs, Stock view with a negative-stock row (covered by unit test only),
+Purchase view with a date range. Not committed.
+
+**Follow-up (same day):** client noticed the green "Saved to …" line stayed after Back / changing the
+date. Now every saved/error line clears on the next click or keypress anywhere in Reports. Verified in
+Chrome with `ExportStockReport` stubbed in-page (the native Save dialog can't be driven): message shows after
+download, disappears on a real click on Back and on a real click into the date field.
+
+**Next steps:** user checks the PDF preview in the Windows app; commit/push/tag when asked (local commits
+`08233c6`, `efd27fa`, `246f7b2` still unpushed).
+
+---
+
 ## 2026-10-29 — Two stock figures on Items master + Add Order
 **Did:** per DECISIONS 2026-10-29 (two stock figures). `Item.Stock` → `StockDelivered` + `StockInclUndelivered`
 (`itemSelect`), two columns each in `Items.tsx` (both sortable) and `AddOrder.tsx` (footer colSpan 5→6). Go test

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -480,6 +481,17 @@ func (a *App) ExportDeliveredOrdersPDF(entries []reports.DeliveredOrdersPrintEnt
 		return "", err
 	}
 	return path, nil
+}
+
+// PreviewDeliveredOrdersPDF renders the same PDF ExportDeliveredOrdersPDF would save and
+// returns it base64-encoded (no save dialog, nothing written to a user-chosen path) so the
+// Reports page can show it inline before the user decides to download.
+func (a *App) PreviewDeliveredOrdersPDF(entries []reports.DeliveredOrdersPrintEntry) (string, error) {
+	data, err := reports.RenderDeliveredOrdersPDF(entries)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(data), nil
 }
 
 // ExportDeliveredOrdersExcelZip prompts for a save location and writes one .xlsx per given

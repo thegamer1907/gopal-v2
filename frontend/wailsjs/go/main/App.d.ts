@@ -72,6 +72,8 @@ export function MarkSalesOrderDelivered(arg1:number):Promise<db.SalesOrder>;
 
 export function OpenExistingDatabase():Promise<string>;
 
+export function PreviewDeliveredOrdersPDF(arg1:Array<reports.DeliveredOrdersPrintEntry>):Promise<string>;
+
 export function Quit():Promise<void>;
 
 export function SaveOrderShareImage(arg1:Array<number>,arg2:string):Promise<string>;

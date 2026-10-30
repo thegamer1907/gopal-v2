@@ -138,6 +138,10 @@ export function OpenExistingDatabase() {
   return window['go']['main']['App']['OpenExistingDatabase']();
 }
 
+export function PreviewDeliveredOrdersPDF(arg1) {
+  return window['go']['main']['App']['PreviewDeliveredOrdersPDF'](arg1);
+}
+
 export function Quit() {
   return window['go']['main']['App']['Quit']();
 }

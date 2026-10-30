@@ -728,6 +728,31 @@ func fitDeliveredOrdersCols(pdf *gopdf.GoPdf, entries []DeliveredOrdersPrintEntr
 // back to drawOrderBlock's own mid-table page-break safety net). The sequence itself is
 // never reordered — a table simply starts the next page when it doesn't fit.
 func WriteDeliveredOrdersPDF(path string, entries []DeliveredOrdersPrintEntry) error {
+	return writeDeliveredOrdersPDF(path, entries)
+}
+
+// RenderDeliveredOrdersPDF returns the same PDF WriteDeliveredOrdersPDF would save, as bytes,
+// for the on-screen preview (Reports → Print Delivered Orders → View). It goes through a
+// temp file because the PDF library only writes to a path.
+func RenderDeliveredOrdersPDF(entries []DeliveredOrdersPrintEntry) ([]byte, error) {
+	f, err := os.CreateTemp("", "delivered-orders-*.pdf")
+	if err != nil {
+		return nil, fmt.Errorf("temp file: %w", err)
+	}
+	path := f.Name()
+	f.Close()
+	defer os.Remove(path)
+	if err := writeDeliveredOrdersPDF(path, entries); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read rendered pdf: %w", err)
+	}
+	return data, nil
+}
+
+func writeDeliveredOrdersPDF(path string, entries []DeliveredOrdersPrintEntry) error {
 	pdf := gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.SetMargins(pdfMarginPt, pdfMarginPt, pdfMarginPt, pdfMarginPt)

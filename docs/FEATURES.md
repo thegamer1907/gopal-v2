@@ -8,6 +8,7 @@ spec (what it does, key behaviors). Move items between sections as work progress
 
 ## Shipped
 
+_Built (2026-10-30, uncommitted): **Reports → View** — Purchase Summary, Stock Report, Order Report and Print Delivered Orders can be viewed on screen (same columns/Totals as the Excel; PDF shown inline) with a Back button, in addition to downloading. See DECISIONS._
 _Built (2026-10-29, uncommitted): **Two stock figures on the Items master and Add Order** — **Stock** (delivered orders only) and **Stock incl. Undelivered** (all orders), matching the Stock Report. See DECISIONS._
 _Built (2026-10-29, uncommitted): **Dashboard "Don't remind me"** — a Reminder column on the lapsed-customers card; the button opens a dialog (default 15 days; days/weeks/months) and hides that customer until the time is up, stored in the new `customer_snoozes` table. See DECISIONS._
 _Built (2026-10-29, uncommitted): **Item Tax Name** — optional info-only per-item field (Items add form/table, New/Edit item dialogs); not used in any export (it started as an export nickname the same day and was repurposed). Also the Less/Add line now reads `Less: 5 × Item` (no dash). See DECISIONS._

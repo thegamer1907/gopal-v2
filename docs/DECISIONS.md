@@ -1192,3 +1192,22 @@ have to re-litigate.
 - **Notes:** still derived on read, no schema change; no over-sell validation (unchanged). Add Order's
   Totals row colSpan went 5 → 6 for the extra column.
 
+### 2026-10-30 — Reports: on-screen "View" for each report (+ inline PDF preview)
+- **Decision:** a **View** button on Purchase Summary, Stock Report, Order Report and Print Delivered
+  Orders. The view is **in-page state** (`view` in `Reports`), not a route, so Back returns with the
+  filters/as-of date/open row intact and nothing needs serializing into the URL. Tables mirror the Excel
+  exports header-for-header and total-for-total via `lib/reportColumns.ts` (the Go writers stay the
+  layout authority for files; a Vitest test pins the header lists so the two can't drift silently).
+  Same rows as the download, so no math is re-derived. No sorting/filters inside the view.
+- **PDF preview:** Go `PreviewDeliveredOrdersPDF` renders the same PDF to a temp file and returns it
+  base64; the frontend shows it in an `<iframe>` through a Blob URL (no PDF library). Export Delivered
+  Orders (zip) deliberately has no view.
+- **Risk:** the iframe relies on the webview's built-in PDF viewer. Verified in Chrome; **not verified in
+  the Windows WebView2 / macOS WKWebView desktop windows**. If it renders blank there, drop the preview
+  and keep Download only (the rest of the feature is independent of it).
+- **Why:** client wanted to see the reports in the app, not only download them.
+- **Follow-up (2026-10-30):** the "Saved to …"/error lines under each report now clear on the next click or
+  keypress anywhere on `/reports` (document-level capture listener), instead of lingering until reload.
+  Chosen over clearing per state change because it also covers "I clicked something else" with no state
+  change; a download sets its message after the save resolves, so it survives its own click.
+
