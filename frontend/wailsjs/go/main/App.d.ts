@@ -3,6 +3,7 @@
 import {db} from '../models';
 import {updater} from '../models';
 import {reports} from '../models';
+import {main} from '../models';
 
 export function AddCompany(arg1:string):Promise<db.Company>;
 
@@ -15,6 +16,8 @@ export function AddPurchaseBill(arg1:db.PurchaseBill):Promise<db.PurchaseBill>;
 export function AddSalesOrder(arg1:db.SalesOrder):Promise<db.SalesOrder>;
 
 export function CheckForUpdate():Promise<updater.Info>;
+
+export function ChooseBackupFolder():Promise<string>;
 
 export function CreateNewDatabase():Promise<string>;
 
@@ -46,6 +49,8 @@ export function ExportStockReport(arg1:Array<reports.StockReportRow>,arg2:string
 
 export function GetAppVersion():Promise<string>;
 
+export function GetBackupStatus():Promise<main.BackupStatus>;
+
 export function GetDatabasePath():Promise<string>;
 
 export function GetItemRateHistory(arg1:number):Promise<Array<db.ItemRateHistoryEntry>>;
@@ -75,6 +80,8 @@ export function OpenExistingDatabase():Promise<string>;
 export function PreviewDeliveredOrdersPDF(arg1:Array<reports.DeliveredOrdersPrintEntry>):Promise<string>;
 
 export function Quit():Promise<void>;
+
+export function ResetBackupFolder():Promise<void>;
 
 export function SaveOrderShareImage(arg1:Array<number>,arg2:string):Promise<string>;
 

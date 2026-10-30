@@ -6,6 +6,25 @@ reads the top entry first.
 
 ---
 
+## 2026-10-30 — Automatic daily DB backups
+**Did:** per DECISIONS 2026-10-30 (backups). New `internal/backup` (`Run`/`ResolveDir`/`Summary`, `VACUUM INTO` +
+tmp/rename, 30-newest retention), `Config.BackupDir` + `db.UpdateConfig` (fixed `switchTo`/startup fallback
+clobbering config), `App.GetBackupStatus`/`ChooseBackupFolder`/`ResetBackupFolder`/`runBackupCheck` (run at
+startup, after switching DB, after folder change), Settings → Backups card, `lib/backupStatus.ts`. `go vet`,
+`go test ./...` (new: 5 backup tests incl. month/year rollover, prune + foreign files, unwritable folder; config
+merge test), `npm test` (25), `tsc` clean. **Verified live:** the running `wails dev` rebuilt and created
+`~/Downloads/DB backup/inventory-backup-2026-10-29.db` — table counts + `integrity_check` identical to the live
+DB; a forced restart left it untouched (no second file); Settings shows the card (Default pill, "1 backup ·
+latest … (29-Oct-26)", Use default disabled). **Not driven:** the native folder picker (Change folder…) — logic
+covered by Go tests, needs a manual check on Windows; the 30-day prune against real elapsed days (unit test only);
+failure display (no failing folder tried live). That test backup file is in the dev DB's folder (`~/Downloads`).
+Not committed.
+
+**Next steps:** user review; consider a backup before **Wipe database**; commit/push/tag when asked (4 local
+unpushed commits from earlier + today's work).
+
+---
+
 ## 2026-10-30 — Reports: on-screen View
 **Did:** per DECISIONS 2026-10-30. New `lib/reportColumns.ts` (+ tests), `ReportTable`, `ReportView`,
 `DeliveredOrdersPdfPreview`; `Reports.tsx` gets a `view` state and View buttons; Go

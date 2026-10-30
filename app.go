@@ -10,10 +10,12 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"gopal-v2/internal/backup"
 	"gopal-v2/internal/db"
 	"gopal-v2/internal/reports"
 	"gopal-v2/internal/updater"
@@ -27,6 +29,8 @@ type App struct {
 	ctx    context.Context
 	db     *sql.DB
 	dbPath string // absolute path of the currently-open database file
+
+	backupErr string // last failed backup attempt ("" = fine); shown in Settings
 }
 
 // NewApp creates a new App application struct
@@ -39,6 +43,8 @@ func NewApp() *App {
 // user-configured path, falling back to the default if that path can't be opened.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// Whichever way the database ends up open below, run the boot-time backup check last.
+	defer a.runBackupCheck()
 
 	path, err := db.ActivePath()
 	if err == nil {
@@ -64,7 +70,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.db = conn
 	a.dbPath = defaultPath
-	_ = db.SaveConfig(db.Config{}) // reset to default; ignore write errors
+	_ = db.UpdateConfig(func(c *db.Config) { c.DBPath = "" }) // reset to default; ignore write errors
 }
 
 // shutdown is called when the app closes; release the database handle.
@@ -292,6 +298,82 @@ func (a *App) WipeDatabase() error {
 	return nil
 }
 
+// --- Backups (Settings → Backups) ---
+
+// BackupStatus is what the Settings page shows about the backup folder.
+type BackupStatus struct {
+	Dir        string `json:"dir"`
+	IsCustom   bool   `json:"isCustom"`   // false = the default "DB backup" folder beside the database
+	Count      int    `json:"count"`      // backups currently in the folder
+	LatestFile string `json:"latestFile"` // newest backup's file name, "" if none
+	LatestDate string `json:"latestDate"` // that backup's day, YYYY-MM-DD
+	LastError  string `json:"lastError"`  // last failed backup attempt, "" if fine
+}
+
+// backupDir resolves the folder backups currently go to, and whether it is a custom one.
+func (a *App) backupDir() (string, bool) {
+	cfg, _ := db.LoadConfig()
+	return backup.ResolveDir(a.dbPath, cfg.BackupDir), strings.TrimSpace(cfg.BackupDir) != ""
+}
+
+// runBackupCheck applies the boot-time rule (see internal/backup): if there is no backup
+// for yesterday, copy the database now. A failure never blocks the app — it is logged and
+// kept for Settings to show.
+func (a *App) runBackupCheck() {
+	if a.db == nil {
+		return
+	}
+	dir, _ := a.backupDir()
+	if _, err := backup.Run(a.db, dir, time.Now()); err != nil {
+		a.backupErr = err.Error()
+		fmt.Printf("database backup failed: %v\n", err)
+		return
+	}
+	a.backupErr = ""
+}
+
+// GetBackupStatus describes the backup folder for Settings.
+func (a *App) GetBackupStatus() BackupStatus {
+	dir, custom := a.backupDir()
+	st := BackupStatus{Dir: dir, IsCustom: custom, LastError: a.backupErr}
+	if info, err := backup.Summary(dir); err == nil {
+		st.Count, st.LatestFile, st.LatestDate = info.Count, info.LatestFile, info.LatestDate
+	} else if st.LastError == "" {
+		st.LastError = err.Error()
+	}
+	return st
+}
+
+// ChooseBackupFolder prompts for a backup folder, remembers it and runs a backup check
+// against it. Returns the chosen folder, or "" if the user cancelled.
+func (a *App) ChooseBackupFolder() (string, error) {
+	dir, _ := a.backupDir()
+	path, err := wruntime.OpenDirectoryDialog(a.ctx, wruntime.OpenDialogOptions{
+		Title:            "Choose backup folder",
+		DefaultDirectory: dir,
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := db.UpdateConfig(func(c *db.Config) { c.BackupDir = path }); err != nil {
+		return "", err
+	}
+	a.runBackupCheck()
+	return path, nil
+}
+
+// ResetBackupFolder goes back to the default "DB backup" folder beside the database.
+func (a *App) ResetBackupFolder() error {
+	if err := db.UpdateConfig(func(c *db.Config) { c.BackupDir = "" }); err != nil {
+		return err
+	}
+	a.runBackupCheck()
+	return nil
+}
+
 // Quit closes the application (from the sidebar Logout button).
 func (a *App) Quit() {
 	wruntime.Quit(a.ctx)
@@ -310,7 +392,11 @@ func (a *App) switchTo(path string) error {
 	}
 	a.db = conn
 	a.dbPath = path
-	return db.SaveConfig(db.Config{DBPath: path})
+	if err := db.UpdateConfig(func(c *db.Config) { c.DBPath = path }); err != nil {
+		return err
+	}
+	a.runBackupCheck() // the new database gets its own day N-1 backup if it lacks one
+	return nil
 }
 
 // AddPurchaseBill saves a purchase bill (header + line items) and returns it with

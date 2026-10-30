@@ -34,11 +34,20 @@ The DB file location is **user-configurable** (Settings → Database). On startu
 the path from **`config.json`** if set, otherwise the default `inventory.db`:
 
 - `config.json` (next to the default DB, e.g. `~/Library/Application Support/gopal-v2/config.json`)
-  holds `{ "dbPath": "<absolute path>" }`. Empty/missing → use the default.
+  holds `{ "dbPath": "<absolute path>", "backupDir": "<absolute path>" }`. Empty/missing → use the
+  default (`backupDir` empty = the `DB backup` folder beside the database file). Always modify it
+  through `db.UpdateConfig` (load → change one field → save): `SaveConfig` overwrites the whole file.
 - Resolution: `db.ActivePath()` → configured `dbPath` or `db.DefaultPath()`; opened via
   `db.OpenAt`. If the configured path fails to open, startup **falls back to the default** and
   resets the config (a bad saved path can't brick the app). See `internal/db/config.go`,
   `app.go` (`startup`, `switchTo`, `WipeDatabase`) and `docs/DECISIONS.md`.
+
+### Backups (no schema; files only)
+`internal/backup` writes `inventory-backup-YYYY-MM-DD.db` (ISO date of the **previous** day) into the
+backup folder — default `<db folder>/DB backup`, or `config.json` `backupDir`. Each file is a full,
+standalone SQLite database made with `VACUUM INTO` (written as `*.tmp`, then renamed). The newest 30
+are kept; anything not matching that exact name pattern is never deleted. To restore: copy a backup
+over (or open it via Settings → Open existing database…).
 
 ---
 

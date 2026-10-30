@@ -260,6 +260,33 @@ export namespace db {
 
 }
 
+export namespace main {
+	
+	export class BackupStatus {
+	    dir: string;
+	    isCustom: boolean;
+	    count: number;
+	    latestFile: string;
+	    latestDate: string;
+	    lastError: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BackupStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dir = source["dir"];
+	        this.isCustom = source["isCustom"];
+	        this.count = source["count"];
+	        this.latestFile = source["latestFile"];
+	        this.latestDate = source["latestDate"];
+	        this.lastError = source["lastError"];
+	    }
+	}
+
+}
+
 export namespace reports {
 	
 	export class OrderExportDeduction {

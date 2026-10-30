@@ -500,7 +500,13 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
     is never reordered across the page break.
 
 ### Settings (`/settings`) — top-nav "Settings" (right-aligned group)
-- `src/pages/Settings.tsx`. First (and only) section is **Database**:
+- `src/pages/Settings.tsx`. Sections: **Database**, **Backups** (below), **Updates**.
+- **Backups** card (2026-10-30): the backup folder in the same monospace box as the DB path with a
+  "Default" pill when not customized, "N backups · latest <file> (dd-mmm-yy)" (or "No backups yet."),
+  **Change folder…** (native folder picker → saved, then a backup check runs against it) and
+  **Use default** (disabled while already default), plus a red "Last backup attempt failed: …" line
+  if the last automatic attempt errored. No manual "Back up now".
+- **Database** section:
   - **Current location** — `GetDatabasePath()` shown in a monospace box (dir muted, filename
     emphasized).
   - **Open existing database…** (`OpenExistingDatabase`) and **Create new database…**

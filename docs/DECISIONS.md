@@ -1211,3 +1211,22 @@ have to re-litigate.
   Chosen over clearing per state change because it also covers "I clicked something else" with no state
   change; a download sets its message after the save resolves, so it survives its own click.
 
+### 2026-10-30 — Automatic daily database backups (boot-time, 30 kept)
+- **Decision:** on every boot (and after switching database or changing the backup folder) the app applies
+  the client's rule using the **system date**: if no backup named for **yesterday (N−1)** exists, copy the
+  database now and name the copy N−1 — the DB at the first boot of day N holds everything up to the end of
+  N−1. Later boots the same day are no-ops. After each run, only the **newest 30** backups are kept
+  (count-based, by the date in the name); files not matching `inventory-backup-YYYY-MM-DD.db` are never
+  touched. Days the app wasn't opened leave no file (no gap-filling) — the next boot just writes one for
+  its own N−1.
+- **How:** `internal/backup` uses SQLite's `VACUUM INTO` (consistent snapshot while the DB is open — a raw
+  file copy could catch it mid-write), to `<name>.tmp` then rename, so a crash never leaves a believable-
+  but-truncated backup. ISO dates in file names so they sort and parse unambiguously (the UI still shows
+  dd-mmm-yy). Default folder `DB backup` beside the database file (`backup.ResolveDir`); override in
+  Settings → Backups (`config.json` `backupDir`).
+- **Failures never block the app:** logged, kept in memory, and shown on the Settings card.
+- **Config fix:** `switchTo` and the startup fallback used `SaveConfig(Config{...})`, which would have wiped
+  `backupDir`; they now use `db.UpdateConfig` (change one field, keep the rest).
+- **Not included (not asked):** a manual "Back up now", a restore UI (restore = Open existing database…),
+  a backup before **Wipe database** — worth considering, since Wipe is the one irreversible action.
+

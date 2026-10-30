@@ -12,10 +12,14 @@ import (
 // the user's chosen database location across restarts.
 const configFileName = "config.json"
 
-// Config holds user-configurable storage settings. For now just the active
-// database path; more settings can be added here later.
+// Config holds user-configurable storage settings: the active database path and the
+// backup folder. Always change it through UpdateConfig so a setting you didn't touch is
+// preserved (SaveConfig overwrites the whole file).
 type Config struct {
 	DBPath string `json:"dbPath"`
+	// BackupDir is where daily database backups go. "" means the default: a "DB backup"
+	// folder beside the database file (see internal/backup).
+	BackupDir string `json:"backupDir"`
 }
 
 // configPath returns the absolute path to config.json (creating the app dir).
@@ -62,6 +66,17 @@ func SaveConfig(c Config) error {
 		return fmt.Errorf("write config %q: %w", path, err)
 	}
 	return nil
+}
+
+// UpdateConfig loads config.json, applies mutate to it and saves it, so changing one
+// setting never clobbers the others.
+func UpdateConfig(mutate func(*Config)) error {
+	c, err := LoadConfig()
+	if err != nil {
+		return err
+	}
+	mutate(&c)
+	return SaveConfig(c)
 }
 
 // ActivePath returns the database path the app should open: the configured

@@ -1,7 +1,10 @@
 import {useEffect, useState} from 'react';
-import {Database, FolderOpen, FilePlus2, Trash2, AlertTriangle, Download, RefreshCw} from 'lucide-react';
+import {Database, FolderOpen, FilePlus2, Trash2, AlertTriangle, Download, RefreshCw, ArchiveRestore} from 'lucide-react';
 import {
     GetDatabasePath,
+    GetBackupStatus,
+    ChooseBackupFolder,
+    ResetBackupFolder,
     OpenExistingDatabase,
     CreateNewDatabase,
     WipeDatabase,
@@ -9,7 +12,8 @@ import {
     CheckForUpdate,
     DownloadAndInstallUpdate,
 } from '../../wailsjs/go/main/App';
-import {updater} from '../../wailsjs/go/models';
+import {main, updater} from '../../wailsjs/go/models';
+import {parseIsoDate} from '@/lib/backupStatus';
 import {Button} from '@/components/ui/button';
 import {
     Card,
@@ -29,8 +33,8 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-// Settings — currently a single Database section: shows where the DB is loaded
-// from and lets the user switch files or wipe it. Switching/wiping reloads the
+// Settings — Database (where the DB is loaded from; switch files or wipe it), Backups
+// (daily automatic copies and their folder) and Updates. Switching/wiping reloads the
 // app so every page re-fetches against the new database. See docs/UI.md.
 
 // Split a path into directory + filename for a clearer display.
@@ -46,6 +50,10 @@ export function Settings() {
     const [error, setError] = useState('');
     const [confirmWipe, setConfirmWipe] = useState(false);
 
+    const [backup, setBackup] = useState<main.BackupStatus | null>(null);
+    const [backupBusy, setBackupBusy] = useState(false);
+    const [backupError, setBackupError] = useState('');
+
     const [version, setVersion] = useState('');
     const [checking, setChecking] = useState(false);
     const [installing, setInstalling] = useState(false);
@@ -55,6 +63,7 @@ export function Settings() {
 
     useEffect(() => {
         GetDatabasePath().then(setPath).catch((e) => setError(String(e)));
+        GetBackupStatus().then(setBackup).catch((e) => setBackupError(String(e)));
         GetAppVersion().then(setVersion);
     }, []);
 
@@ -83,6 +92,21 @@ export function Settings() {
             setUpdateError(String(e));
         } finally {
             setInstalling(false);
+        }
+    }
+
+    // Change/reset the backup folder (each also runs a backup check against the new folder),
+    // then re-read the status. No page reload needed — nothing else depends on it.
+    async function changeBackup(fn: () => Promise<string | void>) {
+        setBackupError('');
+        setBackupBusy(true);
+        try {
+            await fn();
+            setBackup(await GetBackupStatus());
+        } catch (e: any) {
+            setBackupError(String(e));
+        } finally {
+            setBackupBusy(false);
         }
     }
 
@@ -192,6 +216,64 @@ export function Settings() {
                             </div>
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <ArchiveRestore className="size-5 text-muted-foreground"/>
+                        <CardTitle>Backups</CardTitle>
+                    </div>
+                    <CardDescription>
+                        A copy of the database is saved automatically the first time the app opens each
+                        day (named for the previous day). The last 30 days are kept; older copies are
+                        deleted.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-1.5">
+                        <p className="flex items-center gap-2 text-sm font-medium">
+                            Backup folder
+                            {backup && !backup.isCustom && (
+                                <span className="rounded-full border px-2 py-0.5 text-xs font-normal text-muted-foreground">
+                                    Default
+                                </span>
+                            )}
+                        </p>
+                        <div className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-sm break-all">
+                            {backup ? backup.dir : '—'}
+                        </div>
+                        {backup && (
+                            <p className="text-sm text-muted-foreground">
+                                {backup.count === 0
+                                    ? 'No backups yet.'
+                                    : `${backup.count} backup${backup.count === 1 ? '' : 's'} · latest ${backup.latestFile} (${
+                                          parseIsoDate(backup.latestDate) || backup.latestDate
+                                      })`}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                        <Button variant="outline" disabled={backupBusy} onClick={() => changeBackup(ChooseBackupFolder)}>
+                            <FolderOpen className="size-4"/>
+                            Change folder…
+                        </Button>
+                        <Button
+                            variant="outline"
+                            disabled={backupBusy || !backup?.isCustom}
+                            onClick={() => changeBackup(ResetBackupFolder)}
+                        >
+                            Use default
+                        </Button>
+                    </div>
+
+                    {(backupError || backup?.lastError) && (
+                        <p className="text-sm text-destructive">
+                            Last backup attempt failed: {backupError || backup?.lastError}
+                        </p>
+                    )}
                 </CardContent>
             </Card>
 

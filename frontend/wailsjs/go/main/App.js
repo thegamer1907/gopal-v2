@@ -26,6 +26,10 @@ export function CheckForUpdate() {
   return window['go']['main']['App']['CheckForUpdate']();
 }
 
+export function ChooseBackupFolder() {
+  return window['go']['main']['App']['ChooseBackupFolder']();
+}
+
 export function CreateNewDatabase() {
   return window['go']['main']['App']['CreateNewDatabase']();
 }
@@ -86,6 +90,10 @@ export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
 }
 
+export function GetBackupStatus() {
+  return window['go']['main']['App']['GetBackupStatus']();
+}
+
 export function GetDatabasePath() {
   return window['go']['main']['App']['GetDatabasePath']();
 }
@@ -144,6 +152,10 @@ export function PreviewDeliveredOrdersPDF(arg1) {
 
 export function Quit() {
   return window['go']['main']['App']['Quit']();
+}
+
+export function ResetBackupFolder() {
+  return window['go']['main']['App']['ResetBackupFolder']();
 }
 
 export function SaveOrderShareImage(arg1, arg2) {
