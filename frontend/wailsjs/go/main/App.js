@@ -106,6 +106,10 @@ export function ListCompanies() {
   return window['go']['main']['App']['ListCompanies']();
 }
 
+export function ListCustomerSnoozes() {
+  return window['go']['main']['App']['ListCustomerSnoozes']();
+}
+
 export function ListCustomers() {
   return window['go']['main']['App']['ListCustomers']();
 }
@@ -140,6 +144,10 @@ export function Quit() {
 
 export function SaveOrderShareImage(arg1, arg2) {
   return window['go']['main']['App']['SaveOrderShareImage'](arg1, arg2);
+}
+
+export function SnoozeCustomer(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SnoozeCustomer'](arg1, arg2, arg3, arg4);
 }
 
 export function UpdateCompany(arg1, arg2) {

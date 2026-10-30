@@ -101,7 +101,8 @@ export function Items() {
             gstPercent: (it) => it.gstPercent,
             hsn: (it) => it.hsn,
             taxName: (it) => it.taxName,
-            stock: (it) => it.stock,
+            stockDelivered: (it) => it.stockDelivered,
+            stockInclUndelivered: (it) => it.stockInclUndelivered,
         },
         {key: 'company', dir: 'asc'},
     );
@@ -265,7 +266,8 @@ export function Items() {
                                     <SortableHeader label="Pack Size" sortKey="packSize" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                     <SortableHeader label="GST %" sortKey="gstPercent" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <SortableHeader label="HSN" sortKey="hsn" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
-                                    <SortableHeader label="Stock" sortKey="stock" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
+                                    <SortableHeader label="Stock" sortKey="stockDelivered" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
+                                    <SortableHeader label="Stock incl. Undelivered" sortKey="stockInclUndelivered" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <TableHead className="w-32 pr-4 text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -278,7 +280,8 @@ export function Items() {
                                         <TableCell>{it.packSize}</TableCell>
                                         <TableCell className="text-right tabular-nums">{it.gstPercent}</TableCell>
                                         <TableCell>{it.hsn}</TableCell>
-                                        <TableCell className="text-right tabular-nums">{fmtQty(it.stock)}</TableCell>
+                                        <TableCell className="text-right tabular-nums">{fmtQty(it.stockDelivered)}</TableCell>
+                                        <TableCell className="text-right tabular-nums">{fmtQty(it.stockInclUndelivered)}</TableCell>
                                         <TableCell className="pr-4 text-right">
                                             <div className="flex justify-end gap-1">
                                                 <Button

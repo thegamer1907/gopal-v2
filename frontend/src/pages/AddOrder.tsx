@@ -500,6 +500,7 @@ export function AddOrder() {
                                     <th className="w-10">GST %</th>
                                     <th className="w-14">HSN</th>
                                     <th className="w-16">Stock</th>
+                                    <th className="w-20">Stock incl. Undelivered</th>
                                     <th className="w-20">Rate</th>
                                     <th className="w-24 bg-muted/50">Final Amount</th>
                                     <th className="w-8"/>
@@ -556,7 +557,10 @@ export function AddOrder() {
                                                 {line.item ? line.item.hsn : '—'}
                                             </td>
                                             <td className="text-right tabular-nums text-muted-foreground">
-                                                {line.item ? fmtQty(line.item.stock) : '—'}
+                                                {line.item ? fmtQty(line.item.stockDelivered) : '—'}
+                                            </td>
+                                            <td className="text-right tabular-nums text-muted-foreground">
+                                                {line.item ? fmtQty(line.item.stockInclUndelivered) : '—'}
                                             </td>
                                             <td>
                                                 <NumberInput
@@ -601,7 +605,7 @@ export function AddOrder() {
                                 <tr className="border-t-2 font-medium [&>td]:px-2 [&>td]:py-2 [&>td]:tabular-nums">
                                     <td/>
                                     <td className="text-right">{fmtQty(totals.qty)}</td>
-                                    <td colSpan={5} className="text-right text-muted-foreground">Totals</td>
+                                    <td colSpan={6} className="text-right text-muted-foreground">Totals</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.finalAmount)}</td>
                                     <td colSpan={2}/>
                                 </tr>

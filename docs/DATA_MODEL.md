@@ -62,15 +62,16 @@ UNIQUE: `(company_id, name, pack_size)`. Foreign key: `(company_id)` → `compan
 Created **after** `companies` (FK target).
 
 > Go: `db.Item` (`id`, `companyId`, read-only `companyName` via JOIN, name, packSize,
-> gstPercent, hsn, read-only `stock`) + `AddItem(companyID, …)` / `ListItems` (all, JOIN
+> gstPercent, hsn, taxName, read-only `stockDelivered` + `stockInclUndelivered`) + `AddItem(companyID, …)` / `ListItems` (all, JOIN
 > company name) / `ListItemsByCompany(companyID)` in `internal/db/items.go`. UI: Items
 > master page has a company picker + Company column; the bill fetches items **for the
 > selected company**.
 >
-> **`stock` is derived, not a column** — `itemSelect`'s query computes it per row via
-> correlated subqueries: total purchased (`tax_qty + d_qty` summed across
+> **The two stock figures are derived, not columns** — `itemSelect`'s query computes them per
+> row via correlated subqueries: total purchased (`tax_qty + d_qty` summed across
 > `purchase_bill_items`) minus total sold (`qty` summed across `sales_order_items`) for
-> that item. Every caller of `ListItems`/`ListItemsByCompany` gets it for free (no
+> that item — **`stockDelivered`** counts only delivered orders (`delivery_number > 0`),
+> **`stockInclUndelivered`** counts every order (this was the single `stock` before 2026-10-29). Every caller of `ListItems`/`ListItemsByCompany` gets it for free (no
 > separate lookup) — shown on the Items master table and on Add Order once a line's item
 > is picked. `AddItem`/`UpdateItem`'s returned struct leaves it at the zero value (same as
 > `companyName` already is there) — a brand-new item has no history yet regardless, and an
@@ -155,6 +156,21 @@ order still uses the customer).
 > Companies/Items-style master page (`/customers`) with a **`StateCombobox`**
 > (type-to-filter, mirrors `CompanyCombobox`) populated from `INDIAN_STATES` — not a plain
 > dropdown (an earlier shadcn `Select` was replaced with this per client feedback).
+
+### `customer_snoozes` — Dashboard "Don't remind me"
+One row per customer (re-snoozing replaces it). Migration id 14 (additive).
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | |
+| `customer_id` | INTEGER NOT NULL UNIQUE | → `customers(id)` ON DELETE CASCADE |
+| `snoozed_on` | TEXT NOT NULL | `dd-mmm-yy`, the day the snooze was saved |
+| `amount` | INTEGER NOT NULL | ≥ 1 (validated in Go) |
+| `unit` | TEXT NOT NULL | `day` \| `week` \| `month` (validated in Go) |
+
+The expiry is **derived, never stored**: `snoozeEnd` in `frontend/src/lib/lapsedCustomers.ts`
+(snoozed_on + amount × unit; months are calendar months clamped to month end). The customer is
+hidden while today is before that date. Expired rows are left in place. Go:
+`internal/db/customer_snoozes.go` (`SnoozeCustomer`, `ListCustomerSnoozes`).
 
 ### `sales_orders` — sales order header (first piece of the Order Book / Sales feature)
 One row per order (from the Add Order form: Customer, Date). No order number at entry time

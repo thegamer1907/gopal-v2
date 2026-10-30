@@ -570,3 +570,49 @@ func TestItemRateHistory(t *testing.T) {
 		t.Errorf("want empty slice for an item with no orders, got %v", empty)
 	}
 }
+
+// TestItemStockDeliveredVsInclUndelivered: an item's StockDelivered subtracts only delivered
+// orders, StockInclUndelivered subtracts every order; delivering an order moves its quantity
+// from "undelivered only" into both figures.
+func TestItemStockDeliveredVsInclUndelivered(t *testing.T) {
+	f := seedSales(t)
+	items, err := ListItems(f.conn)
+	if err != nil || len(items) == 0 {
+		t.Fatalf("ListItems: %v", err)
+	}
+	if _, err := AddPurchaseBill(f.conn, PurchaseBill{
+		CompanyID: items[0].CompanyID, BillNumber: "B1", Date: "01-Oct-26",
+		Items: []PurchaseBillItem{{ItemID: f.itemA, TaxQty: 40, DQty: 10}},
+	}); err != nil {
+		t.Fatalf("AddPurchaseBill: %v", err)
+	}
+	stockOfA := func() (float64, float64) {
+		t.Helper()
+		all, err := ListItems(f.conn)
+		if err != nil {
+			t.Fatalf("ListItems: %v", err)
+		}
+		for _, it := range all {
+			if it.ID == f.itemA {
+				return it.StockDelivered, it.StockInclUndelivered
+			}
+		}
+		t.Fatalf("item A missing")
+		return 0, 0
+	}
+
+	if d, u := stockOfA(); d != 50 || u != 50 {
+		t.Fatalf("before orders: delivered=%v incl=%v, want 50/50", d, u)
+	}
+	o1 := f.addOrder(t, "02-Oct-26") // item A qty 5
+	f.addOrder(t, "03-Oct-26")       // item A qty 5
+	if d, u := stockOfA(); d != 50 || u != 40 {
+		t.Fatalf("two pending orders: delivered=%v incl=%v, want 50/40", d, u)
+	}
+	if _, err := MarkSalesOrderDelivered(f.conn, o1.ID); err != nil {
+		t.Fatalf("MarkSalesOrderDelivered: %v", err)
+	}
+	if d, u := stockOfA(); d != 45 || u != 40 {
+		t.Fatalf("one delivered: delivered=%v incl=%v, want 45/40", d, u)
+	}
+}

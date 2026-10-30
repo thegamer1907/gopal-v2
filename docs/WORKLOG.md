@@ -6,6 +6,34 @@ reads the top entry first.
 
 ---
 
+## 2026-10-29 — Two stock figures on Items master + Add Order
+**Did:** per DECISIONS 2026-10-29 (two stock figures). `Item.Stock` → `StockDelivered` + `StockInclUndelivered`
+(`itemSelect`), two columns each in `Items.tsx` (both sortable) and `AddOrder.tsx` (footer colSpan 5→6). Go test
+`TestItemStockDeliveredVsInclUndelivered` (pending orders, then mark one delivered). `go vet`, `go test ./...`,
+`tsc` clean. **Verified live in `wails dev` via Claude-in-Chrome:** Items table shows Eclair 1,194 / 1,049,
+Love Bite PB 0 / −3, Rabdi Jar 0 / −28, Éclair 1/- PB 0 / −5 — all equal to an independent sqlite recompute; Add
+Order shows 1,194 / 1,049 for Eclair - 32 PB with the Totals row still aligned (order not saved). Not driven:
+Add Order *edit* mode of a delivered order. Not committed.
+
+**Next steps:** commit (everything from today is uncommitted on top of `efd27fa`), then push/tag when asked.
+
+---
+
+## 2026-10-29 — Dashboard "Don't remind me"
+**Did:** per DECISIONS 2026-10-29 (snooze). Migration 14 `customer_snoozes`, `db.SnoozeCustomer`/`ListCustomerSnoozes`,
+`App` wrappers, `snoozeEnd` + snooze filter in `lib/lapsedCustomers.ts`, Reminder column + dialog in
+`Dashboard.tsx`. `go vet`, `go test ./...`, `tsc` clean; new Go test. **Verified live in `wails dev`
+via Claude-in-Chrome:** button opens dialog with default 15 / days; Save disabled at 0; saving hides
+the customer and writes the row; still hidden after reload; backdating the row (via sqlite) made the
+customer reappear; row click still opens the order; days and months saves persisted. **Not driven:**
+the "weeks" option (same code path), month-end clamping and the top-10 refill with >10 customers
+(only 3 customers in dev DB). My test snooze rows were removed afterwards. **Tests:** added Vitest + `npm test` (15 tests over `snoozeEnd`/snooze filter, `computeStockRows`, `buildOrderExportGroups`; `computeStockRows` moved to `lib/stockReport.ts`) — also covers the earlier Stock Report change; mutation-checked once. Not committed.
+
+**Next steps:** user review; commit/push/tag when asked (last commit `efd27fa` and `08233c6` are
+local, unpushed).
+
+---
+
 ## 2026-10-29 — Nickname → Tax Name (info-only); exports reverted
 **Did:** per DECISIONS 2026-10-29 (Tax Name). Removed all export usage of the item nickname; renamed the
 field to `tax_name` via migration 13 (applied to the dev DB; verified `items.tax_name` present, max

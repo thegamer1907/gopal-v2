@@ -62,6 +62,7 @@ wails build
 **Frontend only (from `frontend/` directory):**
 ```sh
 npm run dev      # Vite dev server standalone
+npm test         # Vitest unit tests for pure logic in src/lib (*.test.ts)
 npm run build    # TypeScript compile + Vite bundle (outputs to frontend/dist/)
 ```
 

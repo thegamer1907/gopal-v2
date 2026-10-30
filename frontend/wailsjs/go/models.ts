@@ -44,6 +44,24 @@ export namespace db {
 	        this.mobile = source["mobile"];
 	    }
 	}
+	export class CustomerSnooze {
+	    customerId: number;
+	    snoozedOn: string;
+	    amount: number;
+	    unit: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CustomerSnooze(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.customerId = source["customerId"];
+	        this.snoozedOn = source["snoozedOn"];
+	        this.amount = source["amount"];
+	        this.unit = source["unit"];
+	    }
+	}
 	export class Item {
 	    id: number;
 	    companyId: number;
@@ -53,7 +71,8 @@ export namespace db {
 	    gstPercent: number;
 	    hsn: number;
 	    taxName: string;
-	    stock: number;
+	    stockDelivered: number;
+	    stockInclUndelivered: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Item(source);
@@ -69,7 +88,8 @@ export namespace db {
 	        this.gstPercent = source["gstPercent"];
 	        this.hsn = source["hsn"];
 	        this.taxName = source["taxName"];
-	        this.stock = source["stock"];
+	        this.stockDelivered = source["stockDelivered"];
+	        this.stockInclUndelivered = source["stockInclUndelivered"];
 	    }
 	}
 	export class ItemRateHistoryEntry {

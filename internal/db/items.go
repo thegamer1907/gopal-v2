@@ -17,7 +17,10 @@ type Item struct {
 	GSTPercent  float64 `json:"gstPercent"`  // GST rate %, e.g. 18
 	HSN         int64   `json:"hsn"`         // HSN code (numeric)
 	TaxName     string  `json:"taxName"`     // optional info-only field; "" = none
-	Stock       float64 `json:"stock"`       // derived on read; see itemSelect. Not written.
+	// Both derived on read (see itemSelect), never written: StockDelivered = purchased −
+	// delivered orders; StockInclUndelivered = purchased − every order, delivered or not.
+	StockDelivered       float64 `json:"stockDelivered"`
+	StockInclUndelivered float64 `json:"stockInclUndelivered"`
 }
 
 // AddItem inserts a new item for a company and returns it with its assigned id.
@@ -66,12 +69,16 @@ func DeleteItem(conn *sql.DB, id int64) error {
 }
 
 // stock is derived, not stored: total purchased (tax_qty + d_qty across every purchase
-// bill line) minus total sold (qty across every saved sales order line). Recomputed on
-// every read via correlated subqueries — fine at single-user/local scale, and avoids
-// keeping a separate figure in sync as bills/orders are added, edited, or deleted.
+// bill line) minus total sold (qty across sales order lines) — once counting only delivered
+// orders (delivery_number > 0), once counting every saved order. Recomputed on every read via
+// correlated subqueries — fine at single-user/local scale, and avoids keeping a separate
+// figure in sync as bills/orders are added, edited, or deleted.
 const itemSelect = `SELECT i.id, i.company_id, c.name, i.name, i.pack_size, i.gst_percent, i.hsn, i.tax_name,
 		COALESCE((SELECT SUM(pbi.tax_qty + pbi.d_qty) FROM purchase_bill_items pbi WHERE pbi.item_id = i.id), 0)
-		- COALESCE((SELECT SUM(soi.qty) FROM sales_order_items soi WHERE soi.item_id = i.id), 0) AS stock
+		- COALESCE((SELECT SUM(soi.qty) FROM sales_order_items soi JOIN sales_orders so ON so.id = soi.order_id
+			WHERE soi.item_id = i.id AND so.delivery_number > 0), 0) AS stock_delivered,
+		COALESCE((SELECT SUM(pbi.tax_qty + pbi.d_qty) FROM purchase_bill_items pbi WHERE pbi.item_id = i.id), 0)
+		- COALESCE((SELECT SUM(soi.qty) FROM sales_order_items soi WHERE soi.item_id = i.id), 0) AS stock_incl_undelivered
 	FROM items i JOIN companies c ON c.id = i.company_id`
 
 func scanItems(rows *sql.Rows) ([]Item, error) {
@@ -79,7 +86,7 @@ func scanItems(rows *sql.Rows) ([]Item, error) {
 	for rows.Next() {
 		var it Item
 		if err := rows.Scan(
-			&it.ID, &it.CompanyID, &it.CompanyName, &it.Name, &it.PackSize, &it.GSTPercent, &it.HSN, &it.TaxName, &it.Stock,
+			&it.ID, &it.CompanyID, &it.CompanyName, &it.Name, &it.PackSize, &it.GSTPercent, &it.HSN, &it.TaxName, &it.StockDelivered, &it.StockInclUndelivered,
 		); err != nil {
 			return nil, fmt.Errorf("scan item: %w", err)
 		}

@@ -118,7 +118,12 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   (`onClick` → `navigate`) and the name is a real `<Link>` to `/orders/:id` for keyboard use.
   **Don't use a `::after`-stretched link on a `<tr>`**: WebKit (the desktop webview) doesn't
   make `<tr>` a positioning container, so every row's overlay covered the whole table and only
-  the last row worked (Chrome hides this). Value = ex-GST Final Amount
+  the last row worked (Chrome hides this). A last **Reminder** column holds a **Don't remind me**
+  button (2026-10-29): it opens one page-level controlled dialog (kept outside the `<tr>` so portal
+  clicks can't bubble into the row's navigate; the row handler also ignores clicks on `button`) —
+  "Don't remind me for [number, default 15] [days|weeks|months]"; saved customers vanish from the
+  list (see DECISIONS). Empty list after snoozing reads "No customers to remind right now."
+  Value = ex-GST Final Amount
   (`finalAmountOf`, shared with View/Edit Orders). More KPIs TBD.
 
 ### Add Purchase Bill (`/purchase-bills/new`) — top-nav "Add Purchase Bill"
@@ -228,7 +233,7 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   `ItemCombobox` is reused as-is with a new `showCompany` flag turned on, so its dropdown
   shows the item's company alongside pack size (needed now that the same item name can
   exist under different companies). **Column order**: Item · Pack Size · GST % · HSN ·
-  **Stock** (all read-only, from the selected item) · **Rate · Qty** (inputs) ·
+  **Stock · Stock incl. Undelivered** (both read-only, from the selected item) · **Rate · Qty** (inputs) ·
   **Final Amount** (calculated, shaded band) · info button · delete.
 - **Delivered orders are locked down** (edit mode only). The heading gains a
   **`Delivered #N`** badge and, in place of the Mark-delivered button, the line
@@ -243,8 +248,8 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   and a "Order marked delivered as #N." message all appear in place without navigating
   away. There is no un-mark — delivery is one-way. The same button/dialog is also offered
   from the order's read-only detail view (`SavedOrders.tsx`'s `OrderDetail`).
-- **Stock**: current on-hand quantity for the selected item — total purchased minus total
-  sold, **derived** (not stored; see `docs/DATA_MODEL.md`'s `items.stock` note), already
+- **Stock / Stock incl. Undelivered** (2026-10-29): on-hand quantity for the selected item —
+  total purchased minus delivered orders / minus all orders, **derived** (not stored; see `docs/DATA_MODEL.md`'s `items.stock` note), already
   present on every cached item so it needs no extra fetch. The cached item list is
   re-fetched after a successful save so Stock stays current for the rest of the session
   (e.g. adding the same item to a second order right after). No validation blocks
@@ -327,9 +332,9 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
 ### Items (`/items`) — item master
 - An untitled company-scoped add card (**Company, Item, Tax Name (optional), Pack Size, GST %, HSN** + Add; Tax Name is also a table column and a field in New/Edit Item dialogs — info-only, not used in any export),
   and a card whose header is just the search box and the item count, over the items table (Company / Item / Pack Size / GST % / HSN /
-  **Stock** + **Actions**). Pack Size / GST % / HSN use `NumberInput` (no spinner); same
+  **Stock · Stock incl. Undelivered** + **Actions**; Tax Name sits after Item). Pack Size / GST % / HSN use `NumberInput` (no spinner); same
   in the on-the-fly `NewItemDialog`.
-- **Stock** is current on-hand quantity — total purchased minus total sold, **derived**
+- **Stock** (delivered orders only) and **Stock incl. Undelivered** (all orders) are current on-hand quantities — total purchased minus sold, **derived**
   on every read (not a stored column; see `docs/DATA_MODEL.md`), sortable like every
   other column.
 - **Search box** (item or company name) + **sortable headers** (`useTableSort`, default by

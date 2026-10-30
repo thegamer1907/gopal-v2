@@ -56,6 +56,8 @@ export function GetSalesOrder(arg1:number):Promise<db.SalesOrder>;
 
 export function ListCompanies():Promise<Array<db.Company>>;
 
+export function ListCustomerSnoozes():Promise<Array<db.CustomerSnooze>>;
+
 export function ListCustomers():Promise<Array<db.Customer>>;
 
 export function ListItems():Promise<Array<db.Item>>;
@@ -73,6 +75,8 @@ export function OpenExistingDatabase():Promise<string>;
 export function Quit():Promise<void>;
 
 export function SaveOrderShareImage(arg1:Array<number>,arg2:string):Promise<string>;
+
+export function SnoozeCustomer(arg1:number,arg2:string,arg3:number,arg4:string):Promise<void>;
 
 export function UpdateCompany(arg1:number,arg2:string):Promise<db.Company>;
 

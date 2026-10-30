@@ -163,6 +163,19 @@ var migrations = []migration{
 		id:  13,
 		sql: `ALTER TABLE items RENAME COLUMN nick_name TO tax_name;`,
 	},
+	// Dashboard "Don't remind me": one snooze per customer (re-snoozing replaces it). The
+	// expiry is derived from snoozed_on + amount + unit on the frontend, never stored.
+	{
+		id: 14,
+		sql: `CREATE TABLE IF NOT EXISTS customer_snoozes (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			customer_id INTEGER NOT NULL UNIQUE,
+			snoozed_on  TEXT NOT NULL,
+			amount      INTEGER NOT NULL,
+			unit        TEXT NOT NULL,
+			FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+		);`,
+	},
 }
 
 // backfillDeliveryNumbersSQL numbers the already-delivered orders 1..N in id order. Keyed

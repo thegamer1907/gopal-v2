@@ -130,6 +130,18 @@ func (a *App) UpdateCustomer(c db.Customer) (db.Customer, error) {
 	return db.UpdateCustomer(a.db, c)
 }
 
+// SnoozeCustomer hides a customer from the Dashboard's lapsed-customers card for
+// amount × unit ("day" | "week" | "month") starting snoozedOn (dd-mmm-yy); replaces any
+// earlier snooze for that customer.
+func (a *App) SnoozeCustomer(customerID int64, snoozedOn string, amount int, unit string) error {
+	return db.SnoozeCustomer(a.db, customerID, snoozedOn, amount, unit)
+}
+
+// ListCustomerSnoozes returns every stored snooze, expired ones included.
+func (a *App) ListCustomerSnoozes() ([]db.CustomerSnooze, error) {
+	return db.ListCustomerSnoozes(a.db)
+}
+
 // DeleteCustomer removes a customer.
 func (a *App) DeleteCustomer(id int64) error {
 	return db.DeleteCustomer(a.db, id)

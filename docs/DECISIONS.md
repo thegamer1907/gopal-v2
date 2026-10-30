@@ -1158,3 +1158,37 @@ have to re-litigate.
 - **Why:** client reconsidered — they want a place to record the tax-facing name, not to change customer output.
 - **Kept:** `Less: 5 × Item` label change (separate ask).
 
+### 2026-10-29 — Dashboard "Don't remind me": per-customer snooze in a new table
+- **Decision:** a **Reminder** column on the lapsed-customers card; **Don't remind me** opens a
+  controlled dialog ("for [15] [days|weeks|months]", default 15 days, Save disabled unless the
+  number is an integer ≥ 1). Saving writes `customer_snoozes` (migration 14; one row per customer,
+  upsert) and hides the customer until `snoozed_on + amount × unit`. Expiry is **derived on the
+  frontend** (`snoozeEnd`), not stored — same date-math-in-the-frontend convention; months are
+  calendar months clamped to month end. Snoozed customers are filtered **before** the top-10 cut,
+  so the next customer fills the slot.
+- **Assumed (not asked):** a new order does **not** cancel a snooze — it just runs out; no
+  "view/undo snoozed" UI; expired rows are left in the table (replaced on re-snooze).
+- **Why:** client asked for a way to stop being reminded about specific customers for a while.
+- **Alternatives:** storing a computed `snoozed_until` (rejected: redundant, and the client
+  described storing the date + duration); clearing a snooze when a new order arrives (not asked).
+
+### 2026-10-29 — Frontend unit tests: Vitest for pure `src/lib` logic
+- **Decision:** add `vitest` (dev dependency) and `npm test`. Pure frontend logic is tested in
+  `src/lib/*.test.ts`: snooze end/filter (`lapsedCustomers`), Stock Report rows (`stockReport`),
+  export grouping/deductions (`salesOrder`). `computeStockRows` moved out of `Reports.tsx` into
+  `lib/stockReport.ts` (unchanged logic) so it can be imported without React.
+- **Why:** much of the business math (stock, snooze, export grouping) lives in the frontend by design
+  and was only checked live; live checks don't guard against regressions. Go already had tests.
+- **Convention going forward:** new pure logic gets a test next to it; UI behaviour is still checked
+  in the running app. No component/DOM tests (no jsdom) — not needed so far.
+
+### 2026-10-29 — Item stock: two figures on the Items master and Add Order
+- **Decision:** `db.Item` now carries **`StockDelivered`** (purchased − delivered orders) and
+  **`StockInclUndelivered`** (purchased − all orders; the old single `Stock`, renamed). The Items
+  master and Add Order each show both columns — **Stock** and **Stock incl. Undelivered** — matching
+  the Stock Report's Quantity / Quantity incl. Undelivered. Supersedes the 2026-10-29 note that left
+  live item Stock unchanged.
+- **Why:** client wanted the same two figures everywhere stock appears, so the pages agree.
+- **Notes:** still derived on read, no schema change; no over-sell validation (unchanged). Add Order's
+  Totals row colSpan went 5 → 6 for the extra column.
+
