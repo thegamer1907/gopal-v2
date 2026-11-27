@@ -22,9 +22,9 @@ describe('report view columns mirror the Excel headers', () => {
             'Quantity incl. Undelivered',
         ]);
     });
-    it('Order Report', () => {
+    it('Sales Report', () => {
         expect(headers(orderReportColumns)).toEqual([
-            'Date', 'Customer', 'City', 'Item', 'Pack Size', 'GST %', 'HSN', 'Qty', 'Rate', 'Final Amount', 'Delivered?', 'Delivery #',
+            'Date', 'Customer', 'City', 'Company', 'Item', 'Pack Size', 'GST %', 'HSN', 'Qty', 'Rate', 'Final Amount', 'Delivered?', 'Delivery #',
         ]);
     });
 });
@@ -70,7 +70,7 @@ describe('Stock Report cells and totals', () => {
     });
 });
 
-describe('Order Report cells and totals', () => {
+describe('Sales Report cells and totals', () => {
     const a = reports.OrderReportRow.createFrom({qty: 4, rate: 10, finalAmount: 400, delivered: true, deliveryNo: 7});
     const b = reports.OrderReportRow.createFrom({qty: 6, rate: 12, finalAmount: 720, delivered: false, deliveryNo: 0});
     const col = (h: string) => orderReportColumns.find((c) => c.header === h)!;

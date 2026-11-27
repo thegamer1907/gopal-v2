@@ -428,6 +428,7 @@ export namespace reports {
 	    date: string;
 	    customerName: string;
 	    customerCity: string;
+	    companyName: string;
 	    itemName: string;
 	    packSize: number;
 	    gstPercent: number;
@@ -447,6 +448,7 @@ export namespace reports {
 	        this.date = source["date"];
 	        this.customerName = source["customerName"];
 	        this.customerCity = source["customerCity"];
+	        this.companyName = source["companyName"];
 	        this.itemName = source["itemName"];
 	        this.packSize = source["packSize"];
 	        this.gstPercent = source["gstPercent"];

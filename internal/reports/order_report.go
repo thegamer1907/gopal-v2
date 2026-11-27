@@ -14,6 +14,7 @@ type OrderReportRow struct {
 	Date         string  `json:"date"` // dd-mmm-yy, as displayed
 	CustomerName string  `json:"customerName"`
 	CustomerCity string  `json:"customerCity"`
+	CompanyName  string  `json:"companyName"` // the item's company (from the item master)
 	ItemName     string  `json:"itemName"`
 	PackSize     float64 `json:"packSize"`
 	GSTPercent   float64 `json:"gstPercent"`
@@ -25,13 +26,16 @@ type OrderReportRow struct {
 	DeliveryNo   int64   `json:"deliveryNo"`
 }
 
-const orderReportSheetName = "Order Report"
+// The sheet/file is called "Sales Report" in the UI; the Go/TS identifiers keep the "order" naming
+// since each row is a sales-order line.
+const orderReportSheetName = "Sales Report"
 
 // Column layout (1-based). Keep in sync with the header/style setup below.
 const (
 	colORDate = iota + 1
 	colORCustomer
 	colORCity
+	colORCompany
 	colORItem
 	colORPackSize
 	colORGST
@@ -48,6 +52,7 @@ var orderReportHeaders = [colORCount]string{
 	colORDate - 1:       "Date",
 	colORCustomer - 1:   "Customer",
 	colORCity - 1:       "City",
+	colORCompany - 1:    "Company",
 	colORItem - 1:       "Item",
 	colORPackSize - 1:   "Pack Size",
 	colORGST - 1:        "GST %",
@@ -62,7 +67,7 @@ var orderReportHeaders = [colORCount]string{
 var orderReportMoneyCols = []int{colORRate, colORAmount}
 var orderReportQtyCols = []int{colORPackSize, colORQty}
 
-// WriteOrderReport writes rows to a new "Order Report" workbook at path: a bold header,
+// WriteOrderReport writes rows to a new "Sales Report" workbook at path: a bold header,
 // real typed date/number cells, a frozen + auto-filtered header row, and a bold Totals
 // row summing only Qty and Final Amount — mirroring the on-screen order Totals row.
 func WriteOrderReport(path string, rows []OrderReportRow) error {
@@ -210,6 +215,7 @@ func writeOrderReportRows(f *excelize.File, rows []OrderReportRow) (int, error) 
 		values[colORDate-1] = orderDateValue(r.Date)
 		values[colORCustomer-1] = r.CustomerName
 		values[colORCity-1] = r.CustomerCity
+		values[colORCompany-1] = r.CompanyName
 		values[colORItem-1] = r.ItemName
 		values[colORPackSize-1] = r.PackSize
 		values[colORGST-1] = r.GSTPercent / 100
@@ -331,7 +337,7 @@ func finishOrderReportLayout(f *excelize.File, totalsRow int) error {
 	if err := f.SetColWidth(orderReportSheetName, "B", "B", 20); err != nil { // Customer, wider
 		return err
 	}
-	if err := f.SetColWidth(orderReportSheetName, "D", "D", 22); err != nil { // Item name, wider
+	if err := f.SetColWidth(orderReportSheetName, "D", "E", 22); err != nil { // Company + Item name, wider
 		return err
 	}
 

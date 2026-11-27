@@ -119,7 +119,7 @@ function stockFilenameFor(asOfDate: string): string {
     return `Stock Report (as of ${asOfDate}).xlsx`;
 }
 
-// --- Order Report ---
+// --- Sales Report (the Order Report's UI name; identifiers keep the "order" naming) ---
 
 type DeliveryFilter = 'all' | 'delivered' | 'pending';
 
@@ -134,7 +134,9 @@ function matchesDelivery(order: db.SalesOrder, filter: DeliveryFilter): boolean 
     return filter === 'delivered' ? order.delivered : !order.delivered;
 }
 
-function toOrderReportRows(orders: db.SalesOrder[]): reports.OrderReportRow[] {
+function toOrderReportRows(orders: db.SalesOrder[], items: db.Item[]): reports.OrderReportRow[] {
+    // An order line only knows its item; the company comes from the item master.
+    const companyByItem = new Map(items.map((i) => [i.id, i.companyName]));
     // Sort orders (not the flattened rows) so each order's lines stay together — date
     // ascending, tie-broken by id since orders have no bill-number-style identifier.
     const sorted = [...orders].sort((a, b) => {
@@ -154,6 +156,7 @@ function toOrderReportRows(orders: db.SalesOrder[]): reports.OrderReportRow[] {
                     date: displayDate(order.date),
                     customerName: order.customerName,
                     customerCity: order.customerCity,
+                    companyName: companyByItem.get(it.itemId) ?? '',
                     itemName: it.itemName,
                     packSize,
                     gstPercent: it.gstPercent,
@@ -175,9 +178,9 @@ function orderFilenameFor(range: DateRange | undefined, filter: DeliveryFilter):
     if (range?.from) {
         const from = formatDate(range.from);
         const to = range.to ? formatDate(range.to) : from;
-        return `Order Report${suffix} (${from} to ${to}).xlsx`;
+        return `Sales Report${suffix} (${from} to ${to}).xlsx`;
     }
-    return `Order Report${suffix} (All).xlsx`;
+    return `Sales Report${suffix} (All).xlsx`;
 }
 
 // --- Print Delivered Orders ---
@@ -293,7 +296,7 @@ export function Reports() {
         }
     }
 
-    // --- Order Report state ---
+    // --- Sales Report state ---
     const [orderRange, setOrderRange] = useState<DateRange | undefined>(undefined);
     const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>('all');
     const [orderBusy, setOrderBusy] = useState(false);
@@ -304,7 +307,7 @@ export function Reports() {
         () => orders.filter((o) => inRange(o, orderRange) && matchesDelivery(o, deliveryFilter)),
         [orders, orderRange, deliveryFilter],
     );
-    const orderRows = useMemo(() => toOrderReportRows(filteredOrders), [filteredOrders]);
+    const orderRows = useMemo(() => toOrderReportRows(filteredOrders, items), [filteredOrders, items]);
     const orderTotalValue = useMemo(() => orderRows.reduce((sum, r) => sum + r.finalAmount, 0), [orderRows]);
 
     async function downloadOrderReport() {
@@ -451,7 +454,7 @@ export function Reports() {
     if (view === 'orders') {
         return (
             <ReportView
-                title="Order Report"
+                title="Sales Report"
                 summary={`${deliveryFilterLabel[deliveryFilter]} · ${rangeLabel(orderRange)} · ${orderRows.length} line${orderRows.length === 1 ? '' : 's'} across ${filteredOrders.length} order${filteredOrders.length === 1 ? '' : 's'}`}
                 onBack={() => setView(null)}
                 downloadLabel="Download Excel"
@@ -585,8 +588,8 @@ export function Reports() {
 
                 <ReportRow
                     icon={<ClipboardList className="size-5 text-muted-foreground"/>}
-                    title="Order Report"
-                    description="Every sales order line, filterable by delivery status."
+                    title="Sales Report"
+                    description="Every sales line, filterable by delivery status."
                     open={openId === 'orders'}
                     onToggle={() => toggle('orders')}
                 >

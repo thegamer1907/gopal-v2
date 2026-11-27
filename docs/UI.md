@@ -392,7 +392,7 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   instead of `UpdateCustomer`) — same 9-field form and Name+City requirement either way.
 
 ### Reports (`/reports`) — top-nav "Reports"
-- **View (2026-10-30):** Purchase Summary, Stock Report, Order Report and Print Delivered Orders each
+- **View (2026-10-30):** Purchase Summary, Stock Report, Sales Report (formerly Order Report) and Print Delivered Orders each
   have an outline **View** button beside Download (disabled on the same conditions). It swaps the
   page for a full-page view — `← Back` (left), the report title + one-line summary (filter/range/
   as-of date, counts), **Download Excel/PDF** (right) — held as `view` state in `Reports` so Back
@@ -409,7 +409,7 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   border` container: icon + title + short description + chevron. Clicking a row expands that
   report's options inline beneath it (**one open at a time**; all collapsed on load; click
   again to collapse). The row is a native `<button aria-expanded>` (local `ReportRow`
-  component, not Radix `asChild`). Reports: Purchase Summary, Stock Report, Order Report,
+  component, not Radix `asChild`). Reports: Purchase Summary, Stock Report, Sales Report,
   Print Delivered Orders, Export Delivered Orders (Excel). A future report is just another
   `ReportRow`. All share one `useEffect` on mount (`ListPurchaseBills`/`ListItems`/
   `ListSalesOrders`, loaded once) but keep separate `busy`/`saved`/`error` state per report
@@ -466,7 +466,7 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
     line on or before the as-of date** (via `calcLine`); **P&L** = Pack Size × Quantity ×
     Final Rate; **GST Value** = Quantity × Billing Rate. See DECISIONS.
 
-- **Order Report card:** icon + title/description, a **delivery-status** `Select` (All
+- **Sales Report card** (renamed from "Order Report" 2026-11-26; code identifiers keep the `order` naming): icon + title/description, a **delivery-status** `Select` (All
   orders / Delivered only / Pending only — a new three-way control; the existing
   `SavedOrders.tsx` "Delivered only" `Switch` is binary and can't express "All," see
   DECISIONS) next to a **`DateRangeFilter`** (same empty-range-means-all convention as
@@ -476,12 +476,12 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   - **Data flow:** loads all orders via `ListSalesOrders()`, filters by `inRange` (date) AND
     the delivery-status match, sorts the **filtered orders** (not the flattened rows) by
     parsed date ascending with `id` as the tie-break (orders have no bill-number-style human
-    identifier), then flattens each order's lines into one `reports.OrderReportRow` per line
+    identifier), then flattens each order's lines into one `reports.OrderReportRow` per line (with the item's **Company**, looked up from the loaded item master)
     — reusing `calcOrderLine`/`effectivePackSize` from `lib/salesOrder.ts` for Final Amount,
-    never re-derived. Calls `ExportOrderReport(rows, filename)`; filename is `Order Report
-    (All).xlsx` / `Order Report (dd-mmm-yy to dd-mmm-yy).xlsx`, with a `- Delivered`/
+    never re-derived. Calls `ExportOrderReport(rows, filename)`; filename is `Sales Report
+    (All).xlsx` / `Sales Report (dd-mmm-yy to dd-mmm-yy).xlsx`, with a `- Delivered`/
     `- Pending` suffix when the filter isn't "All."
-  - **The workbook:** bold frozen header (row 1) — Date/Customer/City/Item/Pack Size/GST %/
+  - **The workbook:** bold frozen header (row 1) — Date/Customer/City/**Company**/Item/Pack Size/GST %/
     HSN/Qty/Rate/Final Amount/Delivered?/Delivery #; Date is a real typed date cell, GST % a
     real percentage cell, money columns `#,##0.00`, **Pack Size and Qty are whole numbers
     (`0`, no decimals)** — matches `fmtQty`/the app's "quantities are always whole" rule,

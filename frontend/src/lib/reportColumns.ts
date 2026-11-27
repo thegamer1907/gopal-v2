@@ -77,6 +77,7 @@ export const orderReportColumns: ReportColumn<reports.OrderReportRow>[] = [
     {header: 'Date', align: 'center', cell: (r) => r.date},
     {header: 'Customer', cell: (r) => r.customerName},
     {header: 'City', cell: (r) => r.customerCity},
+    {header: 'Company', cell: (r) => r.companyName},
     {header: 'Item', cell: (r) => r.itemName, total: 'Totals'},
     {header: 'Pack Size', align: 'center', cell: (r) => plain(r.packSize)},
     {header: 'GST %', align: 'center', cell: (r) => pct(r.gstPercent)},

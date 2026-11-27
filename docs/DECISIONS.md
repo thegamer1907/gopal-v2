@@ -1255,3 +1255,16 @@ have to re-litigate.
 - **Why:** derivable from existing bills → computed on read in `lib/purchaseHistory.ts` (`finalRateHistoryByItem`), no
   schema/Go change (house rule). Display-only; not in the saved-bill view or exports (not asked).
 - **Process note:** the dev database is test data — leave test rows in it after testing (CLAUDE.md working rule).
+
+### 2026-11-26 — Order Report renamed Sales Report; Company column added
+- **Decision:** the Reports page's **Order Report** is now **Sales Report** (list row, on-screen view title, Excel sheet
+  name, download filename `Sales Report (…).xlsx`, save-dialog title) and gains a **Company** column between City and Item
+  (on screen and in the Excel). **Scope: this report only** — Print Delivered Orders / Export Delivered Orders (Excel) are
+  customer-facing per-order documents with a fixed layout and keep their names and columns.
+- **How:** user-visible text only; Go/TS identifiers (`OrderReportRow`, `WriteOrderReport`, `ExportOrderReport`,
+  `orderReportColumns`) keep "order" since each row is a sales-order line, avoiding binding churn. Company is resolved
+  on the frontend from the already-loaded item master (`itemId → companyName`) — order lines don't carry it — and passed
+  as `OrderReportRow.CompanyName`; the Excel gets the column via the `colORCompany` iota constant (Item column width moved
+  from D to D:E). Not a pure frontend change: the Excel is written in Go. No schema change.
+- **Filter labels unchanged:** "All orders / Delivered only / Pending only" and "N lines across M orders" describe order
+  status and counts, not the report's name.

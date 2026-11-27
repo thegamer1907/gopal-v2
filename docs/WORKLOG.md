@@ -6,6 +6,21 @@ reads the top entry first.
 
 ---
 
+## 2026-11-26 — Order Report → Sales Report, + Company column
+**Did:** per DECISIONS 2026-11-26 (Sales Report). Renamed in `Reports.tsx` (list row, view title, filenames), the Excel
+sheet name and save-dialog title; added `Company` (before Item) to `orderReportColumns`, `OrderReportRow.CompanyName`
+(Go + regenerated models) and the Excel (`colORCompany`; Item width moved to D:E); company comes from the loaded item
+master. New Go test `order_report_test.go` (sheet name, header order, company in D, Totals in the right columns).
+`go vet`, `go test ./...`, `npm test` (38), `tsc` clean. **Verified live in `wails dev` via Claude-in-Chrome:** list row
+reads Sales Report; View shows the Company column and Totals 237 / 2,50,008.50; per-company line counts and qty equal sqlite
+(Prayagh 28 lines / 165, TEST Sample Co 11 / 72); "Delivered only" = 2 lines, Qty 20, 10,880.00 with Company; Excel export
+stubbed in-page received all 39 rows with `companyName` and filename `Sales Report (All).xlsx`. **Not driven:** a real
+Excel download (native Save dialog; workbook content covered by the Go test — needs a manual check on Windows). Committed; released as v0.15.0.
+
+**Next steps:** user review; commit/push/tag when asked (two earlier commits `fdbccdb`, `a0a5518` are still unpushed).
+
+---
+
 ## 2026-11-26 — Add Purchase Bill: Last Final Rate + history
 **Did:** per DECISIONS 2026-11-26 (Last Final Rate). Frontend-only: `lib/purchaseHistory.ts` (+4 Vitest tests, 38 total),
 `PurchaseRateHistoryDialog`, Last Final Rate column + "i" button in `AddPurchaseBill.tsx` (bills loaded on mount and after

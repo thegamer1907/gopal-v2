@@ -8,8 +8,9 @@ spec (what it does, key behaviors). Move items between sections as work progress
 
 ## Shipped
 
-_Shipped (2026-11-26): **Add Purchase Bill: Last Final Rate + history** — a Last Final Rate column (the item's final rate last time it was bought) with an "i" button listing every earlier purchase (date, bill no., final rate, ▲▼ change). Frontend-only. See DECISIONS._
-_Shipped (2026-11-26): **Add Order Final Rate + markup** — read-only Final Rate column (latest purchase-bill final rate plus markup %); markup optional per company and per item (item overrides company), editable in the company/item add + edit forms. See DECISIONS._
+_Shipped (2026-11-26, v0.15.0): **Sales Report** — the Order Report is renamed Sales Report and gets a Company column (before Item) on screen and in the Excel; the two Delivered Orders reports are unchanged. See DECISIONS._
+_Shipped (2026-11-26, v0.15.0): **Add Purchase Bill: Last Final Rate + history** — a Last Final Rate column (the item's final rate last time it was bought) with an "i" button listing every earlier purchase (date, bill no., final rate, ▲▼ change). Frontend-only. See DECISIONS._
+_Shipped (2026-11-26, v0.15.0): **Add Order Final Rate + markup** — read-only Final Rate column (latest purchase-bill final rate plus markup %); markup optional per company and per item (item overrides company), editable in the company/item add + edit forms. See DECISIONS._
 _Shipped (2026-10-30, v0.14.0): **Automatic daily database backups** — first boot of each day saves a copy named for the previous day into a `DB backup` folder beside the DB (30 kept); folder changeable in Settings → Backups. See DECISIONS._
 _Shipped (2026-10-30, v0.14.0): **Reports → View** — Purchase Summary, Stock Report, Order Report and Print Delivered Orders can be viewed on screen (same columns/Totals as the Excel; PDF shown inline) with a Back button, in addition to downloading. See DECISIONS._
 _Shipped (2026-10-29, v0.14.0): **Two stock figures on the Items master and Add Order** — **Stock** (delivered orders only) and **Stock incl. Undelivered** (all orders), matching the Stock Report. See DECISIONS._

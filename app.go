@@ -479,7 +479,7 @@ func (a *App) ExportStockReport(rows []reports.StockReportRow, asOfDate string, 
 // the chosen path, or "" if the user cancelled the dialog.
 func (a *App) ExportOrderReport(rows []reports.OrderReportRow, defaultFilename string) (string, error) {
 	path, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
-		Title:           "Export Order Report",
+		Title:           "Export Sales Report",
 		DefaultFilename: defaultFilename,
 		Filters: []wruntime.FileFilter{
 			{DisplayName: "Excel Workbook (*.xlsx)", Pattern: "*.xlsx"},
