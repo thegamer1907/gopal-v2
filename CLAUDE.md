@@ -37,6 +37,9 @@ Then skim `docs/DECISIONS.md` and `docs/DATA_MODEL.md` as the task requires.
   actually works before reporting it done. Unit tests/builds alone don't count. Report
   honestly what was and wasn't exercised (e.g. the native Save dialog can't be driven by
   browser automation, so file downloads need a manual check).
+- **The dev database is test data — leave test rows in it.** When testing in the running
+  app you may add/edit companies, items, bills, orders etc. in the dev DB and do **not** need
+  to clean up or restore it afterwards. (Never do this to the client's real database.)
 
 Claude memory (`~/.claude/.../memory/`) is **secondary**: it's machine-local and does NOT
 travel to Windows. Use it for working preferences and pointers only — the `docs/` files

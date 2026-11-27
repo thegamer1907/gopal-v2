@@ -1244,3 +1244,14 @@ have to re-litigate.
   `AddCompany/UpdateCompany/AddItem/UpdateItem` take a `*float64` markup (JS `null` = not set).
 - **Alternatives:** store the marked-up rate on the order line (rejected: derivable, would go stale); default 0
   instead of NULL (rejected: can't tell "inherit" from "explicit 0%").
+
+### 2026-11-26 — Add Purchase Bill: Last Final Rate + history
+- **Decision:** each bill line shows the item's **Last Final Rate** (newest earlier purchase) with an "i" button opening
+  a history dialog (Date / Bill No. / Final Rate / Change ▲▼ %), so price trends are visible when re-buying an item.
+- **Rules:** "earlier" = every other saved bill for the item, regardless of date (newest by bill date, then bill id —
+  the same rule as the Stock Report's latest line); in edit mode the bill being edited is excluded; each line of an item
+  in a bill is its own row; final rate via the shared `calcLine`, using the item's *current* GST %/pack size like every
+  other derived figure. Rising = red, falling = green (a higher purchase price is the bad direction).
+- **Why:** derivable from existing bills → computed on read in `lib/purchaseHistory.ts` (`finalRateHistoryByItem`), no
+  schema/Go change (house rule). Display-only; not in the saved-bill view or exports (not asked).
+- **Process note:** the dev database is test data — leave test rows in it after testing (CLAUDE.md working rule).

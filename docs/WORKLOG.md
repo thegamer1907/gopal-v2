@@ -6,6 +6,22 @@ reads the top entry first.
 
 ---
 
+## 2026-11-26 — Add Purchase Bill: Last Final Rate + history
+**Did:** per DECISIONS 2026-11-26 (Last Final Rate). Frontend-only: `lib/purchaseHistory.ts` (+4 Vitest tests, 38 total),
+`PurchaseRateHistoryDialog`, Last Final Rate column + "i" button in `AddPurchaseBill.tsx` (bills loaded on mount and after
+each save; totals row gets a spacer cell). `tsc` clean. **Verified live in `wails dev` via Claude-in-Chrome:** Eclair - 32 PB
+shows 47.98 and the dialog lists all 7 purchases with dates/bill numbers/final rates equal to an independent sqlite calc
+(47.98, 47.02, 47.02, 45.38, 45.33, 47.02, 45.96) and correct ▲/▼ amounts and %; edit mode of bill 27 excludes its own line
+(Eclair shows 47.02, Aura Chocolate — only bought on that bill — shows "—" with the i disabled); saved a new bill
+(ZZ-TEST-1, Eclair, final 16.41) and the next bill immediately showed 16.41 as last and listed it first; a never-purchased
+item (Coconut Feast) shows "—"/disabled; switching a row's item updates value and dialog; Totals row stays aligned. The test
+bill (#29) is left in the dev DB (now allowed — see CLAUDE.md). **Not driven:** the same item twice in one bill (unit test
+only), a bill dated earlier than existing ones. Committed. Also added the "dev DB is test data" rule to CLAUDE.md.
+
+**Next steps:** user review; commit/tag when asked (the Final Rate + markup commit `fdbccdb` is also unpushed/untagged).
+
+---
+
 ## 2026-11-26 — Add Order: Final Rate + markup
 **Did:** per DECISIONS 2026-11-26. Migrations 15/16 (nullable `markup_percent` on companies and items), Go
 company/item APIs take `*float64` markup, `Item.CompanyMarkupPercent` (JOIN), `lib/markup.ts` (+9 Vitest tests),
@@ -18,7 +34,7 @@ Edit dialog; migrations applied to the existing DB (max id 16). Dev DB was resto
 re-run 15/16 on next launch). **Second pass, also verified live:** Add Order *edit* mode (undelivered and delivered order, "+3%" shown, Totals
 aligned); Companies add form (name + 4 → stored 4.0, form clears); Items add form (blank → NULL showing the company's
 value muted, 1.5 → stored); inline New Company dialog (6 → stored) and New Item dialog (0 → stored as 0, label "blank
-uses the company's 6%"). Test rows and markups were removed by restoring the DB copy. Console only showed pre-existing
+uses the company's 6%"). Test rows were removed by restoring a DB copy (no longer needed — see CLAUDE.md). Console only showed pre-existing
 noise (React forwardRef warning on `DialogOverlay`, Wails `ipc.js` in browser mode). **Not driven:** a company whose items
 have several bills on the same date (covered by a unit test only). Committed.
 

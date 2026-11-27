@@ -1,11 +1,12 @@
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
-import {Plus, Trash2, Save, Calendar as CalendarIcon} from 'lucide-react';
+import {Plus, Trash2, Save, Info, Calendar as CalendarIcon} from 'lucide-react';
 import {
     ListItemsByCompany,
     ListCompanies,
     AddPurchaseBill as SavePurchaseBill,
     GetPurchaseBill,
+    ListPurchaseBills,
     UpdatePurchaseBill,
 } from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
@@ -27,12 +28,14 @@ import {ItemCombobox} from '@/components/ItemCombobox';
 import {NewItemDialog} from '@/components/NewItemDialog';
 import {CompanyCombobox} from '@/components/CompanyCombobox';
 import {NewCompanyDialog} from '@/components/NewCompanyDialog';
+import {PurchaseRateHistoryDialog} from '@/components/PurchaseRateHistoryDialog';
 import {NumberInput} from '@/components/NumberInput';
 import {useUnsavedChanges} from '@/components/UnsavedChanges';
 import {Calendar} from '@/components/ui/calendar';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {cn} from '@/lib/utils';
 import {num, fmt, fmtQty, calcLine} from '@/lib/purchaseBill';
+import {finalRateHistoryByItem} from '@/lib/purchaseHistory';
 import {formatDate, todayDate, parseDate, displayDate} from '@/lib/date';
 
 // Add Purchase Bill — header (Company, Bill number, Date) plus searchable line items.
@@ -119,6 +122,9 @@ export function AddPurchaseBill() {
     const [companyComboKey, setCompanyComboKey] = useState(0);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState('');
+    // Every saved bill, for each item's past final rates (Last Final Rate column + dialog).
+    const [bills, setBills] = useState<db.PurchaseBill[]>([]);
+    const [historyLineId, setHistoryLineId] = useState<number | null>(null);
     const {setDirty} = useUnsavedChanges();
 
     // Cache the company list once on load.
@@ -127,6 +133,14 @@ export function AddPurchaseBill() {
             .then(setCompaniesCache)
             .catch((e) => setError(String(e)));
     }, []);
+
+    function refreshBills() {
+        ListPurchaseBills().then(setBills).catch((e) => setError(String(e)));
+    }
+    useEffect(refreshBills, []);
+
+    // itemId → earlier final rates, newest first. In edit mode the bill being edited is left out.
+    const rateHistory = useMemo(() => finalRateHistoryByItem(bills, editId), [bills, editId]);
 
     // Fetch the selected company's items whenever the company changes.
     useEffect(() => {
@@ -154,6 +168,7 @@ export function AddPurchaseBill() {
         setLines([blankLine(1)]);
         setNextId(2);
         setPendingCompany(null);
+        setHistoryLineId(null);
         setError('');
         setSaved('');
     }, [editId]);
@@ -230,6 +245,7 @@ export function AddPurchaseBill() {
     }
 
     function removeLine(id: number) {
+        if (historyLineId === id) setHistoryLineId(null);
         setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.id !== id) : prev));
     }
 
@@ -268,6 +284,8 @@ export function AddPurchaseBill() {
         setCompaniesCache((prev) => [...prev, created]);
         requestCompany(created);
     }
+
+    const historyLine = historyLineId !== null ? lines.find((l) => l.id === historyLineId) : undefined;
 
     // Running totals for every column except Pack Size, GST %, Billing Rate,
     // Final Rate and Remarks.
@@ -335,6 +353,9 @@ export function AddPurchaseBill() {
             setDate(todayDate());
             setLines([blankLine(nextId)]);
             setNextId((n) => n + 1);
+            setHistoryLineId(null);
+            // So the bill just saved counts as the "last" purchase for the next one.
+            refreshBills();
         } catch (err: any) {
             setError(String(err));
         }
@@ -429,6 +450,7 @@ export function AddPurchaseBill() {
                                     <th className="w-16 bg-muted/50">Bill Value</th>
                                     <th className="w-16 bg-muted/50">Billing Rate</th>
                                     <th className="w-16 bg-muted/50">Final Rate</th>
+                                    <th className="w-24">Last Final Rate</th>
                                     <th className="w-16">Discount</th>
                                     <th>Remarks</th>
                                     <th className="w-8"/>
@@ -437,6 +459,7 @@ export function AddPurchaseBill() {
                             <tbody className="[&>tr>td]:px-2 [&>tr>td]:py-1.5 [&>tr>td]:align-middle">
                                 {lines.map((line, i) => {
                                     const c = calc(line);
+                                    const lastRate = line.item ? rateHistory.get(line.item.id)?.[0]?.finalRate : undefined;
                                     return (
                                         <tr
                                             key={line.id}
@@ -493,6 +516,22 @@ export function AddPurchaseBill() {
                                             <td className="text-right tabular-nums bg-muted/50">{fmt(c.billingRate)}</td>
                                             <td className="text-right tabular-nums bg-muted/50">{fmt(c.finalRate)}</td>
                                             <td>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <span className="tabular-nums text-muted-foreground">
+                                                        {lastRate !== undefined ? fmt(lastRate) : '—'}
+                                                    </span>
+                                                    <Button
+                                                        type="button" variant="ghost" size="icon"
+                                                        className="size-7 text-muted-foreground"
+                                                        disabled={!line.item || lastRate === undefined}
+                                                        aria-label="Final rate history"
+                                                        onClick={() => setHistoryLineId(line.id)}
+                                                    >
+                                                        <Info className="size-4"/>
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                            <td>
                                                 <NumberInput
                                                     className="w-16 text-right"
                                                     value={line.discount}
@@ -532,6 +571,7 @@ export function AddPurchaseBill() {
                                     <td className="text-right bg-muted/50">{fmt(totals.taxBillAmount)}</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.billValue)}</td>
                                     <td colSpan={2} className="bg-muted/50"/>
+                                    <td/>
                                     <td className="text-right">{fmt(totals.discount)}</td>
                                     <td colSpan={2}/>
                                 </tr>
@@ -564,6 +604,13 @@ export function AddPurchaseBill() {
                 defaultCompany={company}
                 onOpenChange={(open) => setDialog((d) => ({...d, open}))}
                 onCreated={onItemCreated}
+            />
+
+            <PurchaseRateHistoryDialog
+                open={historyLine !== undefined}
+                onOpenChange={(open) => !open && setHistoryLineId(null)}
+                itemName={historyLine?.item?.name ?? ''}
+                history={historyLine?.item ? rateHistory.get(historyLine.item.id) ?? [] : []}
             />
 
             <NewCompanyDialog

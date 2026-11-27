@@ -181,6 +181,13 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   (route param via `useParams`). In edit mode it prefills the header + lines from
   `GetPurchaseBill`, shows an "Edit purchase bill" heading + an **Update bill** button, and on
   save does a **complete overwrite** via `UpdatePurchaseBill` then returns to View/Edit Bills.
+- **Last Final Rate** (2026-11-26, muted, read-only; right after Final Rate, with an **"i"** button in the same
+  cell): the item's final rate the last time it was bought (newest earlier purchase), 2 dp; `—` and a disabled "i"
+  when the item has never been bought or no item is chosen. The "i" opens `PurchaseRateHistoryDialog` — **Date ·
+  Bill No. · Final Rate · Change**, newest first, where Change is ▲ red (price rose) / ▼ green (fell) with the amount
+  and % against the purchase before it (oldest row `—`). Derived on read from all other saved bills (the bill being
+  edited is excluded in edit mode); the bills reload after each save so a just-saved bill counts immediately. Display-only.
+
 
 ### View/Edit Bills (`/purchase-bills`) — top-nav "View/Edit Bills"
 - **List → detail**, single page (`src/pages/SavedBills.tsx`). Loads all bills via
