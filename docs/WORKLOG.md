@@ -6,6 +6,17 @@ reads the top entry first.
 
 ---
 
+## 2026-11-26 — v0.14.0 confirmed released; docs synced
+**Did:** verified git state — everything from 2026-10-29/30 (stock figures, snooze, Item Tax Name, Stock Report
+columns, Reports View, daily backups) is committed, pushed, and released as **v0.14.0** (tag on `fdd2335`, GitHub
+Latest, 2026-10-30). User confirmed it is all working in the released app. FEATURES.md entries flipped from
+"uncommitted" to "Shipped (v0.14.0)". Older entries below keep their historical "not committed" wording.
+
+**Next steps:** nothing in progress. Candidates from Planned: Dashboard content, as-billed snapshots, auto-check
+for updates on launch; consider a backup before **Wipe database**.
+
+---
+
 ## 2026-10-30 — Automatic daily DB backups
 **Did:** per DECISIONS 2026-10-30 (backups). New `internal/backup` (`Run`/`ResolveDir`/`Summary`, `VACUUM INTO` +
 tmp/rename, 30-newest retention), `Config.BackupDir` + `db.UpdateConfig` (fixed `switchTo`/startup fallback
