@@ -6,6 +6,26 @@ reads the top entry first.
 
 ---
 
+## 2026-11-26 — Add Order: Final Rate + markup
+**Did:** per DECISIONS 2026-11-26. Migrations 15/16 (nullable `markup_percent` on companies and items), Go
+company/item APIs take `*float64` markup, `Item.CompanyMarkupPercent` (JOIN), `lib/markup.ts` (+9 Vitest tests),
+`latestLineByItem` extracted from the Stock Report, Final Rate column on `AddOrder.tsx`, Markup % in the company
+and item add forms / dialogs / tables. `go vet`, `go test ./...` (new nil-vs-0 test), `npm test` (34), `tsc` clean.
+**Verified live in `wails dev` via Claude-in-Chrome:** Eclair - 32 PB final rate 47.98 with no markup (= independent
+sqlite calc 310000×1.05/212/32); company 3% → 49.42 "+3%"; item 2.5% → 49.18 "+2.5%" (overrides); item 0% → 47.98 with no
+hint; blank → stored NULL and falls back to the company's 3%; item with no bill shows "—"; company markup saved via the
+Edit dialog; migrations applied to the existing DB (max id 16). Dev DB was restored from a pre-test copy afterwards (it will
+re-run 15/16 on next launch). **Second pass, also verified live:** Add Order *edit* mode (undelivered and delivered order, "+3%" shown, Totals
+aligned); Companies add form (name + 4 → stored 4.0, form clears); Items add form (blank → NULL showing the company's
+value muted, 1.5 → stored); inline New Company dialog (6 → stored) and New Item dialog (0 → stored as 0, label "blank
+uses the company's 6%"). Test rows and markups were removed by restoring the DB copy. Console only showed pre-existing
+noise (React forwardRef warning on `DialogOverlay`, Wails `ipc.js` in browser mode). **Not driven:** a company whose items
+have several bills on the same date (covered by a unit test only). Committed.
+
+**Next steps:** user review; commit/tag when asked.
+
+---
+
 ## 2026-11-26 — v0.14.0 confirmed released; docs synced
 **Did:** verified git state — everything from 2026-10-29/30 (stock figures, snooze, Item Tax Name, Stock Report
 columns, Reports View, daily backups) is committed, pushed, and released as **v0.14.0** (tag on `fdd2335`, GitHub

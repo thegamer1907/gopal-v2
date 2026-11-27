@@ -3,6 +3,7 @@ import {UpdateItem} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {markupFromInput, markupToInput} from '@/lib/markup';
 import {Label} from '@/components/ui/label';
 import {NumberInput} from '@/components/NumberInput';
 import {CompanyCombobox} from '@/components/CompanyCombobox';
@@ -33,6 +34,7 @@ export function EditItemDialog({open, onOpenChange, item, companies, onUpdated}:
     const [gstPercent, setGstPercent] = useState('');
     const [hsn, setHsn] = useState('');
     const [taxName, setTaxName] = useState('');
+    const [markup, setMarkup] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -45,6 +47,7 @@ export function EditItemDialog({open, onOpenChange, item, companies, onUpdated}:
             setGstPercent(String(item.gstPercent));
             setHsn(String(item.hsn));
             setTaxName(item.taxName);
+            setMarkup(markupToInput(item.markupPercent));
             setError('');
         }
     }, [open, item, companies]);
@@ -66,6 +69,7 @@ export function EditItemDialog({open, onOpenChange, item, companies, onUpdated}:
                 parseFloat(gstPercent) || 0,
                 parseInt(hsn, 10) || 0,
                 taxName.trim(),
+                markupFromInput(markup),
             );
             onUpdated(updated);
             onOpenChange(false);
@@ -119,6 +123,15 @@ export function EditItemDialog({open, onOpenChange, item, companies, onUpdated}:
                             placeholder="Optional"
                             value={taxName}
                             onChange={(e) => setTaxName(e.target.value)}
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="ei-markup">Markup % <span className="font-normal text-muted-foreground">(optional — blank uses the company's{company?.markupPercent != null ? ` ${company.markupPercent}%` : ''})</span></Label>
+                        <NumberInput
+                            id="ei-markup"
+                            placeholder="Optional"
+                            value={markup}
+                            onChange={setMarkup}
                         />
                     </div>
                     <div className="grid grid-cols-3 gap-3">

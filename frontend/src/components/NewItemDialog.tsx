@@ -3,6 +3,7 @@ import {AddItem} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {markupFromInput} from '@/lib/markup';
 import {Label} from '@/components/ui/label';
 import {NumberInput} from '@/components/NumberInput';
 import {CompanyCombobox} from '@/components/CompanyCombobox';
@@ -35,6 +36,7 @@ export function NewItemDialog({open, onOpenChange, initialName, companies, defau
     const [gstPercent, setGstPercent] = useState('');
     const [hsn, setHsn] = useState('');
     const [taxName, setTaxName] = useState('');
+    const [markup, setMarkup] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -47,6 +49,7 @@ export function NewItemDialog({open, onOpenChange, initialName, companies, defau
             setGstPercent('');
             setHsn('');
             setTaxName('');
+            setMarkup('');
             setError('');
         }
     }, [open, initialName, defaultCompany]);
@@ -67,6 +70,7 @@ export function NewItemDialog({open, onOpenChange, initialName, companies, defau
                 parseFloat(gstPercent) || 0,
                 parseInt(hsn, 10) || 0,
                 taxName.trim(),
+                markupFromInput(markup),
             );
             onCreated(created);
             onOpenChange(false);
@@ -120,6 +124,15 @@ export function NewItemDialog({open, onOpenChange, initialName, companies, defau
                             placeholder="Optional"
                             value={taxName}
                             onChange={(e) => setTaxName(e.target.value)}
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="ni-markup">Markup % <span className="font-normal text-muted-foreground">(optional — blank uses the company's{company?.markupPercent != null ? ` ${company.markupPercent}%` : ''})</span></Label>
+                        <NumberInput
+                            id="ni-markup"
+                            placeholder="Optional"
+                            value={markup}
+                            onChange={setMarkup}
                         />
                     </div>
                     <div className="grid grid-cols-3 gap-3">

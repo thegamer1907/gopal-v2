@@ -1230,3 +1230,17 @@ have to re-litigate.
 - **Not included (not asked):** a manual "Back up now", a restore UI (restore = Open existing database…),
   a backup before **Wipe database** — worth considering, since Wipe is the one irreversible action.
 
+### 2026-11-26 — Add Order "Final Rate" with optional markup
+- **Decision:** Add Order shows a read-only **Final Rate** per line = the item's latest purchase-bill final rate
+  (same "latest" rule and `calcLine` as the Stock Report) × (1 + markup/100), INR, 2 dp. Markup is optional at two
+  levels — `companies.markup_percent` and `items.markup_percent` (migrations 15/16, nullable). **Item overrides
+  company; neither set → no markup.** NULL means "not set" and 0 is a real value, so an item at 0% cancels a
+  company markup. No purchase bill → `—`.
+- **Why:** a reference to help the user pick the selling Rate. Computed on read from the bills and masters, never
+  stored (house rule); display-only so it isn't on the saved order, order view or exports.
+- **How:** `lib/markup.ts` (`effectiveMarkup`, `applyMarkup`, `finalRateByItem`); the "latest line per item" logic was
+  extracted from `computeStockRows` into `latestLineByItem` in `lib/stockReport.ts` and is shared. `Item` carries a
+  read-only `companyMarkupPercent` (JOIN) so the frontend resolves the effective markup from an item alone. Go
+  `AddCompany/UpdateCompany/AddItem/UpdateItem` take a `*float64` markup (JS `null` = not set).
+- **Alternatives:** store the marked-up rate on the order line (rejected: derivable, would go stale); default 0
+  instead of NULL (rejected: can't tell "inherit" from "explicit 0%").

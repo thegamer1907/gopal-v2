@@ -3,6 +3,8 @@ import {AddCompany} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {markupFromInput, markupToInput} from '@/lib/markup';
+import {NumberInput} from '@/components/NumberInput';
 import {Label} from '@/components/ui/label';
 import {
     Dialog,
@@ -25,6 +27,7 @@ interface Props {
 
 export function NewCompanyDialog({open, onOpenChange, initialName, onCreated}: Props) {
     const [name, setName] = useState('');
+    const [markup, setMarkup] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -32,6 +35,7 @@ export function NewCompanyDialog({open, onOpenChange, initialName, onCreated}: P
     useEffect(() => {
         if (open) {
             setName(initialName);
+            setMarkup('');
             setError('');
         }
     }, [open, initialName]);
@@ -41,7 +45,7 @@ export function NewCompanyDialog({open, onOpenChange, initialName, onCreated}: P
         if (!trimmed) return;
         setSaving(true);
         try {
-            const created = await AddCompany(trimmed);
+            const created = await AddCompany(trimmed, markupFromInput(markup));
             onCreated(created);
             onOpenChange(false);
         } catch (e: any) {
@@ -76,6 +80,15 @@ export function NewCompanyDialog({open, onOpenChange, initialName, onCreated}: P
                             autoComplete="off"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="nc-markup">Markup % <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <NumberInput
+                            id="nc-markup"
+                            placeholder="e.g. 3"
+                            value={markup}
+                            onChange={setMarkup}
                         />
                     </div>
                     {error && <p className="text-sm text-destructive">{error}</p>}

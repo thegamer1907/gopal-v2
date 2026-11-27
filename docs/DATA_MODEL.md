@@ -67,6 +67,8 @@ company — the same item name can exist under different companies.
 | `hsn` | INTEGER NOT NULL DEFAULT 0 | HSN code, numeric (label: **HSN**) |
 | `tax_name` | TEXT NOT NULL DEFAULT '' | optional, info-only "Tax Name" (nothing reads it yet); `''` = none. Added as `nick_name` by migration 12, renamed by migration 13. Not part of the unique key |
 
+| `markup_percent` | REAL (nullable) | optional per-item markup %, **NULL = not set → inherit the company's**; `0` is a real value (cancels the company's). Migration 16 |
+
 UNIQUE: `(company_id, name, pack_size)`. Foreign key: `(company_id)` → `companies(id)`.
 Created **after** `companies` (FK target).
 
@@ -94,8 +96,9 @@ Created **first** (migration id 1) so it's a valid FK target for `items` and `pu
 |--------|------|-------|
 | `id` | INTEGER PRIMARY KEY AUTOINCREMENT | surrogate key (FK target for bills) |
 | `name` | TEXT NOT NULL UNIQUE | company name (label: **Company**) |
+| `markup_percent` | REAL (nullable) | optional markup % added to the final rate on Add Order; NULL = none. Migration 15 |
 
-> Go: `db.Company` (`id`, `name`) + `AddCompany`/`ListCompanies` in `internal/db/companies.go`;
+> Go: `db.Company` (`id`, `name`, `markupPercent *float64`) + `AddCompany`/`ListCompanies` in `internal/db/companies.go`;
 > exposed via `app.go`. UI mirrors the Items pattern: a master page (`/companies`) plus a
 > `CompanyCombobox` + `NewCompanyDialog` for picking/adding inline on the bill header.
 

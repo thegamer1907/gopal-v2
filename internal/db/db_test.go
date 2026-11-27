@@ -15,12 +15,12 @@ func TestItemsRoundTripAndPersistence(t *testing.T) {
 		t.Fatalf("OpenAt: %v", err)
 	}
 
-	company, err := AddCompany(conn, "Acme")
+	company, err := AddCompany(conn, "Acme", nil)
 	if err != nil {
 		t.Fatalf("AddCompany: %v", err)
 	}
 
-	added, err := AddItem(conn, company.ID, "widget", 100, 18, 3402, "")
+	added, err := AddItem(conn, company.ID, "widget", 100, 18, 3402, "", nil)
 	if err != nil {
 		t.Fatalf("AddItem: %v", err)
 	}
@@ -72,13 +72,13 @@ func TestMastersEditAndDelete(t *testing.T) {
 	}
 	defer conn.Close()
 
-	company, err := AddCompany(conn, "Acme")
+	company, err := AddCompany(conn, "Acme", nil)
 	if err != nil {
 		t.Fatalf("AddCompany: %v", err)
 	}
 
 	// Rename the company.
-	if _, err := UpdateCompany(conn, company.ID, "Acme Corp"); err != nil {
+	if _, err := UpdateCompany(conn, company.ID, "Acme Corp", nil); err != nil {
 		t.Fatalf("UpdateCompany: %v", err)
 	}
 	cos, _ := ListCompanies(conn)
@@ -86,7 +86,7 @@ func TestMastersEditAndDelete(t *testing.T) {
 		t.Fatalf("UpdateCompany not applied: %+v", cos)
 	}
 
-	item, err := AddItem(conn, company.ID, "widget", 100, 18, 3402, "")
+	item, err := AddItem(conn, company.ID, "widget", 100, 18, 3402, "", nil)
 	if err != nil {
 		t.Fatalf("AddItem: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestMastersEditAndDelete(t *testing.T) {
 	}
 
 	// Update the item, then delete it; afterwards the company can be deleted.
-	if _, err := UpdateItem(conn, item.ID, company.ID, "gadget", 50, 12, 1111, "gad"); err != nil {
+	if _, err := UpdateItem(conn, item.ID, company.ID, "gadget", 50, 12, 1111, "gad", nil); err != nil {
 		t.Fatalf("UpdateItem: %v", err)
 	}
 	items, _ := ListItems(conn)
@@ -114,5 +114,62 @@ func TestMastersEditAndDelete(t *testing.T) {
 	cos, _ = ListCompanies(conn)
 	if len(cos) != 0 {
 		t.Fatalf("company should be gone, got %+v", cos)
+	}
+}
+
+// Markup % is optional at both levels: nil (not set) must stay distinct from 0 (a real value
+// that lets an item cancel its company's markup), and the item read carries the company's.
+func TestMarkupPercentNilVsZero(t *testing.T) {
+	conn, err := OpenAt(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+	defer conn.Close()
+
+	three, zero := 3.0, 0.0
+	company, err := AddCompany(conn, "Acme", &three)
+	if err != nil {
+		t.Fatalf("AddCompany: %v", err)
+	}
+	plain, err := AddItem(conn, company.ID, "plain", 10, 18, 1, "", nil)
+	if err != nil {
+		t.Fatalf("AddItem: %v", err)
+	}
+	cancel, err := AddItem(conn, company.ID, "cancel", 10, 18, 1, "", &zero)
+	if err != nil {
+		t.Fatalf("AddItem: %v", err)
+	}
+
+	items, _ := ListItems(conn)
+	byID := map[int64]Item{}
+	for _, it := range items {
+		byID[it.ID] = it
+	}
+	if byID[plain.ID].MarkupPercent != nil {
+		t.Fatalf("unset item markup should be nil, got %v", *byID[plain.ID].MarkupPercent)
+	}
+	if m := byID[cancel.ID].MarkupPercent; m == nil || *m != 0 {
+		t.Fatalf("item markup 0 should round-trip as 0, got %v", m)
+	}
+	if m := byID[plain.ID].CompanyMarkupPercent; m == nil || *m != 3 {
+		t.Fatalf("item should carry company markup 3, got %v", m)
+	}
+
+	// Clearing the company markup (nil) and the item's override.
+	if _, err := UpdateCompany(conn, company.ID, "Acme", nil); err != nil {
+		t.Fatalf("UpdateCompany: %v", err)
+	}
+	if _, err := UpdateItem(conn, cancel.ID, company.ID, "cancel", 10, 18, 1, "", nil); err != nil {
+		t.Fatalf("UpdateItem: %v", err)
+	}
+	cos, _ := ListCompanies(conn)
+	if cos[0].MarkupPercent != nil {
+		t.Fatalf("cleared company markup should be nil, got %v", *cos[0].MarkupPercent)
+	}
+	items, _ = ListItems(conn)
+	for _, it := range items {
+		if it.MarkupPercent != nil || it.CompanyMarkupPercent != nil {
+			t.Fatalf("expected all markups nil after clearing: %+v", it)
+		}
 	}
 }

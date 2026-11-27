@@ -1,6 +1,7 @@
 import {useEffect, useMemo, useState} from 'react';
 import {Info, Package, Pencil, Plus, Search, Trash2} from 'lucide-react';
 import {AddItem, DeleteItem, GetItemRateHistory, ListItems, ListCompanies} from '../../wailsjs/go/main/App';
+import {markupFromInput} from '@/lib/markup';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -44,6 +45,7 @@ export function Items() {
     const [gstPercent, setGstPercent] = useState('');
     const [hsn, setHsn] = useState('');
     const [taxName, setTaxName] = useState('');
+    const [markup, setMarkup] = useState('');
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<db.Item | null>(null);
@@ -58,7 +60,7 @@ export function Items() {
     const isValid = company !== null && fields.every((v) => v.trim() !== '');
     // Dirty (warn before leaving) once any item field has content (company alone
     // isn't "unsaved work").
-    const isDirty = [...fields, taxName].some((v) => v.trim() !== '');
+    const isDirty = [...fields, taxName, markup].some((v) => v.trim() !== '');
 
     useEffect(() => {
         setDirty(isDirty);
@@ -101,6 +103,7 @@ export function Items() {
             gstPercent: (it) => it.gstPercent,
             hsn: (it) => it.hsn,
             taxName: (it) => it.taxName,
+            markup: (it) => it.markupPercent ?? it.companyMarkupPercent ?? -1,
             stockDelivered: (it) => it.stockDelivered,
             stockInclUndelivered: (it) => it.stockInclUndelivered,
         },
@@ -110,13 +113,14 @@ export function Items() {
     async function add() {
         if (!isValid || !company) return;
         try {
-            await AddItem(company.id, name.trim(), parseFloat(packSize) || 0, parseFloat(gstPercent) || 0, parseInt(hsn, 10) || 0, taxName.trim());
+            await AddItem(company.id, name.trim(), parseFloat(packSize) || 0, parseFloat(gstPercent) || 0, parseInt(hsn, 10) || 0, taxName.trim(), markupFromInput(markup));
             // Keep the company selected for quick consecutive adds; clear the rest.
             setName('');
             setPackSize('');
             setGstPercent('');
             setHsn('');
             setTaxName('');
+            setMarkup('');
             await refresh();
         } catch (e: any) {
             setError(String(e));
@@ -189,6 +193,15 @@ export function Items() {
                                 autoComplete="off"
                                 value={taxName}
                                 onChange={(e) => setTaxName(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid gap-2 w-28">
+                            <Label htmlFor="markup">Markup %</Label>
+                            <NumberInput
+                                id="markup"
+                                placeholder="Optional"
+                                value={markup}
+                                onChange={setMarkup}
                             />
                         </div>
                         <div className="grid gap-2 w-32">
@@ -266,6 +279,7 @@ export function Items() {
                                     <SortableHeader label="Pack Size" sortKey="packSize" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
                                     <SortableHeader label="GST %" sortKey="gstPercent" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <SortableHeader label="HSN" sortKey="hsn" activeKey={sortKey} dir={sortDir} onSort={toggle}/>
+                                    <SortableHeader label="Markup %" sortKey="markup" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <SortableHeader label="Stock" sortKey="stockDelivered" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <SortableHeader label="Stock incl. Undelivered" sortKey="stockInclUndelivered" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <TableHead className="w-32 pr-4 text-right">Actions</TableHead>
@@ -280,6 +294,13 @@ export function Items() {
                                         <TableCell>{it.packSize}</TableCell>
                                         <TableCell className="text-right tabular-nums">{it.gstPercent}</TableCell>
                                         <TableCell>{it.hsn}</TableCell>
+                                        <TableCell className="text-right tabular-nums">
+                                            {it.markupPercent != null
+                                                ? it.markupPercent
+                                                : it.companyMarkupPercent != null && (
+                                                    <span className="text-muted-foreground" title="Inherited from the company">{it.companyMarkupPercent}</span>
+                                                )}
+                                        </TableCell>
                                         <TableCell className="text-right tabular-nums">{fmtQty(it.stockDelivered)}</TableCell>
                                         <TableCell className="text-right tabular-nums">{fmtQty(it.stockInclUndelivered)}</TableCell>
                                         <TableCell className="pr-4 text-right">

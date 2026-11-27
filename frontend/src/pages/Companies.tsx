@@ -4,6 +4,8 @@ import {AddCompany, DeleteCompany, ListCompanies} from '../../wailsjs/go/main/Ap
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {NumberInput} from '@/components/NumberInput';
+import {markupFromInput} from '@/lib/markup';
 import {Label} from '@/components/ui/label';
 import {EditCompanyDialog} from '@/components/EditCompanyDialog';
 import {SortableHeader} from '@/components/SortableHeader';
@@ -34,6 +36,7 @@ import {
 export function Companies() {
     const [companies, setCompanies] = useState<db.Company[]>([]);
     const [name, setName] = useState('');
+    const [markup, setMarkup] = useState('');
     const [error, setError] = useState('');
     const [editing, setEditing] = useState<db.Company | null>(null);
     const [deleting, setDeleting] = useState<db.Company | null>(null);
@@ -47,14 +50,14 @@ export function Companies() {
 
     const {sorted, sortKey, sortDir, toggle} = useTableSort(
         filtered,
-        {company: (c) => c.name},
+        {company: (c) => c.name, markup: (c) => c.markupPercent ?? -1},
         {key: 'company', dir: 'asc'},
     );
 
     // Name is mandatory — Add is enabled only when it's filled; dirty (warn before
     // leaving) once it has content.
     const isValid = name.trim() !== '';
-    const isDirty = isValid;
+    const isDirty = isValid || markup.trim() !== '';
 
     useEffect(() => {
         setDirty(isDirty);
@@ -78,8 +81,9 @@ export function Companies() {
     async function add() {
         if (!isValid) return;
         try {
-            await AddCompany(name.trim());
+            await AddCompany(name.trim(), markupFromInput(markup));
             setName('');
+            setMarkup('');
             await refresh();
         } catch (e: any) {
             setError(String(e));
@@ -118,6 +122,15 @@ export function Companies() {
                                 autoComplete="off"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid gap-2 w-32">
+                            <Label htmlFor="markup" className="sr-only">Markup %</Label>
+                            <NumberInput
+                                id="markup"
+                                placeholder="Markup %"
+                                value={markup}
+                                onChange={setMarkup}
                             />
                         </div>
                         <Button type="submit" disabled={!isValid}>
@@ -163,6 +176,7 @@ export function Companies() {
                             <TableHeader>
                                 <TableRow>
                                     <SortableHeader label="Company" sortKey="company" activeKey={sortKey} dir={sortDir} onSort={toggle} className="pl-4"/>
+                                    <SortableHeader label="Markup %" sortKey="markup" activeKey={sortKey} dir={sortDir} onSort={toggle} align="right"/>
                                     <TableHead className="w-24 pr-4 text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -170,6 +184,7 @@ export function Companies() {
                                 {sorted.map((c) => (
                                     <TableRow key={c.id}>
                                         <TableCell className="pl-4 font-medium">{c.name}</TableCell>
+                                        <TableCell className="text-right tabular-nums">{c.markupPercent ?? ''}</TableCell>
                                         <TableCell className="pr-4 text-right">
                                             <div className="flex justify-end gap-1">
                                                 <Button

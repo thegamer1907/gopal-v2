@@ -9,13 +9,14 @@ import (
 // and survive renames); `name` is unique. For now just those two; more columns will
 // follow. See docs/DATA_MODEL.md (companies table).
 type Company struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID            int64    `json:"id"`
+	Name          string   `json:"name"`
+	MarkupPercent *float64 `json:"markupPercent"` // optional; nil = none
 }
 
 // AddCompany inserts a new company and returns it with its assigned id. Name must be unique.
-func AddCompany(conn *sql.DB, name string) (Company, error) {
-	res, err := conn.Exec(`INSERT INTO companies (name) VALUES (?)`, name)
+func AddCompany(conn *sql.DB, name string, markupPercent *float64) (Company, error) {
+	res, err := conn.Exec(`INSERT INTO companies (name, markup_percent) VALUES (?, ?)`, name, markupPercent)
 	if err != nil {
 		return Company{}, fmt.Errorf("insert company: %w", err)
 	}
@@ -23,15 +24,15 @@ func AddCompany(conn *sql.DB, name string) (Company, error) {
 	if err != nil {
 		return Company{}, fmt.Errorf("company id: %w", err)
 	}
-	return Company{ID: id, Name: name}, nil
+	return Company{ID: id, Name: name, MarkupPercent: markupPercent}, nil
 }
 
-// UpdateCompany renames a company and returns the updated record. Name must stay unique.
-func UpdateCompany(conn *sql.DB, id int64, name string) (Company, error) {
-	if _, err := conn.Exec(`UPDATE companies SET name = ? WHERE id = ?`, name, id); err != nil {
+// UpdateCompany renames a company / sets its markup and returns the updated record. Name must stay unique.
+func UpdateCompany(conn *sql.DB, id int64, name string, markupPercent *float64) (Company, error) {
+	if _, err := conn.Exec(`UPDATE companies SET name = ?, markup_percent = ? WHERE id = ?`, name, markupPercent, id); err != nil {
 		return Company{}, fmt.Errorf("update company: %w", err)
 	}
-	return Company{ID: id, Name: name}, nil
+	return Company{ID: id, Name: name, MarkupPercent: markupPercent}, nil
 }
 
 // DeleteCompany removes a company. It refuses (with a friendly error) when items or
@@ -56,7 +57,7 @@ func DeleteCompany(conn *sql.DB, id int64) error {
 
 // ListCompanies returns all companies, ordered by name.
 func ListCompanies(conn *sql.DB) ([]Company, error) {
-	rows, err := conn.Query(`SELECT id, name FROM companies ORDER BY name`)
+	rows, err := conn.Query(`SELECT id, name, markup_percent FROM companies ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("query companies: %w", err)
 	}
@@ -65,7 +66,7 @@ func ListCompanies(conn *sql.DB) ([]Company, error) {
 	companies := []Company{}
 	for rows.Next() {
 		var c Company
-		if err := rows.Scan(&c.ID, &c.Name); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.MarkupPercent); err != nil {
 			return nil, fmt.Errorf("scan company: %w", err)
 		}
 		companies = append(companies, c)

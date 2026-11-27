@@ -81,8 +81,8 @@ func (a *App) shutdown(ctx context.Context) {
 }
 
 // AddItem creates an item master record (for a company) and returns the stored record.
-func (a *App) AddItem(companyID int64, name string, packSize, gstPercent float64, hsn int64, taxName string) (db.Item, error) {
-	return db.AddItem(a.db, companyID, name, packSize, gstPercent, hsn, taxName)
+func (a *App) AddItem(companyID int64, name string, packSize, gstPercent float64, hsn int64, taxName string, markupPercent *float64) (db.Item, error) {
+	return db.AddItem(a.db, companyID, name, packSize, gstPercent, hsn, taxName, markupPercent)
 }
 
 // ListItems returns all inventory items (with their company name), ordered by company then item.
@@ -96,8 +96,8 @@ func (a *App) ListItemsByCompany(companyID int64) ([]db.Item, error) {
 }
 
 // UpdateItem overwrites an item's editable fields (including its company).
-func (a *App) UpdateItem(id, companyID int64, name string, packSize, gstPercent float64, hsn int64, taxName string) (db.Item, error) {
-	return db.UpdateItem(a.db, id, companyID, name, packSize, gstPercent, hsn, taxName)
+func (a *App) UpdateItem(id, companyID int64, name string, packSize, gstPercent float64, hsn int64, taxName string, markupPercent *float64) (db.Item, error) {
+	return db.UpdateItem(a.db, id, companyID, name, packSize, gstPercent, hsn, taxName, markupPercent)
 }
 
 // DeleteItem removes an item (refused if bill lines still reference it).
@@ -106,13 +106,13 @@ func (a *App) DeleteItem(id int64) error {
 }
 
 // AddCompany creates a company master record and returns the stored record.
-func (a *App) AddCompany(name string) (db.Company, error) {
-	return db.AddCompany(a.db, name)
+func (a *App) AddCompany(name string, markupPercent *float64) (db.Company, error) {
+	return db.AddCompany(a.db, name, markupPercent)
 }
 
 // UpdateCompany renames a company and returns the updated record.
-func (a *App) UpdateCompany(id int64, name string) (db.Company, error) {
-	return db.UpdateCompany(a.db, id, name)
+func (a *App) UpdateCompany(id int64, name string, markupPercent *float64) (db.Company, error) {
+	return db.UpdateCompany(a.db, id, name, markupPercent)
 }
 
 // DeleteCompany removes a company (refused if items/bills still reference it).

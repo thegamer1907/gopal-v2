@@ -233,7 +233,7 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   `ItemCombobox` is reused as-is with a new `showCompany` flag turned on, so its dropdown
   shows the item's company alongside pack size (needed now that the same item name can
   exist under different companies). **Column order**: Item · Pack Size · GST % · HSN ·
-  **Stock · Stock incl. Undelivered** (both read-only, from the selected item) · **Rate · Qty** (inputs) ·
+  **Stock · Stock incl. Undelivered** (both read-only, from the selected item) · **Final Rate** (read-only, see below) · **Rate · Qty** (inputs) ·
   **Final Amount** (calculated, shaded band) · info button · delete.
 - **Delivered orders are locked down** (edit mode only). The heading gains a
   **`Delivered #N`** badge and, in place of the Mark-delivered button, the line
@@ -248,6 +248,9 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   and a "Order marked delivered as #N." message all appear in place without navigating
   away. There is no un-mark — delivery is one-way. The same button/dialog is also offered
   from the order's read-only detail view (`SavedOrders.tsx`'s `OrderDetail`).
+- **Final Rate** (2026-11-26, muted, read-only, between Stock incl. Undelivered and Rate): the item's latest purchase-bill final rate
+  + markup, 2 dp, INR; a small `+N%` shows under it when a markup applied; `—` if the item has no purchase bill. Display-only — not saved
+  on the order or in any export. Markup = the item's own % → else its company's % → else none (an item at 0 cancels the company's).
 - **Stock / Stock incl. Undelivered** (2026-10-29): on-hand quantity for the selected item —
   total purchased minus delivered orders / minus all orders, **derived** (not stored; see `docs/DATA_MODEL.md`'s `items.stock` note), already
   present on every cached item so it needs no extra fetch. The cached item list is
@@ -330,9 +333,10 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
     invalidate or resync.
 
 ### Items (`/items`) — item master
-- An untitled company-scoped add card (**Company, Item, Tax Name (optional), Pack Size, GST %, HSN** + Add; Tax Name is also a table column and a field in New/Edit Item dialogs — info-only, not used in any export),
+- An untitled company-scoped add card (**Company, Item, Tax Name (optional), Markup % (optional), Pack Size, GST %, HSN** + Add; Tax Name is also a table column and a field in New/Edit Item dialogs — info-only, not used in any export),
   and a card whose header is just the search box and the item count, over the items table (Company / Item / Pack Size / GST % / HSN /
-  **Stock · Stock incl. Undelivered** + **Actions**; Tax Name sits after Item). Pack Size / GST % / HSN use `NumberInput` (no spinner); same
+  **Markup % · Stock · Stock incl. Undelivered** + **Actions**; Tax Name sits after Item). The Markup % column shows the item's own value, or the
+  company's in muted text when inherited; the New/Edit Item dialogs label it "blank uses the company's N%". Pack Size / GST % / HSN use `NumberInput` (no spinner); same
   in the on-the-fly `NewItemDialog`.
 - **Stock** (delivered orders only) and **Stock incl. Undelivered** (all orders) are current on-hand quantities — total purchased minus sold, **derived**
   on every read (not a stored column; see `docs/DATA_MODEL.md`), sortable like every
@@ -345,8 +349,8 @@ The client's standing feedback is that the UI **uses too much space**, so a dens
   and **Delete** (controlled `AlertDialog`; backend refuses if bill lines reference it).
 
 ### Companies (`/companies`) — company master
-- A live company count, an "Add company" card (just **Company name** + Add — name only), and a
-  card with the companies table (Company + **Actions**). Built with shadcn
+- A live company count, an "Add company" card (**Company name** + optional **Markup %** + Add), and a
+  card with the companies table (Company + sortable **Markup %** + **Actions**; Markup % is also a field in the New/Edit Company dialogs). Built with shadcn
   `Card`/`Input`/`Label`/`Button`/`Table`.
 - **Search box** (by name) + a **sortable** Company header. Each row has **Edit**
   (`EditCompanyDialog` rename) and **Delete** (controlled `AlertDialog`; backend refuses if items

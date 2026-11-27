@@ -5,6 +5,27 @@ import {db, reports} from '../../wailsjs/go/models';
 import {parseDate} from '@/lib/date';
 import {calcLine} from '@/lib/purchaseBill';
 
+// latestLineByItem finds each item's LATEST purchase-bill line (greatest bill date, then
+// highest bill id; within a bill, the last line for that item), optionally only bills dated
+// on/before `cutoffEnd`. Shared by the Stock Report and Add Order's marked-up Final Rate.
+export function latestLineByItem(
+    bills: db.PurchaseBill[],
+    cutoffEnd?: Date,
+): Map<number, {date: Date; billId: number; line: db.PurchaseBillItem}> {
+    const latest = new Map<number, {date: Date; billId: number; line: db.PurchaseBillItem}>();
+    for (const bill of bills) {
+        const d = parseDate(bill.date);
+        if (!d || (cutoffEnd && d > cutoffEnd)) continue;
+        for (const it of bill.items) {
+            const prev = latest.get(it.itemId);
+            if (!prev || d > prev.date || (d.getTime() === prev.date.getTime() && bill.id >= prev.billId)) {
+                latest.set(it.itemId, {date: d, billId: bill.id, line: it});
+            }
+        }
+    }
+    return latest;
+}
+
 // computeStockRows sums every purchase/sale line up to (and including) the cutoff date
 // — the same purchased-minus-sold formula items.go's itemSelect uses for the live
 // "today" stock figure, just re-derived here per item so an arbitrary past date can be
@@ -18,22 +39,17 @@ export function computeStockRows(
     if (!cutoff) return [];
     const cutoffEnd = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate(), 23, 59, 59, 999);
 
-    // Per item: total purchased, plus its LATEST purchase-bill line on/before the cutoff
-    // (greatest date, then highest bill id; within a bill, the last line for that item) —
+    // Per item: total purchased, plus its LATEST purchase-bill line on/before the cutoff —
     // that line's rates drive the Final/Billing Rate columns.
     const purchasedByItem = new Map<number, number>();
-    const latestLine = new Map<number, {date: Date; billId: number; line: db.PurchaseBillItem}>();
     for (const bill of bills) {
         const d = parseDate(bill.date);
         if (!d || d > cutoffEnd) continue;
         for (const it of bill.items) {
             purchasedByItem.set(it.itemId, (purchasedByItem.get(it.itemId) ?? 0) + it.taxQty + it.dQty);
-            const prev = latestLine.get(it.itemId);
-            if (!prev || d > prev.date || (d.getTime() === prev.date.getTime() && bill.id >= prev.billId)) {
-                latestLine.set(it.itemId, {date: d, billId: bill.id, line: it});
-            }
         }
     }
+    const latestLine = latestLineByItem(bills, cutoffEnd);
 
     // Main Quantity counts delivered orders only; the last column also counts undelivered
     // ones (a delivered order's date is its delivery date, so the cutoff applies as-is).

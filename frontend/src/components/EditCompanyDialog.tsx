@@ -3,6 +3,8 @@ import {UpdateCompany} from '../../wailsjs/go/main/App';
 import {db} from '../../wailsjs/go/models';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {markupFromInput, markupToInput} from '@/lib/markup';
+import {NumberInput} from '@/components/NumberInput';
 import {Label} from '@/components/ui/label';
 import {
     Dialog,
@@ -24,6 +26,7 @@ interface Props {
 
 export function EditCompanyDialog({open, onOpenChange, company, onUpdated}: Props) {
     const [name, setName] = useState('');
+    const [markup, setMarkup] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -31,6 +34,7 @@ export function EditCompanyDialog({open, onOpenChange, company, onUpdated}: Prop
     useEffect(() => {
         if (open && company) {
             setName(company.name);
+            setMarkup(markupToInput(company.markupPercent));
             setError('');
         }
     }, [open, company]);
@@ -40,7 +44,7 @@ export function EditCompanyDialog({open, onOpenChange, company, onUpdated}: Prop
         if (!trimmed || !company) return;
         setSaving(true);
         try {
-            const updated = await UpdateCompany(company.id, trimmed);
+            const updated = await UpdateCompany(company.id, trimmed, markupFromInput(markup));
             onUpdated(updated);
             onOpenChange(false);
         } catch (e: any) {
@@ -75,6 +79,15 @@ export function EditCompanyDialog({open, onOpenChange, company, onUpdated}: Prop
                             autoComplete="off"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="ec-markup">Markup % <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <NumberInput
+                            id="ec-markup"
+                            placeholder="e.g. 3"
+                            value={markup}
+                            onChange={setMarkup}
                         />
                     </div>
                     {error && <p className="text-sm text-destructive">{error}</p>}

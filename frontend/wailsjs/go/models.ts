@@ -3,6 +3,7 @@ export namespace db {
 	export class Company {
 	    id: number;
 	    name: string;
+	    markupPercent?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Company(source);
@@ -12,6 +13,7 @@ export namespace db {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.markupPercent = source["markupPercent"];
 	    }
 	}
 	export class Customer {
@@ -71,6 +73,8 @@ export namespace db {
 	    gstPercent: number;
 	    hsn: number;
 	    taxName: string;
+	    markupPercent?: number;
+	    companyMarkupPercent?: number;
 	    stockDelivered: number;
 	    stockInclUndelivered: number;
 	
@@ -88,6 +92,8 @@ export namespace db {
 	        this.gstPercent = source["gstPercent"];
 	        this.hsn = source["hsn"];
 	        this.taxName = source["taxName"];
+	        this.markupPercent = source["markupPercent"];
+	        this.companyMarkupPercent = source["companyMarkupPercent"];
 	        this.stockDelivered = source["stockDelivered"];
 	        this.stockInclUndelivered = source["stockInclUndelivered"];
 	    }

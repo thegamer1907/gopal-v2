@@ -1,8 +1,9 @@
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {useParams, useNavigate} from 'react-router-dom';
 import {Plus, Trash2, Save, Info, Calendar as CalendarIcon, CheckCircle2} from 'lucide-react';
 import {
     ListCustomers,
+    ListPurchaseBills,
     ListItems,
     ListCompanies,
     AddSalesOrder,
@@ -41,6 +42,7 @@ import {Input} from '@/components/ui/input';
 import {cn} from '@/lib/utils';
 import {num, fmt, fmtQty} from '@/lib/purchaseBill';
 import {calcOrderLine} from '@/lib/salesOrder';
+import {applyMarkup, effectiveMarkup, finalRateByItem} from '@/lib/markup';
 import {formatDate, todayDate, parseDate, displayDate} from '@/lib/date';
 
 // Add Order — first piece of the Order Book / Sales feature. Header (Customer, Date)
@@ -139,13 +141,16 @@ export function AddOrder() {
 
     const [error, setError] = useState('');
     const [saved, setSaved] = useState('');
+    // itemId → final rate from the item's latest purchase bill (no entry = never purchased).
+    const [finalRates, setFinalRates] = useState<Map<number, number>>(new Map());
     const {setDirty} = useUnsavedChanges();
 
-    // Cache customers/items/companies once on load.
+    // Cache customers/items/companies (and each item's latest final rate) once on load.
     useEffect(() => {
         ListCustomers().then(setCustomersCache).catch((e) => setError(String(e)));
         ListItems().then(setItems).catch((e) => setError(String(e)));
         ListCompanies().then(setCompanies).catch((e) => setError(String(e)));
+        ListPurchaseBills().then((b) => setFinalRates(finalRateByItem(b))).catch((e) => setError(String(e)));
     }, []);
 
     // /orders/new and /orders/:id/edit share this component, so React Router doesn't
@@ -250,6 +255,20 @@ export function AddOrder() {
     useEffect(() => {
         lastRowRef.current?.scrollIntoView({behavior: 'smooth', block: 'center'});
     }, [lines.length]);
+
+    // Final Rate column: the item's latest purchase-bill final rate plus its effective markup
+    // (item's own %, else the company's, else none). "—" when there is no item or no bill yet.
+    function finalWithMarkup(item: db.Item | null) {
+        const base = item ? finalRates.get(item.id) : undefined;
+        if (!item || base === undefined) return '—';
+        const markup = effectiveMarkup(item);
+        return (
+            <>
+                {fmt(applyMarkup(base, markup))}
+                {markup !== 0 && <span className="block text-xs">+{markup}%</span>}
+            </>
+        );
+    }
 
     function updateLine(id: number, patch: Partial<Line>) {
         setLines((prev) => prev.map((l) => (l.id === id ? {...l, ...patch} : l)));
@@ -501,6 +520,7 @@ export function AddOrder() {
                                     <th className="w-14">HSN</th>
                                     <th className="w-16">Stock</th>
                                     <th className="w-20">Stock incl. Undelivered</th>
+                                    <th className="w-24">Final Rate</th>
                                     <th className="w-20">Rate</th>
                                     <th className="w-24 bg-muted/50">Final Amount</th>
                                     <th className="w-8"/>
@@ -562,6 +582,9 @@ export function AddOrder() {
                                             <td className="text-right tabular-nums text-muted-foreground">
                                                 {line.item ? fmtQty(line.item.stockInclUndelivered) : '—'}
                                             </td>
+                                            <td className="text-right tabular-nums text-muted-foreground">
+                                                {finalWithMarkup(line.item)}
+                                            </td>
                                             <td>
                                                 <NumberInput
                                                     className="w-20 text-right"
@@ -605,7 +628,7 @@ export function AddOrder() {
                                 <tr className="border-t-2 font-medium [&>td]:px-2 [&>td]:py-2 [&>td]:tabular-nums">
                                     <td/>
                                     <td className="text-right">{fmtQty(totals.qty)}</td>
-                                    <td colSpan={6} className="text-right text-muted-foreground">Totals</td>
+                                    <td colSpan={7} className="text-right text-muted-foreground">Totals</td>
                                     <td className="text-right bg-muted/50">{fmt(totals.finalAmount)}</td>
                                     <td colSpan={2}/>
                                 </tr>

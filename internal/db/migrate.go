@@ -176,6 +176,16 @@ var migrations = []migration{
 			FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
 		);`,
 	},
+	// Optional markup % added to an item's latest final rate on Add Order. NULL = not set
+	// (0 is a real value: an item at 0 cancels its company's markup).
+	{
+		id:  15,
+		sql: `ALTER TABLE companies ADD COLUMN markup_percent REAL;`,
+	},
+	{
+		id:  16,
+		sql: `ALTER TABLE items ADD COLUMN markup_percent REAL;`,
+	},
 }
 
 // backfillDeliveryNumbersSQL numbers the already-delivered orders 1..N in id order. Keyed

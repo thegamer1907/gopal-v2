@@ -26,15 +26,15 @@ func seedSales(t *testing.T) salesFixture {
 	}
 	t.Cleanup(func() { conn.Close() })
 
-	company, err := AddCompany(conn, "Acme")
+	company, err := AddCompany(conn, "Acme", nil)
 	if err != nil {
 		t.Fatalf("AddCompany: %v", err)
 	}
-	itemA, err := AddItem(conn, company.ID, "widget", 20, 18, 3402, "")
+	itemA, err := AddItem(conn, company.ID, "widget", 20, 18, 3402, "", nil)
 	if err != nil {
 		t.Fatalf("AddItem A: %v", err)
 	}
-	itemB, err := AddItem(conn, company.ID, "gizmo", 36, 12, 3403, "")
+	itemB, err := AddItem(conn, company.ID, "gizmo", 36, 12, 3403, "", nil)
 	if err != nil {
 		t.Fatalf("AddItem B: %v", err)
 	}
