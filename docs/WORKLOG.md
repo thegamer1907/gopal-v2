@@ -6,6 +6,16 @@ reads the top entry first.
 
 ---
 
+## 2026-11-27 — Sales Report column reorder
+**Did:** reordered columns per DECISIONS 2026-11-27 in `lib/reportColumns.ts` (`orderReportColumns`) and
+`internal/reports/order_report.go` (col constants, headers, widths); updated `order_report_test.go`. `go test`, `tsc` clean.
+**Verified live** in `wails dev` via Claude-in-Chrome: View shows the new order, Totals 237 / 2,50,008.50 under Qty/Final Amount.
+**Not driven:** a real Excel download (native Save dialog; layout covered by the Go test). Uncommitted.
+
+**Next steps:** user review; commit when asked.
+
+---
+
 ## 2026-11-26 — Order Report → Sales Report, + Company column
 **Did:** per DECISIONS 2026-11-26 (Sales Report). Renamed in `Reports.tsx` (list row, view title, filenames), the Excel
 sheet name and save-dialog title; added `Company` (before Item) to `orderReportColumns`, `OrderReportRow.CompanyName`

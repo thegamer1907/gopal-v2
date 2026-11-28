@@ -74,19 +74,19 @@ export const stockReportColumns: ReportColumn<reports.StockReportRow>[] = [
 ];
 
 export const orderReportColumns: ReportColumn<reports.OrderReportRow>[] = [
+    {header: 'Delivery #', align: 'center', cell: (r) => (r.deliveryNo > 0 ? plain(r.deliveryNo) : '')},
     {header: 'Date', align: 'center', cell: (r) => r.date},
     {header: 'Customer', cell: (r) => r.customerName},
     {header: 'City', cell: (r) => r.customerCity},
-    {header: 'Company', cell: (r) => r.companyName},
+    {header: 'Qty', align: 'center', cell: (r) => fmtQty(r.qty), total: (rs) => fmtQty(sum(rs, (r) => r.qty))},
     {header: 'Item', cell: (r) => r.itemName, total: 'Totals'},
     {header: 'Pack Size', align: 'center', cell: (r) => plain(r.packSize)},
-    {header: 'GST %', align: 'center', cell: (r) => pct(r.gstPercent)},
-    {header: 'HSN', align: 'center', cell: (r) => plain(r.hsn)},
-    {header: 'Qty', align: 'center', cell: (r) => fmtQty(r.qty), total: (rs) => fmtQty(sum(rs, (r) => r.qty))},
     {header: 'Rate', align: 'right', cell: (r) => fmt(r.rate)},
     {header: 'Final Amount', align: 'right', cell: (r) => fmt(r.finalAmount), total: (rs) => fmt(sum(rs, (r) => r.finalAmount))},
+    {header: 'Company', cell: (r) => r.companyName},
+    {header: 'GST %', align: 'center', cell: (r) => pct(r.gstPercent)},
+    {header: 'HSN', align: 'center', cell: (r) => plain(r.hsn)},
     {header: 'Delivered?', align: 'center', cell: (r) => (r.delivered ? 'Yes' : 'No')},
-    {header: 'Delivery #', align: 'center', cell: (r) => (r.deliveryNo > 0 ? plain(r.deliveryNo) : '')},
 ];
 
 // Resolves a column's Totals cell text ('' when the column has none).

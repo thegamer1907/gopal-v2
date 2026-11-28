@@ -32,40 +32,40 @@ const orderReportSheetName = "Sales Report"
 
 // Column layout (1-based). Keep in sync with the header/style setup below.
 const (
-	colORDate = iota + 1
+	colORDeliveryNo = iota + 1
+	colORDate
 	colORCustomer
 	colORCity
-	colORCompany
+	colORQty
 	colORItem
 	colORPackSize
-	colORGST
-	colORHSN
-	colORQty
 	colORRate
 	colORAmount
+	colORCompany
+	colORGST
+	colORHSN
 	colORDelivered
-	colORDeliveryNo
-	colORCount = colORDeliveryNo
+	colORCount = colORDelivered
 )
 
 var orderReportHeaders = [colORCount]string{
+	colORDeliveryNo - 1: "Delivery #",
 	colORDate - 1:       "Date",
 	colORCustomer - 1:   "Customer",
 	colORCity - 1:       "City",
-	colORCompany - 1:    "Company",
+	colORQty - 1:        "Qty",
 	colORItem - 1:       "Item",
 	colORPackSize - 1:   "Pack Size",
-	colORGST - 1:        "GST %",
-	colORHSN - 1:        "HSN",
-	colORQty - 1:        "Qty",
 	colORRate - 1:       "Rate",
 	colORAmount - 1:     "Final Amount",
+	colORCompany - 1:    "Company",
+	colORGST - 1:        "GST %",
+	colORHSN - 1:        "HSN",
 	colORDelivered - 1:  "Delivered?",
-	colORDeliveryNo - 1: "Delivery #",
 }
 
 var orderReportMoneyCols = []int{colORRate, colORAmount}
-var orderReportQtyCols = []int{colORPackSize, colORQty}
+var orderReportQtyCols = []int{colORQty, colORPackSize}
 
 // WriteOrderReport writes rows to a new "Sales Report" workbook at path: a bold header,
 // real typed date/number cells, a frozen + auto-filtered header row, and a bold Totals
@@ -334,10 +334,13 @@ func finishOrderReportLayout(f *excelize.File, totalsRow int) error {
 	if err := f.SetColWidth(orderReportSheetName, "A", lastCol, 14); err != nil {
 		return err
 	}
-	if err := f.SetColWidth(orderReportSheetName, "B", "B", 20); err != nil { // Customer, wider
+	if err := f.SetColWidth(orderReportSheetName, "C", "C", 20); err != nil { // Customer, wider
 		return err
 	}
-	if err := f.SetColWidth(orderReportSheetName, "D", "E", 22); err != nil { // Company + Item name, wider
+	if err := f.SetColWidth(orderReportSheetName, "F", "F", 22); err != nil { // Item name, wider
+		return err
+	}
+	if err := f.SetColWidth(orderReportSheetName, "J", "J", 22); err != nil { // Company, wider
 		return err
 	}
 

@@ -8,7 +8,7 @@ import (
 )
 
 // The Sales Report workbook (the Order Report's UI name) must carry a Company column between
-// City and Item, with Totals still under Item / Qty / Final Amount.
+// the new column sequence, with Totals still under Item / Qty / Final Amount.
 func TestWriteOrderReportHasCompanyColumn(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sales.xlsx")
 	rows := []OrderReportRow{
@@ -36,31 +36,31 @@ func TestWriteOrderReportHasCompanyColumn(t *testing.T) {
 		}
 		return v
 	}
-	wantHeaders := []string{"Date", "Customer", "City", "Company", "Item", "Pack Size", "GST %", "HSN", "Qty", "Rate", "Final Amount", "Delivered?", "Delivery #"}
+	wantHeaders := []string{"Delivery #", "Date", "Customer", "City", "Qty", "Item", "Pack Size", "Rate", "Final Amount", "Company", "GST %", "HSN", "Delivered?"}
 	for i, h := range wantHeaders {
 		ref, _ := excelize.CoordinatesToCellName(i+1, 1)
 		if got := cell(ref); got != h {
 			t.Errorf("header %s = %q, want %q", ref, got, h)
 		}
 	}
-	if got := cell("D2"); got != "Prayagh" {
-		t.Errorf("D2 company = %q, want Prayagh", got)
+	if got := cell("J2"); got != "Prayagh" {
+		t.Errorf("J2 company = %q, want Prayagh", got)
 	}
-	if got := cell("D3"); got != "Acme" {
-		t.Errorf("D3 company = %q, want Acme", got)
+	if got := cell("J3"); got != "Acme" {
+		t.Errorf("J3 company = %q, want Acme", got)
 	}
-	if got := cell("E2"); got != "Eclair" {
-		t.Errorf("E2 item = %q, want Eclair", got)
+	if got := cell("F2"); got != "Eclair" {
+		t.Errorf("F2 item = %q, want Eclair", got)
 	}
 
-	// Totals row (row 4): label under Item (E), sums under Qty (I) and Final Amount (K).
-	if got := cell("E4"); got != "Totals" {
-		t.Errorf("E4 = %q, want Totals", got)
+	// Totals row (row 4): label under Item (F), sums under Qty (E) and Final Amount (I).
+	if got := cell("F4"); got != "Totals" {
+		t.Errorf("F4 = %q, want Totals", got)
 	}
-	if got := cell("I4"); got != "10" {
-		t.Errorf("Qty total I4 = %q, want 10", got)
+	if got := cell("E4"); got != "10" {
+		t.Errorf("Qty total E4 = %q, want 10", got)
 	}
-	if got := cell("K4"); got != "1,120.00" {
-		t.Errorf("Final Amount total K4 = %q, want 1,120.00", got)
+	if got := cell("I4"); got != "1,120.00" {
+		t.Errorf("Final Amount total I4 = %q, want 1,120.00", got)
 	}
 }

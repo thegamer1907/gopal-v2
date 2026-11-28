@@ -1268,3 +1268,8 @@ have to re-litigate.
   from D to D:E). Not a pure frontend change: the Excel is written in Go. No schema change.
 - **Filter labels unchanged:** "All orders / Delivered only / Pending only" and "N lines across M orders" describe order
   status and counts, not the report's name.
+
+### 2026-11-27 — Sales Report column order
+- **Decision:** Sales Report (screen + Excel) columns are now: Delivery #, Date, Customer, City, Qty, Item, Pack Size,
+  Rate, Final Amount, Company, GST %, HSN, Delivered?. Totals still sum Qty and Final Amount (label under Item).
+- **Why:** user-requested layout (matches how they read/reconcile deliveries). Display-only; no data/schema change.
